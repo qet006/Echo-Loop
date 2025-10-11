@@ -67,10 +67,7 @@ class LibraryScreen extends StatelessWidget {
   }
 
   void _showAddAudioDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const _AddAudioDialog(),
-    );
+    showDialog(context: context, builder: (context) => const _AddAudioDialog());
   }
 }
 
@@ -82,14 +79,13 @@ class _AudioListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final playerProvider = context.watch<PlayerProvider>();
-    final isCurrentlyPlaying = playerProvider.currentAudioItem?.id == audioItem.id;
+    final isCurrentlyPlaying =
+        playerProvider.currentAudioItem?.id == audioItem.id;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       elevation: isCurrentlyPlaying ? 4 : 1,
-      color: isCurrentlyPlaying 
-          ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
-          : null,
+      color: null,
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: Theme.of(context).colorScheme.primaryContainer,
@@ -192,7 +188,9 @@ class _AudioListTile extends StatelessWidget {
           ),
           TextButton(
             onPressed: () {
-              context.read<AudioLibraryProvider>().removeAudioItem(audioItem.id);
+              context.read<AudioLibraryProvider>().removeAudioItem(
+                audioItem.id,
+              );
               Navigator.pop(context);
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),

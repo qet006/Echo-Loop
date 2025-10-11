@@ -28,13 +28,6 @@ class PlaybackControls extends StatelessWidget {
             onPressed: player.hasSentences ? () => player.nextSentence() : null,
             tooltip: 'Next Sentence',
           ),
-          const SizedBox(width: 24),
-          IconButton(
-            icon: const Icon(Icons.stop),
-            iconSize: 28,
-            onPressed: player.isPlaying ? () => player.stop() : null,
-            tooltip: 'Stop',
-          ),
         ],
       ),
     );

@@ -17,7 +17,8 @@ class PlayerProvider extends ChangeNotifier {
   Set<int> _bookmarkedIndices = {};
   
   bool _isLoading = false;
-  int _currentLoopCount = 0;
+  int _currentSentenceLoopCount = 0;  // 当前句子的循环次数
+  int _currentAudioLoopCount = 0;     // 当前音频的循环次数
   Timer? _pauseTimer;
   Timer? _sentenceEndTimer;
   StreamSubscription? _positionSubscription;
@@ -96,7 +97,8 @@ class PlayerProvider extends ChangeNotifier {
       _currentAudioItem = audioItem;
       _sentences = [];
       _currentSentenceIndex = null;
-      _currentLoopCount = 0;
+      _currentSentenceLoopCount = 0;
+      _currentAudioLoopCount = 0;
 
       // Load audio
       try {
@@ -146,63 +148,43 @@ class PlayerProvider extends ChangeNotifier {
     }
   }
 
+  // 播放音频：直接播放整个音频
   Future<void> play() async {
     if (_currentAudioItem == null) return;
-
-    if (_settings.mode == PlaybackMode.singleSentence) {
-      // If no sentence is selected, select the first one
-      if (_currentSentenceIndex == null) {
-        final targetSentences = _getTargetSentences();
-        if (targetSentences.isNotEmpty) {
-          await playSentence(targetSentences.first.index);
-        }
-      } else {
-        await playSentence(_currentSentenceIndex!);
-      }
-    } else if (_settings.mode == PlaybackMode.bookmarkedOnly) {
-      // Play bookmarked sentences with per-sentence control so loop/pause work
-      final bookmarked = bookmarkedSentences;
-      if (bookmarked.isEmpty) return;
-      
-      int targetIndex;
-      if (_currentSentenceIndex == null ||
-          !_bookmarkedIndices.contains(_currentSentenceIndex)) {
-        targetIndex = bookmarked.first.index;
-      } else {
-        targetIndex = _currentSentenceIndex!;
-      }
-      await playSentence(targetIndex);
-    } else {
-      await _audioPlayer.play();
-    }
+    await _audioPlayer.play();
   }
 
+  // 暂停播放
   Future<void> pause() async {
     await _audioPlayer.pause();
     _pauseTimer?.cancel();
     _sentenceEndTimer?.cancel();
   }
 
+  // 停止播放
   Future<void> stop() async {
     await _audioPlayer.stop();
     _pauseTimer?.cancel();
     _sentenceEndTimer?.cancel();
-    _currentLoopCount = 0;
+    _currentSentenceLoopCount = 0;
+    _currentAudioLoopCount = 0;
   }
 
   Future<void> seek(Duration position) async {
     await _audioPlayer.seek(position);
   }
 
+  // 播放单个句子（用于逐句精听）
   Future<void> playSentence(int index) async {
     if (index < 0 || index >= _sentences.length) return;
 
     _currentSentenceIndex = index;
-    _currentLoopCount = 0;
+    _currentSentenceLoopCount = 0;
     
     await _playSentenceInternal(index);
   }
 
+  // 内部方法：播放句子的实际逻辑
   Future<void> _playSentenceInternal(int index) async {
     if (_isDisposed) return;
     
@@ -210,11 +192,10 @@ class PlayerProvider extends ChangeNotifier {
     await _audioPlayer.seek(sentence.startTime);
     await _audioPlayer.play();
 
-    // Cancel any existing sentence end timer
+    // 取消现有的句子结束计时器
     _sentenceEndTimer?.cancel();
     
-    // Schedule pause at sentence end
-    // Adjust for current playback speed so the timer fires when audio reaches the end
+    // 根据播放速度调整计时器，使其在音频播放到句子结束时触发
     final speed = _audioPlayer.speed == 0 ? 1.0 : _audioPlayer.speed;
     final scaledMs = (sentence.duration.inMilliseconds / speed).round();
     final duration = Duration(milliseconds: scaledMs);
@@ -226,18 +207,20 @@ class PlayerProvider extends ChangeNotifier {
     });
   }
 
+  // 处理句子播放完成
   Future<void> _handleSentenceCompleted() async {
     if (_isDisposed) return;
 
-    // Check if we should loop this sentence
+    // 检查是否需要循环当前句子
     if (_settings.loopEnabled) {
-      _currentLoopCount++;
+      _currentSentenceLoopCount++;
       
-      // loopCount is clamped to 1-20; no infinite loop support
-      final shouldLoop = _currentLoopCount < _settings.loopCount;
+      // 句子循环次数：1-20次
+      final shouldLoop = _currentSentenceLoopCount < _settings.loopCount;
       
       if (shouldLoop && _currentSentenceIndex != null) {
         _pauseTimer?.cancel();
+        // 等待指定的间隔时间后重新播放句子
         _pauseTimer = Timer(_settings.pauseInterval, () async {
           if (!_isDisposed) {
             await _playSentenceInternal(_currentSentenceIndex!);
@@ -247,96 +230,75 @@ class PlayerProvider extends ChangeNotifier {
       }
     }
     
-    // Loop not enabled or loop completed
-    // In single sentence/bookmarked mode, move to next sentence and auto-play
-    if (_settings.mode == PlaybackMode.singleSentence ||
-        _settings.mode == PlaybackMode.bookmarkedOnly) {
-      _currentLoopCount = 0;
-      await nextSentence();
-      if (_currentSentenceIndex != null) {
-        await _playSentenceInternal(_currentSentenceIndex!);
-      }
-    }
+    // 句子循环完成或未启用循环，不自动播放下一句
+    // 用户需要手动点击下一句按钮
+    _currentSentenceLoopCount = 0;
   }
 
+  // 处理整个音频播放完成
   void _handlePlaybackCompleted() {
     if (_isDisposed) return;
     
-    if (_settings.mode == PlaybackMode.fullArticle && _settings.loopEnabled) {
-      _currentLoopCount++;
+    // 检查是否启用音频循环
+    // loopAudio: 0=无穷循环, 1-10=循环指定次数
+    if (_settings.loopAudioEnabled) {
+      _currentAudioLoopCount++;
       
-      // loopCount is clamped to 1-20; no infinite loop support
-      final shouldLoop = _currentLoopCount < _settings.loopCount;
+      // 判断是否继续循环
+      final shouldLoop = _settings.loopAudio == 0 || _currentAudioLoopCount < _settings.loopAudio;
       
       if (shouldLoop) {
         _pauseTimer?.cancel();
+        // 等待间隔时间后重新播放整个音频
         _pauseTimer = Timer(_settings.pauseInterval, () async {
           if (!_isDisposed) {
             await _audioPlayer.seek(Duration.zero);
             await _audioPlayer.play();
           }
         });
+      } else {
+        // 循环完成，重置计数
+        _currentAudioLoopCount = 0;
       }
     }
   }
 
+  // 跳转到下一句
   Future<void> nextSentence() async {
     if (_sentences.isEmpty) return;
-    
-    final targetSentences = _getTargetSentences();
-    if (targetSentences.isEmpty) return;
 
     int nextIndex;
     if (_currentSentenceIndex == null) {
-      nextIndex = targetSentences.first.index;
+      nextIndex = 0;
+    } else if (_currentSentenceIndex! >= _sentences.length - 1) {
+      // 已是最后一句，循环到第一句
+      nextIndex = 0;
     } else {
-      final currentPosInTarget = targetSentences.indexWhere(
-        (s) => s.index == _currentSentenceIndex
-      );
-      if (currentPosInTarget == -1 || currentPosInTarget >= targetSentences.length - 1) {
-        nextIndex = targetSentences.first.index;
-      } else {
-        nextIndex = targetSentences[currentPosInTarget + 1].index;
-      }
+      nextIndex = _currentSentenceIndex! + 1;
     }
 
-    // Just seek, don't auto-play
     _currentSentenceIndex = nextIndex;
     await seek(_sentences[nextIndex].startTime);
     notifyListeners();
   }
 
+  // 跳转到上一句
   Future<void> previousSentence() async {
     if (_sentences.isEmpty) return;
-    
-    final targetSentences = _getTargetSentences();
-    if (targetSentences.isEmpty) return;
 
     int prevIndex;
     if (_currentSentenceIndex == null) {
-      prevIndex = targetSentences.last.index;
+      prevIndex = _sentences.length - 1;
+    } else if (_currentSentenceIndex! <= 0) {
+      // 已是第一句，循环到最后一句
+      prevIndex = _sentences.length - 1;
     } else {
-      final currentPosInTarget = targetSentences.indexWhere(
-        (s) => s.index == _currentSentenceIndex
-      );
-      if (currentPosInTarget <= 0) {
-        prevIndex = targetSentences.last.index;
-      } else {
-        prevIndex = targetSentences[currentPosInTarget - 1].index;
-      }
+      prevIndex = _currentSentenceIndex! - 1;
     }
 
-    // Just seek, don't auto-play
     _currentSentenceIndex = prevIndex;
     await seek(_sentences[prevIndex].startTime);
     notifyListeners();
-  }
-
-  List<Sentence> _getTargetSentences() {
-    if (_settings.mode == PlaybackMode.bookmarkedOnly) {
-      return bookmarkedSentences;
-    }
-    return _sentences;
   }
 
   Future<void> toggleBookmark(int index) async {

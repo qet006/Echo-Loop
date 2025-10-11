@@ -180,4 +180,61 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get infinite => '无限';
+
+  @override
+  String get singleSentenceMode => '单句模式';
+
+  @override
+  String get singleSentenceModeDesc => '只展示当前播放的句子';
+
+  @override
+  String get sentenceRepeat => '句子重复';
+
+  @override
+  String get repeatCount => '重复次数';
+
+  @override
+  String get intervalTime => '间隔时间（秒）';
+
+  @override
+  String get audioLoop => '音频循环';
+
+  @override
+  String get loopTimes => '循环次数';
+
+  @override
+  String get noLoop => '不循环';
+
+  @override
+  String get infiniteLoop => '无穷 ∞';
+
+  @override
+  String get times => '次';
+
+  @override
+  String get fullText => '全文';
+
+  @override
+  String get bookmarked => '收藏';
+
+  @override
+  String get noSubtitle => '无字幕';
+
+  @override
+  String get noSentenceSelected => '未选择句子';
+
+  @override
+  String get noBookmarkedSentences => '没有收藏的句子';
+
+  @override
+  String get tapBookmarkIcon => '点击句子旁的书签图标收藏';
+
+  @override
+  String get removeBookmarkTip => '取消收藏';
+
+  @override
+  String get addBookmarkTip => '收藏';
+
+  @override
+  String get listMode => '列表模式';
 }

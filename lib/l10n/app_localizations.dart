@@ -439,6 +439,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'∞'**
   String get infinite;
+
+  /// No description provided for @singleSentenceMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Single Sentence Mode'**
+  String get singleSentenceMode;
+
+  /// No description provided for @singleSentenceModeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Show only current sentence'**
+  String get singleSentenceModeDesc;
+
+  /// No description provided for @sentenceRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Sentence Repeat'**
+  String get sentenceRepeat;
+
+  /// No description provided for @repeatCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat Count'**
+  String get repeatCount;
+
+  /// No description provided for @intervalTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Interval (seconds)'**
+  String get intervalTime;
+
+  /// No description provided for @audioLoop.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Loop'**
+  String get audioLoop;
+
+  /// No description provided for @loopTimes.
+  ///
+  /// In en, this message translates to:
+  /// **'Loop Count'**
+  String get loopTimes;
+
+  /// No description provided for @noLoop.
+  ///
+  /// In en, this message translates to:
+  /// **'No Loop'**
+  String get noLoop;
+
+  /// No description provided for @infiniteLoop.
+  ///
+  /// In en, this message translates to:
+  /// **'Infinite ∞'**
+  String get infiniteLoop;
+
+  /// No description provided for @times.
+  ///
+  /// In en, this message translates to:
+  /// **'times'**
+  String get times;
+
+  /// No description provided for @fullText.
+  ///
+  /// In en, this message translates to:
+  /// **'Full Text'**
+  String get fullText;
+
+  /// No description provided for @bookmarked.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmarked'**
+  String get bookmarked;
+
+  /// No description provided for @noSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No Subtitle'**
+  String get noSubtitle;
+
+  /// No description provided for @noSentenceSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'No sentence selected'**
+  String get noSentenceSelected;
+
+  /// No description provided for @noBookmarkedSentences.
+  ///
+  /// In en, this message translates to:
+  /// **'No bookmarked sentences'**
+  String get noBookmarkedSentences;
+
+  /// No description provided for @tapBookmarkIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap bookmark icon to save'**
+  String get tapBookmarkIcon;
+
+  /// No description provided for @removeBookmarkTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove bookmark'**
+  String get removeBookmarkTip;
+
+  /// No description provided for @addBookmarkTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Add bookmark'**
+  String get addBookmarkTip;
+
+  /// No description provided for @listMode.
+  ///
+  /// In en, this message translates to:
+  /// **'List Mode'**
+  String get listMode;
 }
 
 class _AppLocalizationsDelegate

@@ -180,4 +180,61 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get infinite => '∞';
+
+  @override
+  String get singleSentenceMode => 'Single Sentence Mode';
+
+  @override
+  String get singleSentenceModeDesc => 'Show only current sentence';
+
+  @override
+  String get sentenceRepeat => 'Sentence Repeat';
+
+  @override
+  String get repeatCount => 'Repeat Count';
+
+  @override
+  String get intervalTime => 'Interval (seconds)';
+
+  @override
+  String get audioLoop => 'Audio Loop';
+
+  @override
+  String get loopTimes => 'Loop Count';
+
+  @override
+  String get noLoop => 'No Loop';
+
+  @override
+  String get infiniteLoop => 'Infinite ∞';
+
+  @override
+  String get times => 'times';
+
+  @override
+  String get fullText => 'Full Text';
+
+  @override
+  String get bookmarked => 'Bookmarked';
+
+  @override
+  String get noSubtitle => 'No Subtitle';
+
+  @override
+  String get noSentenceSelected => 'No sentence selected';
+
+  @override
+  String get noBookmarkedSentences => 'No bookmarked sentences';
+
+  @override
+  String get tapBookmarkIcon => 'Tap bookmark icon to save';
+
+  @override
+  String get removeBookmarkTip => 'Remove bookmark';
+
+  @override
+  String get addBookmarkTip => 'Add bookmark';
+
+  @override
+  String get listMode => 'List Mode';
 }

@@ -1,39 +1,40 @@
-enum PlaybackMode {
-  singleSentence,
-  fullArticle,
-  bookmarkedOnly,
-}
-
+// 播放设置模型
 class PlaybackSettings {
-  final bool loopEnabled;
-  final int loopCount; // number of loops per item, 1-20
-  final Duration pauseInterval; // pause duration between loops
-  final double playbackSpeed;
-  final PlaybackMode mode;
-  final bool showTranscript;
+  final bool loopEnabled;              // 是否启用句子循环
+  final int loopCount;                 // 句子循环次数，1-20
+  final Duration pauseInterval;        // 句子循环间隔时间
+  final double playbackSpeed;          // 播放速度
+  final bool singleSentenceMode;       // 单句模式：控制字幕展示方式
+  final bool showTranscript;           // 是否显示字幕文本
+  final bool loopAudioEnabled;         // 是否启用音频循环
+  final int loopAudio;                 // 音频循环次数：0=无穷，1-10=具体次数
 
   PlaybackSettings({
     this.loopEnabled = false,
     this.loopCount = 3,
-    this.pauseInterval = const Duration(seconds: 1),
+    this.pauseInterval = const Duration(seconds: 3),
     this.playbackSpeed = 1.0,
-    this.mode = PlaybackMode.fullArticle,
+    this.singleSentenceMode = false,
     this.showTranscript = true,
+    this.loopAudioEnabled = false,    // 默认不启用音频循环
+    this.loopAudio = 1,                // 默认循环1次
   });
 
   Map<String, dynamic> toJson() => {
-        'loopEnabled': loopEnabled,
-        'loopCount': loopCount,
-        'pauseInterval': pauseInterval.inMilliseconds,
-        'playbackSpeed': playbackSpeed,
-        'mode': mode.index,
-        'showTranscript': showTranscript,
-      };
+    'loopEnabled': loopEnabled,
+    'loopCount': loopCount,
+    'pauseInterval': pauseInterval.inMilliseconds,
+    'playbackSpeed': playbackSpeed,
+    'singleSentenceMode': singleSentenceMode,
+    'showTranscript': showTranscript,
+    'loopAudioEnabled': loopAudioEnabled,
+    'loopAudio': loopAudio,
+  };
 
   factory PlaybackSettings.fromJson(Map<String, dynamic> json) =>
       PlaybackSettings(
         loopEnabled: json['loopEnabled'] ?? false,
-        // sanitize legacy values: 0 (infinite) -> default 3; clamp to 1-20
+        // 句子循环次数：范围 1-20
         loopCount: (() {
           final raw = json['loopCount'];
           final v = raw is int ? raw : 3;
@@ -41,7 +42,7 @@ class PlaybackSettings {
           if (v > 20) return 20;
           return v;
         })(),
-        // pauseInterval in ms; clamp to 0-30s
+        // 句子循环间隔：范围 0-30秒
         pauseInterval: (() {
           final ms = json['pauseInterval'];
           final rawMs = ms is int ? ms : 1000;
@@ -51,8 +52,17 @@ class PlaybackSettings {
           return Duration(seconds: secs);
         })(),
         playbackSpeed: json['playbackSpeed'] ?? 1.0,
-        mode: PlaybackMode.values[json['mode'] ?? 1],
+        singleSentenceMode: json['singleSentenceMode'] ?? false,
         showTranscript: json['showTranscript'] ?? true,
+        loopAudioEnabled: json['loopAudioEnabled'] ?? false,
+        // 音频循环：0=无穷，1-10=具体次数
+        loopAudio: (() {
+          final raw = json['loopAudio'];
+          final v = raw is int ? raw : 1;
+          if (v < 0) return 1;
+          if (v > 10) return 10;
+          return v;
+        })(),
       );
 
   PlaybackSettings copyWith({
@@ -60,16 +70,20 @@ class PlaybackSettings {
     int? loopCount,
     Duration? pauseInterval,
     double? playbackSpeed,
-    PlaybackMode? mode,
+    bool? singleSentenceMode,
     bool? showTranscript,
+    bool? loopAudioEnabled,
+    int? loopAudio,
   }) {
     return PlaybackSettings(
       loopEnabled: loopEnabled ?? this.loopEnabled,
       loopCount: loopCount ?? this.loopCount,
       pauseInterval: pauseInterval ?? this.pauseInterval,
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
-      mode: mode ?? this.mode,
+      singleSentenceMode: singleSentenceMode ?? this.singleSentenceMode,
       showTranscript: showTranscript ?? this.showTranscript,
+      loopAudioEnabled: loopAudioEnabled ?? this.loopAudioEnabled,
+      loopAudio: loopAudio ?? this.loopAudio,
     );
   }
 }
