@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import '../l10n/app_localizations.dart';
@@ -9,6 +8,7 @@ import '../services/subtitle_parser.dart';
 import '../widgets/playback_controls.dart';
 import '../widgets/sentence_list_view.dart';
 import '../widgets/settings_dialog.dart';
+import '../widgets/player_hotkey_scope.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -19,16 +19,13 @@ class PlayerScreen extends StatefulWidget {
 
 class _PlayerScreenState extends State<PlayerScreen>
     with SingleTickerProviderStateMixin {
-  final FocusNode _focusNode = FocusNode();
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // Request focus on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNode.requestFocus();
       final player = Provider.of<PlayerProvider>(context, listen: false);
       player.setPlaylistMode(PlaylistMode.full);
     });
@@ -51,91 +48,42 @@ class _PlayerScreenState extends State<PlayerScreen>
   @override
   void dispose() {
     _tabController.dispose();
-    _focusNode.dispose();
     super.dispose();
   }
 
-  void _handleKeyEvent(KeyEvent event, PlayerProvider player) {
-    if (event is! KeyDownEvent) return;
-
-    // 检查焦点是否在输入控件上（如下拉菜单），如果是则不处理键盘事件
-    final focusedWidget = FocusManager.instance.primaryFocus?.context?.widget;
-    if (focusedWidget != null) {
-      // 如果焦点在其他可交互控件上（如DropdownButton），不处理快捷键
-      if (focusedWidget.runtimeType.toString().contains('Dropdown') ||
-          focusedWidget.runtimeType.toString().contains('TextField') ||
-          focusedWidget.runtimeType.toString().contains('EditableText')) {
-        return;
-      }
-    }
-
-    switch (event.logicalKey) {
-      case LogicalKeyboardKey.space:
-        // 空格键控制播放/暂停
-        if (player.isPlaying) {
-          player.pause();
-        } else {
-          player.play();
-        }
-      case LogicalKeyboardKey.arrowLeft:
-        // 左箭头：上一句
-        if (player.hasSentences) {
-          player.previousSentence();
-        }
-      case LogicalKeyboardKey.arrowRight:
-        // 右箭头：下一句
-        if (player.hasSentences) {
-          player.nextSentence();
-        }
-      case LogicalKeyboardKey.arrowUp:
-        // 上箭头：切换字幕显示/隐藏
-        final settings = player.settings;
-        player.updateSettings(
-          settings.copyWith(showTranscript: !settings.showTranscript),
-        );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<PlayerProvider>(
       builder: (context, player, child) {
-        return Shortcuts(
-          shortcuts: <LogicalKeySet, Intent>{
-            LogicalKeySet(LogicalKeyboardKey.tab): const DoNothingIntent(),
-            LogicalKeySet(LogicalKeyboardKey.shift, LogicalKeyboardKey.tab):
-                const DoNothingIntent(),
-          },
-          child: KeyboardListener(
-            focusNode: _focusNode,
-            onKeyEvent: (event) => _handleKeyEvent(event, player),
-            child: Scaffold(
-              appBar: AppBar(
-                title: Text(player.currentAudioItem?.name ?? 'Player'),
-                actions: [
-                  IconButton(
-                    icon: Icon(
-                      player.autoScrollEnabled
-                          ? Icons.center_focus_strong
-                          : Icons.center_focus_weak,
-                    ),
-                    onPressed: () =>
-                        player.setAutoScroll(!player.autoScrollEnabled),
-                    tooltip: player.autoScrollEnabled
-                        ? 'Disable auto-scroll'
-                        : 'Enable auto-scroll',
+        return PlayerHotkeyScope(
+          player: player,
+          child: Scaffold(
+            appBar: AppBar(
+              title: Text(player.currentAudioItem?.name ?? 'Player'),
+              actions: [
+                IconButton(
+                  icon: Icon(
+                    player.autoScrollEnabled
+                        ? Icons.center_focus_strong
+                        : Icons.center_focus_weak,
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.settings),
-                    onPressed: () => _showSettingsDialog(context, player),
-                    tooltip: 'Settings',
-                  ),
-                ],
-              ),
-              body: !player.hasAudio
-                  ? const Center(child: Text('No audio loaded'))
-                  : _buildLayout(context, player),
+                  onPressed: () =>
+                      player.setAutoScroll(!player.autoScrollEnabled),
+                  tooltip: player.autoScrollEnabled
+                      ? 'Disable auto-scroll'
+                      : 'Enable auto-scroll',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.settings),
+                  onPressed: () => _showSettingsDialog(context, player),
+                  tooltip: 'Settings',
+                ),
+              ],
             ),
+            body: !player.hasAudio
+                ? const Center(child: Text('No audio loaded'))
+                : _buildLayout(context, player),
           ),
         );
       },
@@ -259,6 +207,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       onBookmarkToggle: (index) => player.toggleBookmark(index),
       onUserScroll: () => player.setAutoScroll(false),
       storageKey: 'full_text_list',
+      itemPlaybackSentenceIndex: player.itemPlaybackSentenceIndex,
     );
   }
 
@@ -328,6 +277,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       onBookmarkToggle: (index) => player.toggleBookmark(index),
       onUserScroll: () => player.setAutoScroll(false),
       storageKey: 'bookmarked_list',
+      itemPlaybackSentenceIndex: player.itemPlaybackSentenceIndex,
     );
   }
 
@@ -437,19 +387,43 @@ class _PlayerScreenState extends State<PlayerScreen>
   Widget _buildProgressBar(PlayerProvider player) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: StreamBuilder(
-        stream: player.audioPlayer.positionStream,
+      child: StreamBuilder<Duration>(
+        stream: player.absolutePositionStream,
         builder: (context, snapshot) {
           final position = snapshot.data ?? Duration.zero;
           final total = player.totalDuration ?? Duration.zero;
 
-          return ProgressBar(
-            progress: position,
-            total: total,
-            onSeek: (duration) => player.seek(duration),
-            barHeight: 4,
-            thumbRadius: 6,
-            timeLabelTextStyle: const TextStyle(fontSize: 12),
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ProgressBar(
+                progress: position,
+                total: total,
+                onSeek: (duration) => player.seekAbsolute(duration),
+                barHeight: 4,
+                thumbRadius: 6,
+                timeLabelTextStyle: const TextStyle(fontSize: 12),
+                timeLabelLocation: TimeLabelLocation.none,
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    SubtitleParser.formatDuration(position),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  Text(
+                    () {
+                      final clampedPos = position > total ? total : position;
+                      final remaining = total - clampedPos;
+                      return '-${SubtitleParser.formatDuration(remaining)}';
+                    }(),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ],
           );
         },
       ),

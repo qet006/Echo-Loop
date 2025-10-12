@@ -15,6 +15,7 @@ class SentenceListView extends StatefulWidget {
   final String storageKey;
   final bool autoScrollEnabled;
   final VoidCallback? onUserScroll;
+  final int? itemPlaybackSentenceIndex;
 
   const SentenceListView({
     super.key,
@@ -28,6 +29,7 @@ class SentenceListView extends StatefulWidget {
     this.storageKey = 'sentence_list',
     this.autoScrollEnabled = true,
     this.onUserScroll,
+    this.itemPlaybackSentenceIndex,
   });
 
   @override
@@ -100,32 +102,40 @@ class _SentenceListViewState extends State<SentenceListView> {
         }
         return false;
       },
-      child: ListView.builder(
-      key: PageStorageKey<String>(widget.storageKey),
-      controller: _scrollController,
-      itemCount: widget.sentences.length,
-      padding: const EdgeInsets.all(8),
-      cacheExtent: 800,
-      itemBuilder: (context, idx) {
-        final sentence = widget.sentences[idx];
-        final isCurrent = widget.currentIndex == sentence.index;
-        final isBookmarked = widget.bookmarkedIndices.contains(sentence.index);
+      child: Focus(
+        canRequestFocus: false,
+        descendantsAreFocusable: false,
+        child: ListView.builder(
+          key: PageStorageKey<String>(widget.storageKey),
+          controller: _scrollController,
+          primary: false,
+          itemCount: widget.sentences.length,
+          padding: const EdgeInsets.all(8),
+          cacheExtent: 800,
+          itemBuilder: (context, idx) {
+            final sentence = widget.sentences[idx];
+            final isCurrent = widget.currentIndex == sentence.index;
+            final isBookmarked = widget.bookmarkedIndices.contains(sentence.index);
+            final isItemPlaying =
+                widget.itemPlaybackSentenceIndex == sentence.index;
 
-        if (isCurrent && !_itemKeys.containsKey(sentence.index)) {
-          _itemKeys[sentence.index] = GlobalKey();
-        }
+            if (isCurrent && !_itemKeys.containsKey(sentence.index)) {
+              _itemKeys[sentence.index] = GlobalKey();
+            }
 
-        return _SentenceTile(
-          key: isCurrent ? _itemKeys[sentence.index] : null,
-          sentence: sentence,
-          isCurrent: isCurrent,
-          isBookmarked: isBookmarked,
-          showTranscript: widget.showTranscript,
-          onTap: () => widget.onSentenceTap(sentence.index),
-          onPlay: () => widget.onPlayTap(sentence.index),
-          onBookmarkToggle: () => widget.onBookmarkToggle(sentence.index),
-        );
-      },
+            return _SentenceTile(
+              key: isCurrent ? _itemKeys[sentence.index] : null,
+              sentence: sentence,
+              isCurrent: isCurrent,
+              isBookmarked: isBookmarked,
+              showTranscript: widget.showTranscript,
+              onTap: () => widget.onSentenceTap(sentence.index),
+              onPlay: () => widget.onPlayTap(sentence.index),
+              onBookmarkToggle: () => widget.onBookmarkToggle(sentence.index),
+              isItemPlaying: isItemPlaying,
+            );
+          },
+        ),
       ),
     );
   }
@@ -139,6 +149,7 @@ class _SentenceTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onPlay;
   final VoidCallback onBookmarkToggle;
+  final bool isItemPlaying;
 
   const _SentenceTile({
     super.key,
@@ -149,6 +160,7 @@ class _SentenceTile extends StatelessWidget {
     required this.onTap,
     required this.onPlay,
     required this.onBookmarkToggle,
+    required this.isItemPlaying,
   });
 
   @override
@@ -242,9 +254,9 @@ class _SentenceTile extends StatelessWidget {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.play_arrow),
+                icon: Icon(isItemPlaying ? Icons.pause : Icons.play_arrow),
                 onPressed: onPlay,
-                tooltip: 'Play sentence',
+                tooltip: isItemPlaying ? 'Pause sentence' : 'Play sentence',
               ),
               IconButton(
                 icon: Icon(

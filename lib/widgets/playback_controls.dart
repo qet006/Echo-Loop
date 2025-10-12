@@ -95,17 +95,17 @@ class PlaybackControls extends StatelessWidget {
         shape: BoxShape.circle,
       ),
       child: IconButton(
-        icon: Icon(player.isPlaying ? Icons.pause : Icons.play_arrow),
+        icon: Icon(player.isMainPlaybackPlaying ? Icons.pause : Icons.play_arrow),
         iconSize: 40,
         color: Theme.of(context).colorScheme.onPrimary,
         onPressed: () {
-          if (player.isPlaying) {
+          if (player.isMainPlaybackPlaying) {
             player.pause();
           } else {
             player.play();
           }
         },
-        tooltip: player.isPlaying ? 'Pause' : 'Play',
+        tooltip: player.isMainPlaybackPlaying ? 'Pause' : 'Play',
       ),
     );
   }
