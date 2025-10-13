@@ -11,13 +11,11 @@ class SentenceListView extends StatefulWidget {
   final int? currentIndex;
   final Set<int> bookmarkedIndices;
   final Function(int) onSentenceTap;
-  final Function(int) onPlayTap;
   final Function(int) onBookmarkToggle;
   final bool showTranscript;
   final String storageKey;
   final bool autoScrollEnabled;
   final VoidCallback? onUserScroll;
-  final int? itemPlaybackSentenceIndex;
 
   const SentenceListView({
     super.key,
@@ -25,13 +23,11 @@ class SentenceListView extends StatefulWidget {
     required this.currentIndex,
     required this.bookmarkedIndices,
     required this.onSentenceTap,
-    required this.onPlayTap,
     required this.onBookmarkToggle,
     this.showTranscript = true,
     this.storageKey = 'sentence_list',
     this.autoScrollEnabled = true,
     this.onUserScroll,
-    this.itemPlaybackSentenceIndex,
   });
 
   @override
@@ -121,8 +117,6 @@ class _SentenceListViewState extends State<SentenceListView> {
             final sentence = widget.sentences[idx];
             final isCurrent = widget.currentIndex == sentence.index;
             final isBookmarked = widget.bookmarkedIndices.contains(sentence.index);
-            final isItemPlaying =
-                widget.itemPlaybackSentenceIndex == sentence.index;
 
             if (isCurrent && !_itemKeys.containsKey(sentence.index)) {
               _itemKeys[sentence.index] = GlobalKey();
@@ -135,9 +129,7 @@ class _SentenceListViewState extends State<SentenceListView> {
               isBookmarked: isBookmarked,
               showTranscript: widget.showTranscript,
               onTap: () => widget.onSentenceTap(sentence.index),
-              onPlay: () => widget.onPlayTap(sentence.index),
               onBookmarkToggle: () => widget.onBookmarkToggle(sentence.index),
-              isItemPlaying: isItemPlaying,
             );
           },
         ),
@@ -152,9 +144,7 @@ class _SentenceTile extends StatelessWidget {
   final bool isBookmarked;
   final bool showTranscript;
   final VoidCallback onTap;
-  final VoidCallback onPlay;
   final VoidCallback onBookmarkToggle;
-  final bool isItemPlaying;
 
   const _SentenceTile({
     super.key,
@@ -163,9 +153,7 @@ class _SentenceTile extends StatelessWidget {
     required this.isBookmarked,
     required this.showTranscript,
     required this.onTap,
-    required this.onPlay,
     required this.onBookmarkToggle,
-    required this.isItemPlaying,
   });
 
   void _showContextMenu(BuildContext context, Offset position) async {
@@ -307,14 +295,6 @@ class _SentenceTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 4),
-                IconButton(
-                  icon: Icon(isItemPlaying ? Icons.pause : Icons.play_arrow),
-                  iconSize: 22,
-                  padding: const EdgeInsets.all(8),
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                  onPressed: onPlay,
-                  tooltip: isItemPlaying ? 'Pause sentence' : 'Play sentence',
-                ),
                 IconButton(
                   icon: Icon(
                     isBookmarked ? Icons.bookmark : Icons.bookmark_border,

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import '../models/audio_item.dart';
@@ -29,7 +28,6 @@ class PlayerProvider extends ChangeNotifier {
 
   // 播放控制 - 简化的状态管理
   int _playbackSessionId = 0; // 用于取消旧的播放会话
-  int? _itemPlaybackSentenceIndex; // 标记哪个句子正在通过item按钮播放
   bool _isMainPlaybackPlaying = false; // 标记主播放控制的播放状态
 
   // 进度条相关 - 用于显示绝对位置
@@ -58,7 +56,6 @@ class PlayerProvider extends ChangeNotifier {
   bool get hasAudio => _currentAudioItem != null;
   bool get hasSentences => _sentences.isNotEmpty;
   bool get autoScrollEnabled => _autoScrollEnabled;
-  int? get itemPlaybackSentenceIndex => _itemPlaybackSentenceIndex;
 
   // 绝对位置流：将 clip 相对位置映射到完整音频的绝对位置
   Stream<Duration> get absolutePositionStream =>
@@ -141,10 +138,6 @@ class PlayerProvider extends ChangeNotifier {
 
   void _updateCurrentSentence(Duration position) {
     if (_sentences.isEmpty) return;
-
-    // 如果正在进行 item 播放，不要自动更新选中状态
-    // 这样可以避免点击播放按钮时选中状态跳转
-    if (_itemPlaybackSentenceIndex != null) return;
 
     final index = _sentences.indexWhere(
       (s) => position >= s.startTime && position < s.endTime,
@@ -275,13 +268,6 @@ class PlayerProvider extends ChangeNotifier {
   Future<void> mainPlay() async {
     print('mainPlay');
     if (_currentAudioItem == null) return;
-
-    // 停止item播放（如果正在播放）
-    if (_itemPlaybackSentenceIndex != null) {
-      _audioPlayer.pause();
-      _playbackSessionId++; // 取消item播放会话
-      _itemPlaybackSentenceIndex = null;
-    }
 
     // 标记为主播放模式
     _isMainPlaybackPlaying = true;
@@ -539,21 +525,6 @@ class PlayerProvider extends ChangeNotifier {
     print("_playSingleSentenceOnce play end");
   }
 
-  /// 单次播放句子（用于item按钮点击）
-  Future<void> playSingleSentenceOnce(int index, int sessionId) async {
-    if (index < 0 || index >= _sentences.length) return;
-
-    final sentence = _sentences[index];
-
-    await _playSingleSentenceOnce(sentence, sessionId);
-
-    // 播放完成，清除item播放状态（只有当前会话仍然有效时才清除）
-    if (_is_active_session(sessionId) && _itemPlaybackSentenceIndex == index) {
-      _itemPlaybackSentenceIndex = null;
-      notifyListeners();
-    }
-  }
-
   // ============================================================================
   // 控制方法
   // ============================================================================
@@ -562,7 +533,6 @@ class PlayerProvider extends ChangeNotifier {
     _playbackSessionId++; // 取消当前播放会话
     print("5");
     _isMainPlaybackPlaying = false;
-    _itemPlaybackSentenceIndex = null;
     await _audioPlayer.pause();
   }
 
@@ -570,7 +540,6 @@ class PlayerProvider extends ChangeNotifier {
     _playbackSessionId++; // 取消当前播放会话
     print("6");
     _isMainPlaybackPlaying = false;
-    _itemPlaybackSentenceIndex = null;
     await _audioPlayer.stop();
   }
 
@@ -586,26 +555,15 @@ class PlayerProvider extends ChangeNotifier {
       // 先 seek 到绝对位置，然后再更新 _clipStart
       await _audioPlayer.seek(absolutePosition);
       _clipStart = Duration.zero;
-      // 如果正在 item 播放，清除 item 播放状态
-      if (_itemPlaybackSentenceIndex != null) {
-        _itemPlaybackSentenceIndex = null;
-        notifyListeners();
-      }
+      notifyListeners();
     } else {
       // 直接 seek 到绝对位置
       await _audioPlayer.seek(absolutePosition);
     }
   }
 
-  Future<void> selectFullSentence(int index) async {
+  Future<void> selectFullSentence(int index, {bool autoPlay = true}) async {
     if (index < 0 || index >= _sentences.length) return;
-    
-    // 如果正在进行 item 播放，停止播放
-    if (_itemPlaybackSentenceIndex != null) {
-      ++_playbackSessionId; // 取消当前播放会话
-      _itemPlaybackSentenceIndex = null;
-      await _audioPlayer.pause();
-    }
     
     _currentFullIndex = index;
     _autoScrollEnabled = true;
@@ -620,17 +578,15 @@ class PlayerProvider extends ChangeNotifier {
       await _audioPlayer.seek(_sentences[index].startTime);
     }
     notifyListeners();
+    
+    // 点击item时执行与主播放/暂停按钮相同的动作
+    if (autoPlay) {
+      await mainPlay();
+    }
   }
 
-  Future<void> selectBookmarkedSentence(int index) async {
+  Future<void> selectBookmarkedSentence(int index, {bool autoPlay = true}) async {
     if (index < 0 || index >= _sentences.length) return;
-    
-    // 如果正在进行 item 播放，停止播放
-    if (_itemPlaybackSentenceIndex != null) {
-      ++_playbackSessionId; // 取消当前播放会话
-      _itemPlaybackSentenceIndex = null;
-      await _audioPlayer.pause();
-    }
     
     _currentBookmarkIndex = index;
     _autoScrollEnabled = true;
@@ -645,47 +601,11 @@ class PlayerProvider extends ChangeNotifier {
       await _audioPlayer.seek(_sentences[index].startTime);
     }
     notifyListeners();
-  }
-
-  /// 播放指定句子（用于点击播放按钮）- 单句播放模式
-  Future<void> playSentence(int index) async {
-    if (index < 0 || index >= _sentences.length) return;
-
-    // 如果点击的是正在播放的item，停止播放
-    if (_itemPlaybackSentenceIndex == index) {
-      ++_playbackSessionId; // 取消当前播放会话
-      _itemPlaybackSentenceIndex = null;
-      await _audioPlayer.pause();
-      notifyListeners();
-      return;
-    }
-
-    // 停止所有播放
-    ++_playbackSessionId; // 取消当前播放会话
-    final wasPlaying = _audioPlayer.playing;
-    if (wasPlaying) {
-      await _audioPlayer.pause();
-    }
     
-    // 清除所有播放状态
-    _isMainPlaybackPlaying = false;
-    _itemPlaybackSentenceIndex = null;
-
-    // 根据播放模式设置当前播放索引
-    if (_playlistMode == PlaylistMode.bookmarks) {
-      if (!_bookmarkedIndices.contains(index)) return;
-      _currentBookmarkIndex = index;
-    } else {
-      _currentFullIndex = index;
+    // 点击item时执行与主播放/暂停按钮相同的动作
+    if (autoPlay) {
+      await mainPlay();
     }
-
-    // 标记为item播放
-    _itemPlaybackSentenceIndex = index;
-    final currentSessionId = ++_playbackSessionId;
-
-    // 先通知 UI 状态变化，然后开始播放（播放内部会再次通知进度条更新）
-    notifyListeners();
-    await playSingleSentenceOnce(index, currentSessionId);
   }
 
   Future<void> nextSentence() async {

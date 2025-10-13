@@ -173,9 +173,9 @@ class _PlayerScreenState extends State<PlayerScreen>
     // 单句模式：只展示当前播放的句子
     if (player.settings.singleSentenceMode) {
       if (player.currentFullIndex == null && player.sentences.isNotEmpty) {
-        // 自动选择第一个句子
+        // 自动选择第一个句子（不自动播放）
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          player.playSentence(0);
+          player.selectFullSentence(0, autoPlay: false);
         });
         return const Center(child: CircularProgressIndicator());
       }
@@ -203,11 +203,9 @@ class _PlayerScreenState extends State<PlayerScreen>
       showTranscript: player.settings.showTranscript,
       autoScrollEnabled: player.autoScrollEnabled,
       onSentenceTap: (index) => player.selectFullSentence(index),
-      onPlayTap: (index) => player.playSentence(index),
       onBookmarkToggle: (index) => player.toggleBookmark(index),
       onUserScroll: () => player.setAutoScroll(false),
       storageKey: 'full_text_list',
-      itemPlaybackSentenceIndex: player.itemPlaybackSentenceIndex,
     );
   }
 
@@ -244,7 +242,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         // 自动选择第一个收藏的句子
         if (bookmarkedSentences.isNotEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            player.playSentence(bookmarkedSentences.first.index);
+            player.selectBookmarkedSentence(bookmarkedSentences.first.index, autoPlay: false);
           });
           return const Center(child: CircularProgressIndicator());
         }
@@ -273,11 +271,9 @@ class _PlayerScreenState extends State<PlayerScreen>
       showTranscript: player.settings.showTranscript,
       autoScrollEnabled: player.autoScrollEnabled,
       onSentenceTap: (index) => player.selectBookmarkedSentence(index),
-      onPlayTap: (index) => player.playSentence(index),
       onBookmarkToggle: (index) => player.toggleBookmark(index),
       onUserScroll: () => player.setAutoScroll(false),
       storageKey: 'bookmarked_list',
-      itemPlaybackSentenceIndex: player.itemPlaybackSentenceIndex,
     );
   }
 
