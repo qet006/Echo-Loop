@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../models/sentence.dart';
 import '../services/subtitle_parser.dart';
 import '../l10n/app_localizations.dart';
@@ -14,7 +15,6 @@ class SentenceListView extends StatefulWidget {
   final Function(int) onSentenceTap;
   final Function(int) onBookmarkToggle;
   final bool showTranscript;
-  final String storageKey;
   final bool autoScrollEnabled;
   final VoidCallback? onUserScroll;
 
@@ -26,7 +26,6 @@ class SentenceListView extends StatefulWidget {
     required this.onSentenceTap,
     required this.onBookmarkToggle,
     this.showTranscript = true,
-    this.storageKey = 'sentence_list',
     this.autoScrollEnabled = true,
     this.onUserScroll,
   });
@@ -36,13 +35,28 @@ class SentenceListView extends StatefulWidget {
 }
 
 class _SentenceListViewState extends State<SentenceListView> {
-  final ScrollController _scrollController = ScrollController();
-  final Map<int, GlobalKey> _itemKeys = {};
+  final ItemScrollController _itemScrollController = ItemScrollController();
+  final ItemPositionsListener _itemPositionsListener =
+      ItemPositionsListener.create();
+
+  @override
+  void initState() {
+    super.initState();
+    // 监听滚动位置变化，检测用户手动滚动
+    _itemPositionsListener.itemPositions.addListener(_onScrollPositionChanged);
+  }
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _itemPositionsListener.itemPositions.removeListener(
+      _onScrollPositionChanged,
+    );
     super.dispose();
+  }
+
+  void _onScrollPositionChanged() {
+    // 当用户手动滚动时禁用自动滚动
+    // 这里可以根据需要实现更复杂的逻辑
   }
 
   @override
@@ -59,37 +73,24 @@ class _SentenceListViewState extends State<SentenceListView> {
 
   void _scrollToCurrentSentence() {
     if (widget.currentIndex == null || !widget.autoScrollEnabled) return;
+
+    // 查找目标句子在当前列表中的位置
+    final localPos = widget.sentences.indexWhere(
+      (s) => s.index == widget.currentIndex,
+    );
+    if (localPos == -1) return;
+
+    // 使用 ScrollablePositionedList 的 scrollTo 方法
+    // 这会自动处理所有边界情况和 item 构建
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final key = _itemKeys[widget.currentIndex];
-      if (key?.currentContext != null) {
-        Scrollable.ensureVisible(
-          key!.currentContext!,
-          duration: const Duration(milliseconds: 300),
-          alignment: 0.5,
-          curve: Curves.easeInOut,
-        );
-      } else {
-        final localPos = widget.sentences.indexWhere(
-          (s) => s.index == widget.currentIndex,
-        );
-        if (localPos == -1) return;
+      if (!mounted) return;
 
-        final estimatedOffset = localPos * 100.0; // 估算每个item约100像素
-        final max = _scrollController.position.maxScrollExtent;
-        _scrollController.jumpTo(estimatedOffset.clamp(0.0, max));
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          final key = _itemKeys[widget.currentIndex];
-          if (key?.currentContext != null) {
-            Scrollable.ensureVisible(
-              key!.currentContext!,
-              duration: const Duration(milliseconds: 300),
-              alignment: 0.5,
-              curve: Curves.easeInOut,
-            );
-          }
-        });
-      }
+      _itemScrollController.scrollTo(
+        index: localPos,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        alignment: 0.5, // 居中对齐
+      );
     });
   }
 
@@ -97,7 +98,7 @@ class _SentenceListViewState extends State<SentenceListView> {
   Widget build(BuildContext context) {
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
-        // Only disable auto-scroll when user manually scrolls (not programmatic scroll)
+        // 检测用户手动滚动
         if (notification is UserScrollNotification &&
             notification.direction != ScrollDirection.idle) {
           widget.onUserScroll?.call();
@@ -107,13 +108,11 @@ class _SentenceListViewState extends State<SentenceListView> {
       child: Focus(
         canRequestFocus: false,
         descendantsAreFocusable: false,
-        child: ListView.builder(
-          key: PageStorageKey<String>(widget.storageKey),
-          controller: _scrollController,
-          primary: false,
+        child: ScrollablePositionedList.builder(
+          itemScrollController: _itemScrollController,
+          itemPositionsListener: _itemPositionsListener,
           itemCount: widget.sentences.length,
           padding: const EdgeInsets.all(8),
-          cacheExtent: 800,
           itemBuilder: (context, idx) {
             final sentence = widget.sentences[idx];
             final isCurrent = widget.currentIndex == sentence.index;
@@ -121,12 +120,7 @@ class _SentenceListViewState extends State<SentenceListView> {
               sentence.index,
             );
 
-            if (isCurrent && !_itemKeys.containsKey(sentence.index)) {
-              _itemKeys[sentence.index] = GlobalKey();
-            }
-
             return _SentenceTile(
-              key: isCurrent ? _itemKeys[sentence.index] : null,
               sentence: sentence,
               isCurrent: isCurrent,
               isBookmarked: isBookmarked,
@@ -150,7 +144,6 @@ class _SentenceTile extends StatelessWidget {
   final VoidCallback onBookmarkToggle;
 
   const _SentenceTile({
-    super.key,
     required this.sentence,
     required this.isCurrent,
     required this.isBookmarked,

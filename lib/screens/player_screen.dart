@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import '../l10n/app_localizations.dart';
@@ -221,7 +222,6 @@ class _PlayerScreenState extends State<PlayerScreen>
       onSentenceTap: (index) => player.selectFullSentence(index),
       onBookmarkToggle: (index) => player.toggleBookmark(index),
       onUserScroll: () => player.setAutoScroll(false),
-      storageKey: 'full_text_list',
     );
   }
 
@@ -295,7 +295,6 @@ class _PlayerScreenState extends State<PlayerScreen>
       onSentenceTap: (index) => player.selectBookmarkedSentence(index),
       onBookmarkToggle: (index) => player.toggleBookmark(index),
       onUserScroll: () => player.setAutoScroll(false),
-      storageKey: 'bookmarked_list',
     );
   }
 
@@ -306,67 +305,131 @@ class _PlayerScreenState extends State<PlayerScreen>
     final isBookmarked = player.bookmarkedIndices.contains(
       currentSentence.index,
     );
+    final isMobile = Platform.isIOS || Platform.isAndroid;
 
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
-        child: Card(
-          elevation: 4,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Stack(
-                  children: [
-                    Text(
-                      currentSentence.text,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.normal),
-                      textAlign: TextAlign.left,
-                    ),
-                    if (!player.settings.showTranscript)
-                      Positioned.fill(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                            child: Container(
-                              color: Colors.grey.withValues(alpha: 0.1),
+        child: GestureDetector(
+          // 右键点击
+          onSecondaryTapDown: (details) {
+            _showContextMenu(
+              context,
+              details.globalPosition,
+              currentSentence.text,
+            );
+          },
+          // 长按
+          onLongPressStart: isMobile
+              ? (details) => _showContextMenu(
+                  context,
+                  details.globalPosition,
+                  currentSentence.text,
+                )
+              : null,
+          child: Card(
+            elevation: 4,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(
+                    children: [
+                      Text(
+                        currentSentence.text,
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.normal),
+                        textAlign: TextAlign.left,
+                      ),
+                      if (!player.settings.showTranscript)
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                              child: Container(
+                                color: Colors.grey.withValues(alpha: 0.1),
+                              ),
                             ),
                           ),
                         ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        SubtitleParser.formatDuration(
+                          currentSentence.startTime,
+                        ),
+                        style: TextStyle(color: Colors.grey[600]),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      SubtitleParser.formatDuration(currentSentence.startTime),
-                      style: TextStyle(color: Colors.grey[600]),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                        color: isBookmarked ? Colors.amber : Colors.grey,
+                      IconButton(
+                        icon: Icon(
+                          isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                          color: isBookmarked ? Colors.amber : Colors.grey,
+                        ),
+                        onPressed: () =>
+                            player.toggleBookmark(currentSentence.index),
+                        tooltip: isBookmarked
+                            ? l10n.removeBookmarkTip
+                            : l10n.addBookmarkTip,
                       ),
-                      onPressed: () =>
-                          player.toggleBookmark(currentSentence.index),
-                      tooltip: isBookmarked
-                          ? l10n.removeBookmarkTip
-                          : l10n.addBookmarkTip,
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  // 显示上下文菜单
+  void _showContextMenu(
+    BuildContext context,
+    Offset position,
+    String text,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final RenderBox? overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+
+    final result = await showMenu(
+      context: context,
+      position: RelativeRect.fromRect(
+        position & const Size(40, 40),
+        Offset.zero & (overlay?.size ?? const Size(0, 0)),
+      ),
+      items: [
+        PopupMenuItem<String>(
+          value: 'copy',
+          child: Row(
+            children: [
+              const Icon(Icons.copy, size: 20),
+              const SizedBox(width: 12),
+              Text(l10n.copy),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (result == 'copy' && context.mounted) {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.copied),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 
   // 显示设置对话框

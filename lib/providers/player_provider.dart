@@ -83,19 +83,28 @@ class PlayerProvider extends ChangeNotifier {
       // 切换到 full text 模式
       if (_currentFullIndex != null && _currentFullIndex! < _sentences.length) {
         await _audioPlayer.seek(_sentences[_currentFullIndex!].startTime);
+      } else if (_sentences.isNotEmpty) {
+        // 确保有有效的索引
+        _currentFullIndex = 0;
+        await _audioPlayer.seek(_sentences[0].startTime);
       }
     } else {
       // 切换到 bookmark 模式
+      final bookmarked = bookmarkedSentences;
+      if (bookmarked.isEmpty) {
+        // 书签为空，保持当前状态但不播放
+        notifyListeners();
+        return;
+      }
+
       if (_currentBookmarkIndex != null &&
-          _currentBookmarkIndex! < _sentences.length) {
+          _currentBookmarkIndex! < _sentences.length &&
+          _bookmarkedIndices.contains(_currentBookmarkIndex)) {
         await _audioPlayer.seek(_sentences[_currentBookmarkIndex!].startTime);
       } else {
         // 如果当前没有选中的 bookmark，选择第一个
-        final bookmarked = bookmarkedSentences;
-        if (bookmarked.isNotEmpty) {
-          _currentBookmarkIndex = bookmarked.first.index;
-          await _audioPlayer.seek(bookmarked.first.startTime);
-        }
+        _currentBookmarkIndex = bookmarked.first.index;
+        await _audioPlayer.seek(bookmarked.first.startTime);
       }
     }
 
@@ -624,16 +633,69 @@ class PlayerProvider extends ChangeNotifier {
 
   /// 绝对位置的 seek（用于进度条拖动）
   Future<void> seekAbsolute(Duration absolutePosition) async {
+    final wasPlaying = _audioPlayer.playing;
+    if (wasPlaying) {
+      await pause();
+    }
     // 清除 clip 限制，切换到完整音频模式
     if (_clipStart != Duration.zero) {
       await _audioPlayer.setClip(start: null, end: null);
       // 先 seek 到绝对位置，然后再更新 _clipStart
       await _audioPlayer.seek(absolutePosition);
       _clipStart = Duration.zero;
-      notifyListeners();
     } else {
       // 直接 seek 到绝对位置
       await _audioPlayer.seek(absolutePosition);
+    }
+
+    // 根据新位置更新当前句子索引
+    int? snappedBookmarkIndex;
+    if (_sentences.isNotEmpty) {
+      final newIndex = _findSentenceIndexByPosition(absolutePosition);
+      if (newIndex != -1) {
+        if (_playlistMode == PlaylistMode.bookmarks) {
+          // 在书签模式下，检查找到的句子是否是书签
+          if (_bookmarkedIndices.contains(newIndex)) {
+            _currentBookmarkIndex = newIndex;
+            snappedBookmarkIndex = newIndex;
+          } else {
+            // 如果不是书签，找最近的书签
+            final bookmarked = bookmarkedSentences;
+            if (bookmarked.isNotEmpty) {
+              // 找到位置最接近的书签
+              int closestIdx = bookmarked.first.index;
+              Duration closestDiff =
+                  (bookmarked.first.startTime - absolutePosition).abs();
+              for (var s in bookmarked) {
+                final diff = (s.startTime - absolutePosition).abs();
+                if (diff < closestDiff) {
+                  closestDiff = diff;
+                  closestIdx = s.index;
+                }
+              }
+              _currentBookmarkIndex = closestIdx;
+              snappedBookmarkIndex = closestIdx;
+            }
+          }
+        } else {
+          // 全文模式直接使用找到的索引
+          _currentFullIndex = newIndex;
+        }
+        // 启用自动滚动，确保选中的句子可见
+        _autoScrollEnabled = true;
+      }
+    }
+
+    // 书签模式下，拖动后将进度条对齐到目标句子的开始时间
+    if (snappedBookmarkIndex != null) {
+      final s = _sentences[snappedBookmarkIndex];
+      await _audioPlayer.seek(s.startTime);
+    }
+
+    notifyListeners();
+
+    if (wasPlaying) {
+      await play();
     }
   }
 
@@ -830,20 +892,35 @@ class PlayerProvider extends ChangeNotifier {
     final inBookmarksMode = _playlistMode == PlaylistMode.bookmarks;
 
     int? nextIndex;
-    // 在书签页且是“取消收藏”时，基于操作前的列表计算“下一个”句子
-    if (inBookmarksMode && isRemoving) {
+    Set<int> indicesToRemove = {};
+    // 如果是取消收藏：计算所有同文本（不区分大小写）的书签，无论当前处于哪个标签页
+    if (isRemoving) {
       final beforeList = bookmarkedSentences;
-      final pos = beforeList.indexWhere((s) => s.index == index);
-      if (pos != -1) {
-        if (pos < beforeList.length - 1) {
-          nextIndex = beforeList[pos + 1].index;
-        } else {
-          nextIndex = null;
+      final targetTextLower = _sentences[index].text.toLowerCase();
+      for (final s in beforeList) {
+        if (s.text.toLowerCase() == targetTextLower) {
+          indicesToRemove.add(s.index);
+        }
+      }
+
+      // 仅在书签页时计算“下一个”焦点
+      if (inBookmarksMode) {
+        final pos = beforeList.indexWhere((s) => s.index == index);
+        if (pos != -1) {
+          // 找下一个句子（跳过将被移除的条目）
+          for (int i = pos + 1; i < beforeList.length; i++) {
+            if (!indicesToRemove.contains(beforeList[i].index)) {
+              nextIndex = beforeList[i].index;
+              break;
+            }
+          }
+          // 没有下一个可用条目，则停止播放
+          nextIndex ??= null;
         }
       }
     }
 
-    // 记住播放状态：仅在书签页才需要恢复
+    // 记住播放状态：仅在书签页才需要恢复，并且如果句子列表为空，就停止播放，不需要恢复
     final shouldResume =
         inBookmarksMode && _audioPlayer.playing && nextIndex != null;
 
@@ -853,12 +930,19 @@ class PlayerProvider extends ChangeNotifier {
     }
 
     if (isRemoving) {
-      // 移除收藏
-      _bookmarkedIndices.remove(index);
-      _sentences[index].isBookmarked = false;
+      // 移除收藏（包括所有同文本的收藏）
+      if (indicesToRemove.isEmpty) {
+        indicesToRemove = {index};
+      }
+      for (final idx in indicesToRemove) {
+        _bookmarkedIndices.remove(idx);
+        if (idx >= 0 && idx < _sentences.length) {
+          _sentences[idx].isBookmarked = false;
+        }
+      }
 
       if (inBookmarksMode) {
-        // 更新当前选中到“下一个”书签
+        // 更新当前选中到"下一个"书签
         _currentBookmarkIndex = nextIndex;
 
         if (nextIndex != null && nextIndex < _sentences.length) {
