@@ -19,9 +19,7 @@ void main() {
   group('CollectionScreen', () {
     group('渲染', () {
       testWidgets('空状态显示提示文案', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(const CollectionScreen()),
-        );
+        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
         await tester.pumpAndSettle();
 
         expect(
@@ -32,27 +30,22 @@ void main() {
       });
 
       testWidgets('显示 AppBar 标题', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(const CollectionScreen()),
-        );
+        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
         await tester.pumpAndSettle();
 
         expect(find.text('Collections'), findsOneWidget);
       });
 
       testWidgets('显示创建按钮', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(const CollectionScreen()),
-        );
+        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
         await tester.pumpAndSettle();
 
-        expect(find.byIcon(Icons.add), findsOneWidget);
+        // AppBar 中的 + 按钮和空状态 CTA 中都有 add 图标
+        expect(find.byIcon(Icons.add), findsNWidgets(2));
       });
 
       testWidgets('显示排序按钮', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(const CollectionScreen()),
-        );
+        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
         await tester.pumpAndSettle();
 
         expect(find.byIcon(Icons.sort), findsOneWidget);
@@ -145,9 +138,8 @@ void main() {
               appSettingsProvider.overrideWith(() => TestAppSettings()),
               audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
               collectionListProvider.overrideWith(
-                () => TestCollectionList(
-                  const CollectionState(isLoading: true),
-                ),
+                () =>
+                    TestCollectionList(const CollectionState(isLoading: true)),
               ),
               listeningPracticeProvider.overrideWith(
                 () => TestListeningPractice(),
@@ -164,28 +156,24 @@ void main() {
 
     group('交互', () {
       testWidgets('点击 + 创建新合集', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(const CollectionScreen()),
-        );
+        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
         await tester.pumpAndSettle();
 
-        // 点击创建按钮
-        await tester.tap(find.byIcon(Icons.add));
+        // 点击 AppBar 中的创建按钮（第一个 add 图标）
+        await tester.tap(find.byIcon(Icons.add).first);
         await tester.pumpAndSettle();
 
-        // 应弹出创建对话框
-        expect(find.text('Create Collection'), findsOneWidget);
+        // 应弹出创建对话框（"Create Collection" 同时出现在 CTA 按钮和对话框标题中）
+        expect(find.text('Create Collection'), findsNWidgets(2));
         expect(find.text('Collection Name'), findsOneWidget);
       });
 
       testWidgets('创建合集时空名称显示错误', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(const CollectionScreen()),
-        );
+        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
         await tester.pumpAndSettle();
 
-        // 打开创建对话框
-        await tester.tap(find.byIcon(Icons.add));
+        // 打开创建对话框（AppBar 中的 + 按钮）
+        await tester.tap(find.byIcon(Icons.add).first);
         await tester.pumpAndSettle();
 
         // 直接点击添加（不输入名称）
@@ -197,9 +185,7 @@ void main() {
       });
 
       testWidgets('切换 grid/list 视图模式', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(const CollectionScreen()),
-        );
+        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
         await tester.pumpAndSettle();
 
         // 默认列表模式，显示 grid_view 切换图标
@@ -214,9 +200,7 @@ void main() {
       });
 
       testWidgets('点击排序按钮显示排序选项', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(const CollectionScreen()),
-        );
+        await tester.pumpWidget(createTestScreen(const CollectionScreen()));
         await tester.pumpAndSettle();
 
         // 点击排序按钮

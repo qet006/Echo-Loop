@@ -10,6 +10,7 @@ import '../l10n/app_localizations.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../providers/audio_engine/audio_engine_provider.dart';
 import '../services/subtitle_parser.dart';
+import '../theme/app_theme.dart';
 import '../widgets/playback_controls.dart';
 import '../widgets/sentence_list_view.dart';
 import '../widgets/settings_dialog.dart';
@@ -39,11 +40,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     _tabController.addListener(() {
       if (_tabController.index != _previousTabIndex) {
         _previousTabIndex = _tabController.index;
-        ref.read(listeningPracticeProvider.notifier).setPlaylistMode(
-          _tabController.index == 0
-              ? PlaylistMode.full
-              : PlaylistMode.bookmarks,
-        );
+        ref
+            .read(listeningPracticeProvider.notifier)
+            .setPlaylistMode(
+              _tabController.index == 0
+                  ? PlaylistMode.full
+                  : PlaylistMode.bookmarks,
+            );
       }
     });
   }
@@ -100,7 +103,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     );
   }
 
-  Widget _buildLayout(BuildContext context, ListeningPracticeState playerState) {
+  Widget _buildLayout(
+    BuildContext context,
+    ListeningPracticeState playerState,
+  ) {
     return Column(
       children: [
         Expanded(child: _buildTranscriptView(playerState)),
@@ -118,11 +124,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.subtitles_off, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
+            Icon(
+              Icons.subtitles_off_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+            const SizedBox(height: AppSpacing.m),
             Text(
               l10n.noSubtitle,
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -141,9 +153,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                 children: [
                   const Icon(Icons.article, size: 18),
                   const SizedBox(width: 8),
-                  Text(
-                    '${l10n.fullText} (${playerState.sentences.length})',
-                  ),
+                  Text('${l10n.fullText} (${playerState.sentences.length})'),
                 ],
               ),
             ),
@@ -198,7 +208,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       return Center(
         child: Text(
           l10n.noSentenceSelected,
-          style: const TextStyle(color: Colors.grey),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       );
     }
@@ -233,16 +245,24 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.bookmark_border, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
+            Icon(
+              Icons.bookmark_border,
+              size: 64,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+            const SizedBox(height: AppSpacing.m),
             Text(
               l10n.noBookmarkedSentences,
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.s),
             Text(
               l10n.tapBookmarkIcon,
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -251,8 +271,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
     if (playerState.settings.singleSentenceMode) {
       if (playerState.currentBookmarkIndex == null ||
-          !playerState.bookmarkedIndices
-              .contains(playerState.currentBookmarkIndex)) {
+          !playerState.bookmarkedIndices.contains(
+            playerState.currentBookmarkIndex,
+          )) {
         if (bookmarkedSentences.isNotEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             controller.selectBookmarkedSentence(
@@ -265,7 +286,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         return Center(
           child: Text(
             l10n.noSentenceSelected,
-            style: const TextStyle(color: Colors.grey),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         );
       }
@@ -277,8 +300,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     }
 
     if ((playerState.currentBookmarkIndex == null ||
-            !playerState.bookmarkedIndices
-                .contains(playerState.currentBookmarkIndex)) &&
+            !playerState.bookmarkedIndices.contains(
+              playerState.currentBookmarkIndex,
+            )) &&
         bookmarkedSentences.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         controller.selectBookmarkedSentence(
@@ -330,9 +354,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                 )
               : null,
           child: Card(
-            elevation: 4,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.m),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,14 +375,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                             child: BackdropFilter(
                               filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
                               child: Container(
-                                color: Colors.grey.withValues(alpha: 0.1),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.05),
                               ),
                             ),
                           ),
                         ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.m),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -368,12 +393,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                           children: [
                             Text(
                               '#${currentSentence.index + 1}',
-                              style: TextStyle(color: Colors.grey[500]),
+                              style: AppTextStyles.caption(context),
                             ),
-                            const SizedBox(width: 24),
+                            const SizedBox(width: AppSpacing.l),
                             Text(
                               '${SubtitleParser.formatDuration(currentSentence.startTime)} - ${SubtitleParser.formatDuration(currentSentence.endTime)}',
-                              style: TextStyle(color: Colors.grey[600]),
+                              style: AppTextStyles.caption(context),
                             ),
                           ],
                         ),
@@ -381,7 +406,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                       IconButton(
                         icon: Icon(
                           isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                          color: isBookmarked ? Colors.amber : Colors.grey,
+                          color: isBookmarked
+                              ? AppTheme.bookmarkColor
+                              : Theme.of(context).colorScheme.outline,
                         ),
                         onPressed: () =>
                             controller.toggleBookmark(currentSentence.index),
@@ -443,10 +470,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   }
 
   void _showSettingsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const SettingsDialog(),
-    );
+    showDialog(context: context, builder: (context) => const SettingsDialog());
   }
 
   Widget _buildControlPanel(
@@ -462,8 +486,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
             color: Theme.of(context).colorScheme.surface,
             border: Border(
               top: BorderSide(
-                color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
-                width: 1,
+                color: Theme.of(context).colorScheme.outlineVariant,
+                width: 0.5,
               ),
             ),
           ),
@@ -509,24 +533,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                 onSeek: (duration) => controller.seekAbsolute(duration),
                 barHeight: 3,
                 thumbRadius: 5,
-                timeLabelTextStyle: const TextStyle(fontSize: 11),
+                timeLabelTextStyle: AppTextStyles.caption(context),
                 timeLabelLocation: TimeLabelLocation.none,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xs),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     SubtitleParser.formatDuration(position),
-                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                    style: AppTextStyles.caption(context),
                   ),
                   Text(() {
                     final clampedPos = position > total ? total : position;
                     final remaining = total - clampedPos;
                     return '-${SubtitleParser.formatDuration(remaining)}';
-                  }(),
-                      style:
-                          TextStyle(fontSize: 11, color: Colors.grey[600])),
+                  }(), style: AppTextStyles.caption(context)),
                 ],
               ),
             ],
@@ -538,9 +560,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
   Widget _buildInfoBar(ListeningPracticeState playerState) {
     final l10n = AppLocalizations.of(context)!;
+    final captionStyle = AppTextStyles.caption(context);
+    final iconColor = Theme.of(context).colorScheme.onSurfaceVariant;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.m,
+        vertical: AppSpacing.s,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
@@ -555,14 +582,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                         ? Icons.format_quote
                         : Icons.article,
                     size: 14,
-                    color: Colors.grey[600],
+                    color: iconColor,
                   ),
                   const SizedBox(width: 3),
                   Text(
                     playerState.settings.singleSentenceMode
                         ? l10n.singleSentenceMode
                         : l10n.listMode,
-                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                    style: captionStyle,
                   ),
                 ],
               ),
@@ -571,11 +598,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.repeat_one, size: 14, color: Colors.grey[600]),
+                    Icon(Icons.repeat_one, size: 14, color: iconColor),
                     const SizedBox(width: 3),
                     Text(
                       'x${playerState.settings.loopCount}',
-                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      style: captionStyle,
                     ),
                   ],
                 ),
@@ -585,13 +612,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.repeat, size: 14, color: Colors.grey[600]),
+                    Icon(Icons.repeat, size: 14, color: iconColor),
                     const SizedBox(width: 3),
                     Text(
                       playerState.settings.loopAudio == 0
                           ? '∞'
                           : 'x${playerState.settings.loopAudio}',
-                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      style: captionStyle,
                     ),
                   ],
                 ),
@@ -599,7 +626,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
               const SizedBox(width: 12),
               Text(
                 '${playerState.settings.playbackSpeed}x',
-                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                style: captionStyle,
               ),
             ],
           ),
@@ -677,7 +704,7 @@ class _HotkeyTipsCarouselState extends State<_HotkeyTipsCarousel> {
       child: Text(
         _getCurrentTip(),
         key: ValueKey<int>(_currentIndex),
-        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+        style: AppTextStyles.caption(context),
         textAlign: TextAlign.right,
       ),
     );

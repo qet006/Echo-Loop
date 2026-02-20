@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
+import '../theme/app_theme.dart';
 
 /// 学习页面 - 占位页面
 ///
@@ -16,13 +17,13 @@ class StudyScreen extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.school,
+            Icons.school_outlined,
             size: 64,
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+            color: Theme.of(context).colorScheme.outline,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.m),
           Text(l10n.study, style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.s),
           Text(
             l10n.studyComingSoon,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(

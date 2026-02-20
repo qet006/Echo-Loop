@@ -9,6 +9,7 @@ import '../models/audio_item.dart';
 import '../providers/audio_library_provider.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../l10n/app_localizations.dart';
+import '../theme/app_theme.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
@@ -42,17 +43,19 @@ class LibraryScreen extends ConsumerWidget {
                 Icon(
                   Icons.library_music_outlined,
                   size: 64,
-                  color: Theme.of(context).colorScheme.secondary,
+                  color: Theme.of(context).colorScheme.outline,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.m),
                 Text(
                   l10n.noAudioYet,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.s),
                 Text(
                   l10n.tapToAdd,
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -91,8 +94,11 @@ class _AudioListTile extends ConsumerWidget {
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      elevation: isCurrentlyPlaying ? 4 : 1,
-      color: null,
+      color: isCurrentlyPlaying
+          ? Theme.of(
+              context,
+            ).colorScheme.primaryContainer.withValues(alpha: 0.3)
+          : null,
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: Theme.of(context).colorScheme.primaryContainer,
@@ -155,7 +161,10 @@ class _AudioListTile extends ConsumerWidget {
                   value: 'delete',
                   child: Row(
                     children: [
-                      const Icon(Icons.delete, color: Colors.red),
+                      Icon(
+                        Icons.delete,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                       const SizedBox(width: 8),
                       Text(l10n.delete),
                     ],
@@ -184,10 +193,14 @@ class _AudioListTile extends ConsumerWidget {
               ),
             );
             // 从库中移除无效条目
-            ref.read(audioLibraryProvider.notifier).removeAudioItem(audioItem.id);
+            ref
+                .read(audioLibraryProvider.notifier)
+                .removeAudioItem(audioItem.id);
             return;
           }
-          await ref.read(listeningPracticeProvider.notifier).loadAudio(audioItem);
+          await ref
+              .read(listeningPracticeProvider.notifier)
+              .loadAudio(audioItem);
           if (!context.mounted) return;
           Navigator.pushNamed(context, '/player');
         },
@@ -213,12 +226,14 @@ class _AudioListTile extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () {
-              ref.read(audioLibraryProvider.notifier).removeAudioItem(
-                audioItem.id,
-              );
+              ref
+                  .read(audioLibraryProvider.notifier)
+                  .removeAudioItem(audioItem.id);
               Navigator.pop(context);
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
             child: Text(l10n.delete),
           ),
         ],

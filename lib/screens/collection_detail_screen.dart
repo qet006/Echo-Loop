@@ -11,6 +11,7 @@ import '../providers/collection_provider.dart';
 import '../providers/audio_library_provider.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../l10n/app_localizations.dart';
+import '../theme/app_theme.dart';
 
 /// 合集详情页面 - 展示合集中的音频，支持上传音频
 class CollectionDetailScreen extends ConsumerWidget {
@@ -59,17 +60,25 @@ class CollectionDetailScreen extends ConsumerWidget {
                   Icon(
                     Icons.library_music_outlined,
                     size: 64,
-                    color: Theme.of(context).colorScheme.secondary,
+                    color: Theme.of(context).colorScheme.outline,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.m),
                   Text(
                     l10n.emptyCollection,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.s),
                   Text(
                     l10n.tapToAddAudio,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.l),
+                  FilledButton.icon(
+                    onPressed: () => _showAddAudioDialog(context, collection),
+                    icon: const Icon(Icons.add),
+                    label: Text(l10n.addAudioToCollection),
                   ),
                 ],
               ),
@@ -92,9 +101,8 @@ class CollectionDetailScreen extends ConsumerWidget {
   void _showAddAudioDialog(BuildContext context, Collection collection) {
     showDialog(
       context: context,
-      builder: (context) => _AddAudioToCollectionDialog(
-        collectionId: collection.id,
-      ),
+      builder: (context) =>
+          _AddAudioToCollectionDialog(collectionId: collection.id),
     );
   }
 }
@@ -119,7 +127,11 @@ class _CollectionAudioTile extends ConsumerWidget {
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      elevation: isCurrentlyPlaying ? 4 : 1,
+      color: isCurrentlyPlaying
+          ? Theme.of(
+              context,
+            ).colorScheme.primaryContainer.withValues(alpha: 0.3)
+          : null,
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: Theme.of(context).colorScheme.primaryContainer,
@@ -161,8 +173,7 @@ class _CollectionAudioTile extends ConsumerWidget {
           children: [
             if (isCurrentlyPlaying)
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.primary,
                   borderRadius: BorderRadius.circular(12),
@@ -183,8 +194,10 @@ class _CollectionAudioTile extends ConsumerWidget {
                   value: 'remove',
                   child: Row(
                     children: [
-                      const Icon(Icons.remove_circle_outline,
-                          color: Colors.red),
+                      Icon(
+                        Icons.remove_circle_outline,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                       const SizedBox(width: 8),
                       Text(l10n.removeFromCollection),
                     ],
@@ -213,7 +226,9 @@ class _CollectionAudioTile extends ConsumerWidget {
             );
             return;
           }
-          await ref.read(listeningPracticeProvider.notifier).loadAudio(audioItem);
+          await ref
+              .read(listeningPracticeProvider.notifier)
+              .loadAudio(audioItem);
           if (!context.mounted) return;
           Navigator.pushNamed(context, '/player');
         },
@@ -241,13 +256,12 @@ class _CollectionAudioTile extends ConsumerWidget {
             onPressed: () {
               ref
                   .read(collectionListProvider.notifier)
-                  .removeAudioFromCollection(
-                    collectionId,
-                    audioItem.id,
-                  );
+                  .removeAudioFromCollection(collectionId, audioItem.id);
               Navigator.pop(ctx);
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(ctx).colorScheme.error,
+            ),
             child: Text(l10n.delete),
           ),
         ],
@@ -509,10 +523,9 @@ class _AddAudioToCollectionDialogState
 
     // 添加到合集
     if (mounted) {
-      await ref.read(collectionListProvider.notifier).addAudioToCollection(
-            widget.collectionId,
-            audioId,
-          );
+      await ref
+          .read(collectionListProvider.notifier)
+          .addAudioToCollection(widget.collectionId, audioId);
       Navigator.pop(context);
     }
   }

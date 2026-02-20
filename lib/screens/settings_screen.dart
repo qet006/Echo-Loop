@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/settings_provider.dart';
+import '../theme/app_theme.dart';
 
 class SettingsScreen extends ConsumerWidget {
   final PackageInfo? packageInfo;
@@ -18,6 +19,7 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.settings)),
       body: ListView(
+        padding: const EdgeInsets.all(AppSpacing.m),
         children: [
           _buildSection(
             context,
@@ -27,22 +29,8 @@ class SettingsScreen extends ConsumerWidget {
               _buildLanguageTile(context, l10n, settings, settingsController),
             ],
           ),
-          const Divider(height: 32),
-          _buildSection(
-            context,
-            title: l10n.about,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.info_outline),
-                title: Text(l10n.version),
-                subtitle: Text(packageInfo?.version ?? ''),
-              ),
-              ListTile(
-                leading: const Icon(Icons.description_outlined),
-                title: Text(l10n.appDescription),
-              ),
-            ],
-          ),
+          const SizedBox(height: AppSpacing.m),
+          _buildAboutSection(context, l10n),
         ],
       ),
     );
@@ -57,7 +45,12 @@ class SettingsScreen extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.m,
+            AppSpacing.s,
+            AppSpacing.m,
+            AppSpacing.s,
+          ),
           child: Text(
             title,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
@@ -66,9 +59,51 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
         ),
-        ...children,
+        Card(child: Column(children: _intersperseDividers(children))),
       ],
     );
+  }
+
+  /// 构建关于信息区域
+  Widget _buildAboutSection(BuildContext context, AppLocalizations l10n) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return _buildSection(
+      context,
+      title: l10n.about,
+      children: [
+        ListTile(
+          leading: _emojiIcon('ℹ️'),
+          title: Text(l10n.version),
+          trailing: Text(
+            packageInfo?.version ?? '',
+            style: TextStyle(color: colorScheme.onSurfaceVariant),
+          ),
+        ),
+        ListTile(leading: _emojiIcon('📖'), title: Text(l10n.appDescription)),
+      ],
+    );
+  }
+
+  /// 构建 emoji 图标（Learna AI 风格）
+  Widget _emojiIcon(String emoji) {
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: Center(child: Text(emoji, style: const TextStyle(fontSize: 22))),
+    );
+  }
+
+  /// 在 children 之间插入浅灰分割线
+  List<Widget> _intersperseDividers(List<Widget> children) {
+    if (children.length <= 1) return children;
+    final result = <Widget>[];
+    for (var i = 0; i < children.length; i++) {
+      result.add(children[i]);
+      if (i < children.length - 1) {
+        result.add(const Divider(height: 1, indent: 56));
+      }
+    }
+    return result;
   }
 
   Widget _buildThemeModeTile(
@@ -77,11 +112,21 @@ class SettingsScreen extends ConsumerWidget {
     AppSettingsState settings,
     AppSettings controller,
   ) {
+    final colorScheme = Theme.of(context).colorScheme;
     return ListTile(
-      leading: Icon(_getThemeIcon(settings.themeMode)),
+      leading: _emojiIcon('🎨'),
       title: Text(l10n.themeMode),
-      subtitle: Text(_getThemeModeName(l10n, settings.themeMode)),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _getThemeModeName(l10n, settings.themeMode),
+            style: TextStyle(color: colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          const Icon(Icons.chevron_right),
+        ],
+      ),
       onTap: () => _showThemeModeDialog(context, l10n, settings, controller),
     );
   }
@@ -92,21 +137,23 @@ class SettingsScreen extends ConsumerWidget {
     AppSettingsState settings,
     AppSettings controller,
   ) {
+    final colorScheme = Theme.of(context).colorScheme;
     return ListTile(
-      leading: const Icon(Icons.language),
+      leading: _emojiIcon('🌐'),
       title: Text(l10n.language),
-      subtitle: Text(_getLanguageName(l10n, settings.locale)),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _getLanguageName(l10n, settings.locale),
+            style: TextStyle(color: colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          const Icon(Icons.chevron_right),
+        ],
+      ),
       onTap: () => _showLanguageDialog(context, l10n, settings, controller),
     );
-  }
-
-  IconData _getThemeIcon(ThemeMode mode) {
-    return switch (mode) {
-      ThemeMode.light => Icons.light_mode,
-      ThemeMode.dark => Icons.dark_mode,
-      ThemeMode.system => Icons.brightness_auto,
-    };
   }
 
   String _getThemeModeName(AppLocalizations l10n, ThemeMode mode) {
@@ -138,16 +185,31 @@ class SettingsScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildThemeOption(
-              context, l10n, settings, controller,
-              ThemeMode.system, Icons.brightness_auto, l10n.themeModeSystem,
+              context,
+              l10n,
+              settings,
+              controller,
+              ThemeMode.system,
+              '⚙️',
+              l10n.themeModeSystem,
             ),
             _buildThemeOption(
-              context, l10n, settings, controller,
-              ThemeMode.light, Icons.light_mode, l10n.themeModeLight,
+              context,
+              l10n,
+              settings,
+              controller,
+              ThemeMode.light,
+              '☀️',
+              l10n.themeModeLight,
             ),
             _buildThemeOption(
-              context, l10n, settings, controller,
-              ThemeMode.dark, Icons.dark_mode, l10n.themeModeDark,
+              context,
+              l10n,
+              settings,
+              controller,
+              ThemeMode.dark,
+              '🌛',
+              l10n.themeModeDark,
             ),
           ],
         ),
@@ -161,7 +223,7 @@ class SettingsScreen extends ConsumerWidget {
     AppSettingsState settings,
     AppSettings controller,
     ThemeMode mode,
-    IconData icon,
+    String emoji,
     String label,
   ) {
     final isSelected = settings.themeMode == mode;
@@ -178,7 +240,7 @@ class SettingsScreen extends ConsumerWidget {
       ),
       title: Row(
         children: [
-          Icon(icon, size: 20),
+          Text(emoji, style: const TextStyle(fontSize: 20)),
           const SizedBox(width: 12),
           Text(label),
         ],
@@ -205,12 +267,22 @@ class SettingsScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildLanguageOption(
-              context, l10n, settings, controller,
-              const Locale('en'), l10n.languageEnglish,
+              context,
+              l10n,
+              settings,
+              controller,
+              const Locale('en'),
+              '🇺🇸',
+              l10n.languageEnglish,
             ),
             _buildLanguageOption(
-              context, l10n, settings, controller,
-              const Locale('zh'), l10n.languageChinese,
+              context,
+              l10n,
+              settings,
+              controller,
+              const Locale('zh'),
+              '🇨🇳',
+              l10n.languageChinese,
             ),
           ],
         ),
@@ -224,6 +296,7 @@ class SettingsScreen extends ConsumerWidget {
     AppSettingsState settings,
     AppSettings controller,
     Locale locale,
+    String emoji,
     String label,
   ) {
     final isSelected = settings.locale == locale;
@@ -238,7 +311,13 @@ class SettingsScreen extends ConsumerWidget {
           }
         },
       ),
-      title: Text(label),
+      title: Row(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 12),
+          Text(label),
+        ],
+      ),
       selected: isSelected,
       onTap: () {
         controller.setLocale(locale);

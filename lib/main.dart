@@ -12,6 +12,8 @@ import 'screens/collection_screen.dart';
 import 'screens/study_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/player_screen.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,38 +56,6 @@ class FluencyApp extends ConsumerWidget {
 
   const FluencyApp({super.key, required this.packageInfo});
 
-  ThemeData _buildLightTheme() {
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF2196F3),
-        brightness: Brightness.light,
-      ),
-      cardTheme: const CardThemeData(
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(12)),
-        ),
-      ),
-    );
-  }
-
-  ThemeData _buildDarkTheme() {
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF2196F3),
-        brightness: Brightness.dark,
-      ),
-      cardTheme: const CardThemeData(
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(12)),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(appSettingsProvider);
@@ -93,8 +63,8 @@ class FluencyApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Fluency',
       debugShowCheckedModeBanner: false,
-      theme: _buildLightTheme(),
-      darkTheme: _buildDarkTheme(),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       themeMode: settings.themeMode,
       locale: settings.locale,
       supportedLocales: const [Locale('en'), Locale('zh')],
@@ -107,6 +77,7 @@ class FluencyApp extends ConsumerWidget {
       home: MainScreen(packageInfo: packageInfo),
       routes: {
         '/settings': (context) => const SettingsScreen(),
+        '/player': (context) => const PlayerScreen(),
       },
     );
   }
@@ -136,7 +107,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWideScreen = constraints.maxWidth > 600;
@@ -145,46 +115,48 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           body: Row(
             children: [
               if (isWideScreen)
-                Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
-                    border: Border(
-                      right: BorderSide(
-                        color: Theme.of(context).dividerColor,
-                        width: 1,
+                NavigationRail(
+                  extended: constraints.maxWidth >= 800,
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: (index) {
+                    setState(() {
+                      _selectedIndex = index;
+                    });
+                  },
+                  destinations: [
+                    NavigationRailDestination(
+                      icon: const Icon(Icons.collections_bookmark_outlined),
+                      selectedIcon: const Icon(
+                        Icons.collections_bookmark,
+                        color: AppTheme.navActiveColor,
                       ),
+                      label: Text(l10n.collections),
                     ),
-                  ),
-                  child: NavigationRail(
-                    extended: constraints.maxWidth >= 800,
-                    selectedIndex: _selectedIndex,
-                    backgroundColor: Colors.transparent,
-                    onDestinationSelected: (index) {
-                      setState(() {
-                        _selectedIndex = index;
-                      });
-                    },
-                    destinations: [
-                      NavigationRailDestination(
-                        icon: const Icon(Icons.collections_bookmark),
-                        label: Text(l10n.collections),
+                    NavigationRailDestination(
+                      icon: const Icon(Icons.school_outlined),
+                      selectedIcon: const Icon(
+                        Icons.school,
+                        color: AppTheme.navActiveColor,
                       ),
-                      NavigationRailDestination(
-                        icon: const Icon(Icons.school),
-                        label: Text(l10n.study),
+                      label: Text(l10n.study),
+                    ),
+                    NavigationRailDestination(
+                      icon: const Icon(Icons.favorite_border),
+                      selectedIcon: const Icon(
+                        Icons.favorite,
+                        color: AppTheme.navActiveColor,
                       ),
-                      NavigationRailDestination(
-                        icon: const Icon(Icons.favorite),
-                        label: Text(l10n.favorites),
+                      label: Text(l10n.favorites),
+                    ),
+                    NavigationRailDestination(
+                      icon: const Icon(Icons.person_outline),
+                      selectedIcon: const Icon(
+                        Icons.person,
+                        color: AppTheme.navActiveColor,
                       ),
-                      NavigationRailDestination(
-                        icon: const Icon(Icons.person),
-                        label: Text(l10n.profile),
-                      ),
-                    ],
-                  ),
+                      label: Text(l10n.profile),
+                    ),
+                  ],
                 ),
               Expanded(child: _getSelectedScreen()),
             ],
@@ -201,19 +173,35 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                   labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                   destinations: [
                     NavigationDestination(
-                      icon: const Icon(Icons.collections_bookmark, size: 24),
+                      icon: const Icon(Icons.collections_bookmark_outlined),
+                      selectedIcon: const Icon(
+                        Icons.collections_bookmark,
+                        color: AppTheme.navActiveColor,
+                      ),
                       label: l10n.collections,
                     ),
                     NavigationDestination(
-                      icon: const Icon(Icons.school, size: 24),
+                      icon: const Icon(Icons.school_outlined),
+                      selectedIcon: const Icon(
+                        Icons.school,
+                        color: AppTheme.navActiveColor,
+                      ),
                       label: l10n.study,
                     ),
                     NavigationDestination(
-                      icon: const Icon(Icons.favorite, size: 24),
+                      icon: const Icon(Icons.favorite_border),
+                      selectedIcon: const Icon(
+                        Icons.favorite,
+                        color: AppTheme.navActiveColor,
+                      ),
                       label: l10n.favorites,
                     ),
                     NavigationDestination(
-                      icon: const Icon(Icons.person, size: 24),
+                      icon: const Icon(Icons.person_outline),
+                      selectedIcon: const Icon(
+                        Icons.person,
+                        color: AppTheme.navActiveColor,
+                      ),
                       label: l10n.profile,
                     ),
                   ],

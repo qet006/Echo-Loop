@@ -33,10 +33,9 @@ List<Override> _audioOverrides({
     ),
     audioEngineProvider.overrideWith(
       () => TestAudioEngine(
-        initialState: engineState ??
-            const AudioEngineState(
-              totalDuration: Duration(seconds: 120),
-            ),
+        initialState:
+            engineState ??
+            const AudioEngineState(totalDuration: Duration(seconds: 120)),
       ),
     ),
   ];
@@ -46,18 +45,14 @@ void main() {
   group('PlayerScreen', () {
     group('渲染', () {
       testWidgets('无音频时显示空状态', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(const PlayerScreen()),
-        );
+        await tester.pumpWidget(createTestScreen(const PlayerScreen()));
         await tester.pumpAndSettle();
 
         expect(find.text('No audio loaded'), findsOneWidget);
       });
 
       testWidgets('无音频时 AppBar 显示 Player 标题', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(const PlayerScreen()),
-        );
+        await tester.pumpWidget(createTestScreen(const PlayerScreen()));
         await tester.pumpAndSettle();
 
         expect(find.text('Player'), findsOneWidget);
@@ -157,18 +152,14 @@ void main() {
       });
 
       testWidgets('AppBar 显示设置按钮', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(const PlayerScreen()),
-        );
+        await tester.pumpWidget(createTestScreen(const PlayerScreen()));
         await tester.pumpAndSettle();
 
         expect(find.byIcon(Icons.settings), findsOneWidget);
       });
 
       testWidgets('AppBar 显示自动滚动切换按钮', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(const PlayerScreen()),
-        );
+        await tester.pumpWidget(createTestScreen(const PlayerScreen()));
         await tester.pumpAndSettle();
 
         // 默认启用自动滚动
@@ -192,15 +183,13 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('No Subtitle'), findsOneWidget);
-        expect(find.byIcon(Icons.subtitles_off), findsOneWidget);
+        expect(find.byIcon(Icons.subtitles_off_outlined), findsOneWidget);
       });
     });
 
     group('交互', () {
       testWidgets('点击设置按钮打开设置对话框', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(const PlayerScreen()),
-        );
+        await tester.pumpWidget(createTestScreen(const PlayerScreen()));
         await tester.pumpAndSettle();
 
         // 点击设置按钮

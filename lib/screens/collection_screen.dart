@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/collection.dart';
 import '../providers/collection_provider.dart';
 import '../l10n/app_localizations.dart';
+import '../theme/app_theme.dart';
 import 'collection_detail_screen.dart';
 
 /// 合集列表页面
@@ -23,7 +24,8 @@ class CollectionScreen extends ConsumerWidget {
           // 视图切换按钮
           Builder(
             builder: (context) {
-              final isGrid = collectionState.viewMode == CollectionViewMode.grid;
+              final isGrid =
+                  collectionState.viewMode == CollectionViewMode.grid;
               return IconButton(
                 icon: Icon(isGrid ? Icons.view_list : Icons.grid_view),
                 tooltip: isGrid ? l10n.listView : l10n.gridView,
@@ -53,17 +55,25 @@ class CollectionScreen extends ConsumerWidget {
                 Icon(
                   Icons.collections_bookmark_outlined,
                   size: 64,
-                  color: Theme.of(context).colorScheme.secondary,
+                  color: Theme.of(context).colorScheme.outline,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.m),
                 Text(
                   l10n.noCollectionsYet,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.s),
                 Text(
                   l10n.tapToCreateCollection,
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.l),
+                FilledButton.icon(
+                  onPressed: () => _showCreateDialog(context),
+                  icon: const Icon(Icons.add),
+                  label: Text(l10n.createCollection),
                 ),
               ],
             ),
@@ -71,7 +81,8 @@ class CollectionScreen extends ConsumerWidget {
         }
 
         final collections = collectionState.collections;
-        final isCustomSort = collectionState.sortType == CollectionSortType.custom;
+        final isCustomSort =
+            collectionState.sortType == CollectionSortType.custom;
 
         if (collectionState.viewMode == CollectionViewMode.grid) {
           if (isCustomSort) {
@@ -117,13 +128,18 @@ class CollectionScreen extends ConsumerWidget {
 
   /// 可拖拽排序列表视图（Custom Order 模式）
   Widget _buildReorderableListView(
-      BuildContext context, WidgetRef ref, List<Collection> collections) {
+    BuildContext context,
+    WidgetRef ref,
+    List<Collection> collections,
+  ) {
     return ReorderableListView.builder(
       padding: const EdgeInsets.all(8),
       buildDefaultDragHandles: false,
       itemCount: collections.length,
       onReorder: (oldIndex, newIndex) {
-        ref.read(collectionListProvider.notifier).reorderCollections(oldIndex, newIndex);
+        ref
+            .read(collectionListProvider.notifier)
+            .reorderCollections(oldIndex, newIndex);
       },
       itemBuilder: (context, index) {
         return _CollectionListTile(
@@ -138,7 +154,9 @@ class CollectionScreen extends ConsumerWidget {
 
   /// 可拖拽排序网格视图（Custom Order + Grid 模式）
   Widget _buildReorderableGridView(
-      BuildContext context, List<Collection> collections) {
+    BuildContext context,
+    List<Collection> collections,
+  ) {
     return _ReorderableCollectionGrid(collections: collections);
   }
 
@@ -164,10 +182,26 @@ class _SortButton extends ConsumerWidget {
       itemBuilder: (context) {
         final current = ref.read(collectionListProvider).sortType;
         return [
-          _sortMenuItem(l10n.sortByNameAsc, CollectionSortType.nameAsc, current),
-          _sortMenuItem(l10n.sortByNameDesc, CollectionSortType.nameDesc, current),
-          _sortMenuItem(l10n.sortByDateAsc, CollectionSortType.dateAsc, current),
-          _sortMenuItem(l10n.sortByDateDesc, CollectionSortType.dateDesc, current),
+          _sortMenuItem(
+            l10n.sortByNameAsc,
+            CollectionSortType.nameAsc,
+            current,
+          ),
+          _sortMenuItem(
+            l10n.sortByNameDesc,
+            CollectionSortType.nameDesc,
+            current,
+          ),
+          _sortMenuItem(
+            l10n.sortByDateAsc,
+            CollectionSortType.dateAsc,
+            current,
+          ),
+          _sortMenuItem(
+            l10n.sortByDateDesc,
+            CollectionSortType.dateDesc,
+            current,
+          ),
           _sortMenuItem(l10n.sortByCustom, CollectionSortType.custom, current),
         ];
       },
@@ -224,7 +258,9 @@ class _CollectionGridTile extends ConsumerWidget {
                       iconSize: 18,
                       icon: Icon(
                         collection.isStarred ? Icons.star : Icons.star_border,
-                        color: collection.isStarred ? Colors.amber : null,
+                        color: collection.isStarred
+                            ? AppTheme.bookmarkColor
+                            : null,
                       ),
                       tooltip: collection.isStarred
                           ? l10n.unstarCollection
@@ -257,8 +293,11 @@ class _CollectionGridTile extends ConsumerWidget {
                           value: 'delete',
                           child: Row(
                             children: [
-                              const Icon(Icons.delete,
-                                  size: 18, color: Colors.red),
+                              Icon(
+                                Icons.delete,
+                                size: 18,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
                               const SizedBox(width: 8),
                               Text(l10n.delete),
                             ],
@@ -277,12 +316,16 @@ class _CollectionGridTile extends ConsumerWidget {
                 ],
               ),
               // 文件夹图标
-              Icon(
-                Icons.folder,
-                size: 48,
-                color: collection.isStarred
-                    ? Colors.amber
-                    : Theme.of(context).colorScheme.primary,
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                child: Icon(
+                  Icons.folder,
+                  size: 32,
+                  color: collection.isStarred
+                      ? AppTheme.bookmarkColor
+                      : Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
               ),
               const SizedBox(height: 4),
               // 合集名称
@@ -340,7 +383,7 @@ class _CollectionListTile extends ConsumerWidget {
           child: Icon(
             collection.isStarred ? Icons.folder_special : Icons.folder,
             color: collection.isStarred
-                ? Colors.amber
+                ? AppTheme.bookmarkColor
                 : Theme.of(context).colorScheme.onPrimaryContainer,
           ),
         ),
@@ -370,7 +413,7 @@ class _CollectionListTile extends ConsumerWidget {
               child: IconButton(
                 icon: Icon(
                   collection.isStarred ? Icons.star : Icons.star_border,
-                  color: collection.isStarred ? Colors.amber : null,
+                  color: collection.isStarred ? AppTheme.bookmarkColor : null,
                   size: 22,
                 ),
                 tooltip: collection.isStarred
@@ -378,7 +421,9 @@ class _CollectionListTile extends ConsumerWidget {
                     : l10n.starCollection,
                 padding: EdgeInsets.zero,
                 onPressed: () {
-                  ref.read(collectionListProvider.notifier).toggleStar(collection.id);
+                  ref
+                      .read(collectionListProvider.notifier)
+                      .toggleStar(collection.id);
                 },
               ),
             ),
@@ -403,7 +448,10 @@ class _CollectionListTile extends ConsumerWidget {
                     value: 'delete',
                     child: Row(
                       children: [
-                        const Icon(Icons.delete, color: Colors.red),
+                        Icon(
+                          Icons.delete,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                         const SizedBox(width: 8),
                         Text(l10n.delete),
                       ],
@@ -594,10 +642,7 @@ class _CreateCollectionDialogState
           onPressed: () => Navigator.pop(context),
           child: Text(l10n.cancel),
         ),
-        ElevatedButton(
-          onPressed: _create,
-          child: Text(l10n.add),
-        ),
+        ElevatedButton(onPressed: _create, child: Text(l10n.add)),
       ],
     );
   }
@@ -630,7 +675,10 @@ class _CreateCollectionDialogState
 
 /// 重命名合集对话框
 void _showRenameCollectionDialog(
-    BuildContext context, WidgetRef ref, Collection collection) {
+  BuildContext context,
+  WidgetRef ref,
+  Collection collection,
+) {
   final l10n = AppLocalizations.of(context)!;
   final controller = TextEditingController(text: collection.name);
 
@@ -641,16 +689,13 @@ void _showRenameCollectionDialog(
       content: TextField(
         controller: controller,
         autofocus: true,
-        decoration: InputDecoration(
-          labelText: l10n.collectionName,
-        ),
+        decoration: InputDecoration(labelText: l10n.collectionName),
         onSubmitted: (_) {
           final name = controller.text.trim();
           if (name.isNotEmpty) {
-            ref.read(collectionListProvider.notifier).renameCollection(
-                  collection.id,
-                  name,
-                );
+            ref
+                .read(collectionListProvider.notifier)
+                .renameCollection(collection.id, name);
             Navigator.pop(ctx);
           }
         },
@@ -664,10 +709,9 @@ void _showRenameCollectionDialog(
           onPressed: () {
             final name = controller.text.trim();
             if (name.isNotEmpty) {
-              ref.read(collectionListProvider.notifier).renameCollection(
-                    collection.id,
-                    name,
-                  );
+              ref
+                  .read(collectionListProvider.notifier)
+                  .renameCollection(collection.id, name);
               Navigator.pop(ctx);
             }
           },
@@ -680,7 +724,10 @@ void _showRenameCollectionDialog(
 
 /// 删除确认对话框
 void _showDeleteConfirmDialog(
-    BuildContext context, WidgetRef ref, Collection collection) {
+  BuildContext context,
+  WidgetRef ref,
+  Collection collection,
+) {
   final l10n = AppLocalizations.of(context)!;
   showDialog(
     context: context,
@@ -699,7 +746,9 @@ void _showDeleteConfirmDialog(
                 .deleteCollection(collection.id);
             Navigator.pop(ctx);
           },
-          style: TextButton.styleFrom(foregroundColor: Colors.red),
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(ctx).colorScheme.error,
+          ),
           child: Text(l10n.delete),
         ),
       ],

@@ -22,8 +22,8 @@ void collectionTests() {
       // 初始为空状态
       expect(find.text('No collections yet'), findsOneWidget);
 
-      // 点击创建按钮
-      await tester.tap(find.byIcon(Icons.add));
+      // 点击 AppBar 中的创建按钮（空状态 CTA 中也有 add 图标）
+      await tester.tap(find.byIcon(Icons.add).first);
       await tester.pumpAndSettle();
 
       // 输入合集名称

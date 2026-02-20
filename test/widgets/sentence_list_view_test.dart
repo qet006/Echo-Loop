@@ -75,32 +75,30 @@ void main() {
       testWidgets('当前句子高亮显示', (tester) async {
         final sentences = createTestSentences(count: 3);
 
-        await tester.pumpWidget(_buildTestWidget(
-          sentences: sentences,
-          currentIndex: 1,
-        ));
+        await tester.pumpWidget(
+          _buildTestWidget(sentences: sentences, currentIndex: 1),
+        );
         await tester.pumpAndSettle();
 
-        // 当前句子的 Card 应该有更高的 elevation
+        // 所有 Card 应该渲染
         final cards = tester.widgetList<Card>(find.byType(Card));
         expect(cards.length, 3);
 
-        // Card 列表中第 2 个（index=1）应该 elevation=2（高亮）
+        // 当前句子的 Card 应有高亮背景色（primaryContainer）
         final currentCard = cards.elementAt(1);
-        expect(currentCard.elevation, 2);
+        expect(currentCard.color, isNotNull);
 
-        // 其他 Card 应该 elevation=1（普通）
+        // 其他 Card 使用默认背景（无自定义色）
         final normalCard = cards.elementAt(0);
-        expect(normalCard.elevation, 1);
+        expect(normalCard.color, isNull);
       });
 
       testWidgets('书签图标状态正确（已书签/未书签）', (tester) async {
         final sentences = createTestSentences(count: 3);
 
-        await tester.pumpWidget(_buildTestWidget(
-          sentences: sentences,
-          bookmarkedIndices: {0, 2},
-        ));
+        await tester.pumpWidget(
+          _buildTestWidget(sentences: sentences, bookmarkedIndices: {0, 2}),
+        );
         await tester.pumpAndSettle();
 
         // 有两个已书签的图标和一个未书签的图标
@@ -109,9 +107,7 @@ void main() {
       });
 
       testWidgets('空句子列表不崩溃', (tester) async {
-        await tester.pumpWidget(_buildTestWidget(
-          sentences: const [],
-        ));
+        await tester.pumpWidget(_buildTestWidget(sentences: const []));
         await tester.pumpAndSettle();
 
         // 组件应正常渲染
@@ -124,10 +120,12 @@ void main() {
         final sentences = createTestSentences(count: 3);
         int? tappedIndex;
 
-        await tester.pumpWidget(_buildTestWidget(
-          sentences: sentences,
-          onSentenceTap: (index) => tappedIndex = index,
-        ));
+        await tester.pumpWidget(
+          _buildTestWidget(
+            sentences: sentences,
+            onSentenceTap: (index) => tappedIndex = index,
+          ),
+        );
         await tester.pumpAndSettle();
 
         // 点击第二个句子
@@ -141,10 +139,12 @@ void main() {
         final sentences = createTestSentences(count: 3);
         int? toggledIndex;
 
-        await tester.pumpWidget(_buildTestWidget(
-          sentences: sentences,
-          onBookmarkToggle: (index) => toggledIndex = index,
-        ));
+        await tester.pumpWidget(
+          _buildTestWidget(
+            sentences: sentences,
+            onBookmarkToggle: (index) => toggledIndex = index,
+          ),
+        );
         await tester.pumpAndSettle();
 
         // 点击第一个句子的书签图标

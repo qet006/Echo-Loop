@@ -8,6 +8,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../models/sentence.dart';
 import '../services/subtitle_parser.dart';
 import '../l10n/app_localizations.dart';
+import '../theme/app_theme.dart';
 
 class SentenceListView extends StatefulWidget {
   final List<Sentence> sentences;
@@ -237,23 +238,12 @@ class _SentenceTile extends StatelessWidget {
     final rightSpacing = isMobile ? 2.0 : 4.0;
 
     return Card(
-      elevation: isCurrent ? 2 : 1,
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       color: isCurrent
           ? Theme.of(
               context,
-            ).colorScheme.secondaryContainer.withValues(alpha: 0.26)
+            ).colorScheme.primaryContainer.withValues(alpha: 0.3)
           : null,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: isCurrent
-            ? BorderSide(
-                color: Theme.of(
-                  context,
-                ).colorScheme.secondary.withValues(alpha: 0.35),
-              )
-            : const BorderSide(color: Colors.transparent),
-      ),
       child: GestureDetector(
         onSecondaryTapDown: (details) {
           _showContextMenu(context, details.globalPosition);
@@ -264,7 +254,7 @@ class _SentenceTile extends StatelessWidget {
             : null,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           child: Padding(
             // 移动端右侧减小padding以补偿IconButton的内部空白，实现视觉对称
             padding: isMobile
@@ -304,7 +294,9 @@ class _SentenceTile extends StatelessWidget {
                         children: [
                           Text(
                             sentence.text,
-                            style: const TextStyle(fontSize: 15, height: 1.4),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyLarge?.copyWith(height: 1.4),
                             textAlign: TextAlign.left,
                           ),
                           if (!showTranscript)
@@ -318,7 +310,10 @@ class _SentenceTile extends StatelessWidget {
                                       sigmaY: 5,
                                     ),
                                     child: Container(
-                                      color: Colors.grey.withValues(alpha: 0.1),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.05),
                                     ),
                                   ),
                                 ),
@@ -329,10 +324,7 @@ class _SentenceTile extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         '${SubtitleParser.formatDuration(sentence.startTime)} - ${SubtitleParser.formatDuration(sentence.endTime)}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
-                          fontSize: 11,
-                        ),
+                        style: AppTextStyles.caption(context),
                       ),
                     ],
                   ),
@@ -341,7 +333,9 @@ class _SentenceTile extends StatelessWidget {
                 IconButton(
                   icon: Icon(
                     isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                    color: isBookmarked ? Colors.amber : Colors.grey,
+                    color: isBookmarked
+                        ? AppTheme.bookmarkColor
+                        : Theme.of(context).colorScheme.outline,
                   ),
                   iconSize: iconSize,
                   padding: EdgeInsets.all(iconButtonPadding),

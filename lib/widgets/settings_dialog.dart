@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
+import '../theme/app_theme.dart';
 
 class SettingsDialog extends ConsumerWidget {
   const SettingsDialog({super.key});
@@ -30,16 +31,22 @@ class SettingsDialog extends ConsumerWidget {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(AppSpacing.l),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildSentenceRepeatSettings(
-                      context, l10n, playerState, controller,
+                      context,
+                      l10n,
+                      playerState,
+                      controller,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.m),
                     _buildAudioLoopSettings(
-                      context, l10n, playerState, controller,
+                      context,
+                      l10n,
+                      playerState,
+                      controller,
                     ),
                   ],
                 ),
@@ -71,14 +78,15 @@ class SettingsDialog extends ConsumerWidget {
               value: playerState.settings.autoPlayNextSentenceEnabled,
               onChanged: (value) {
                 controller.updateSettings(
-                  playerState.settings
-                      .copyWith(autoPlayNextSentenceEnabled: value),
+                  playerState.settings.copyWith(
+                    autoPlayNextSentenceEnabled: value,
+                  ),
                 );
               },
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.m),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -97,7 +105,7 @@ class SettingsDialog extends ConsumerWidget {
           ],
         ),
         if (playerState.settings.loopEnabled) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.m),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -133,7 +141,7 @@ class SettingsDialog extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.m),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -203,7 +211,7 @@ class SettingsDialog extends ConsumerWidget {
           ],
         ),
         if (playerState.settings.loopAudioEnabled) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.m),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [

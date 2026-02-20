@@ -13,6 +13,7 @@ import 'package:fluency/providers/audio_library_provider.dart';
 import 'package:fluency/providers/collection_provider.dart';
 import 'package:fluency/providers/listening_practice/listening_practice_provider.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
+import 'package:fluency/theme/app_theme.dart';
 
 import 'mock_providers.dart';
 
@@ -51,10 +52,7 @@ Widget createTestApp(
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-      ),
+      theme: AppTheme.light(),
       home: Scaffold(body: child),
     ),
   );
@@ -87,10 +85,7 @@ Widget createTestScreen(
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-      ),
+      theme: AppTheme.light(),
       home: screen,
       routes: {
         '/player': (context) => const Scaffold(body: Text('Player')),

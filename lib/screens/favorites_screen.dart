@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
+import '../theme/app_theme.dart';
 
 /// 收藏页面 - 占位页面
 ///
@@ -16,16 +17,16 @@ class FavoritesScreen extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.favorite,
+            Icons.favorite_border,
             size: 64,
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+            color: Theme.of(context).colorScheme.outline,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.m),
           Text(
             l10n.favorites,
             style: Theme.of(context).textTheme.headlineMedium,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.s),
           Text(
             l10n.favoritesComingSoon,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(

@@ -10,14 +10,22 @@
 - [x] 将四个 Tab 从 Library | Collections | Player | Account 改为 合集 | 学习 | 收藏 | 我的，默认是学习
 
 **完成时间**: 2026-02-20
-**变更点**:
-- 新建 `lib/screens/study_screen.dart` — 学习页 placeholder
-- 新建 `lib/screens/favorites_screen.dart` — 收藏页 placeholder
-- 修改 `lib/main.dart` — 更新导航栏（NavigationBar + NavigationRail）和 `_getSelectedScreen()`
-- 更新 `lib/l10n/app_en.arb` 和 `lib/l10n/app_zh.arb` — 新增 study/favorites/profile/comingSoon 翻译
-- 更新 `integration_test/app_test.dart` 和 `test/widget_test.dart` — 适配新导航结构
 
----
+## 优化 UI
+
+- [x] 创建主题系统 `lib/theme/app_theme.dart`（颜色、组件主题、间距常量、语义色）
+- [x] 接入主题系统到 main.dart，优化导航栏图标和样式
+- [x] 优化播放器页面（控制面板、句子卡片、进度条、图标颜色统一）
+- [x] 优化合集页面（卡片视觉、图标颜色、空状态 CTA）
+- [x] 优化音频库页面（图标颜色、elevation 统一、空状态）
+- [x] 优化设置页面和对话框（Card 分组、间距统一）
+- [x] 优化占位页面 StudyScreen / FavoritesScreen 空状态
+- [x] 更新测试适配 UI 变更，运行全部验证命令
+- [x] 参考 Learna AI 风格视觉改造（蓝色主色调、浅灰背景、卡片去边框加微弱阴影、圆角增大）
+- [x] 导航栏选中态蓝色 + 设置页面布局优化（分割线、单行 trailing 值）
+
+**完成时间**: 2026-02-21
+**Commit**:
 
 ## Milestone 2: 学习流程引擎
 
