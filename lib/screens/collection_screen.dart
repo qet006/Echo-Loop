@@ -318,13 +318,13 @@ class _CollectionGridTile extends ConsumerWidget {
               // 文件夹图标
               CircleAvatar(
                 radius: 28,
-                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                backgroundColor: Colors.transparent,
                 child: Icon(
                   Icons.folder,
                   size: 32,
                   color: collection.isStarred
                       ? AppTheme.bookmarkColor
-                      : Theme.of(context).colorScheme.onPrimaryContainer,
+                      : Theme.of(context).colorScheme.primary,
                 ),
               ),
               const SizedBox(height: 4),
@@ -379,7 +379,7 @@ class _CollectionListTile extends ConsumerWidget {
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          backgroundColor: Colors.transparent,
           child: Icon(
             collection.isStarred ? Icons.folder_special : Icons.folder,
             color: collection.isStarred

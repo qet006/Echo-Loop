@@ -384,6 +384,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tapToAddAudio => '点击 + 添加音频文件';
 
   @override
+  String get renameAudio => '重命名';
+
+  @override
+  String get audioName => '音频名称';
+
+  @override
+  String get audioAlreadyInCollection => '音频重复';
+
+  @override
+  String audioAlreadyInCollectionMessage(String name) {
+    return '合集中已存在名为「$name」的音频。';
+  }
+
+  @override
   String get study => '学习';
 
   @override

@@ -1,21 +1,13 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../models/collection.dart';
 import '../services/storage_service.dart';
+import 'audio_library_provider.dart';
 
 part 'collection_provider.g.dart';
 
-enum CollectionSortType {
-  nameAsc,
-  nameDesc,
-  dateAsc,
-  dateDesc,
-  custom,
-}
+enum CollectionSortType { nameAsc, nameDesc, dateAsc, dateDesc, custom }
 
-enum CollectionViewMode {
-  grid,
-  list,
-}
+enum CollectionViewMode { grid, list }
 
 class CollectionState {
   final List<Collection> rawCollections;
@@ -75,6 +67,31 @@ class CollectionList extends _$CollectionList {
     state = state.copyWith(isLoading: true);
     final collections = await StorageService.loadCollections();
     state = state.copyWith(rawCollections: collections, isLoading: false);
+
+    // 清理合集中引用了已不存在的音频 ID
+    await _cleanupStaleAudioIds();
+  }
+
+  /// 清理合集中引用了已不存在的音频 ID
+  Future<void> _cleanupStaleAudioIds() async {
+    final libraryNotifier = ref.read(audioLibraryProvider.notifier);
+    final collections = [...state.rawCollections];
+    bool changed = false;
+
+    for (int i = 0; i < collections.length; i++) {
+      final validIds = collections[i].audioItemIds
+          .where((id) => libraryNotifier.getItemById(id) != null)
+          .toList();
+      if (validIds.length != collections[i].audioItemIds.length) {
+        collections[i] = collections[i].copyWith(audioItemIds: validIds);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      state = state.copyWith(rawCollections: collections);
+      await _save();
+    }
   }
 
   Future<void> createCollection(String name) async {
@@ -119,18 +136,14 @@ class CollectionList extends _$CollectionList {
     }
   }
 
-  Future<void> addAudioToCollection(
-    String collectionId,
-    String audioId,
-  ) async {
+  Future<void> addAudioToCollection(String collectionId, String audioId) async {
     final collections = [...state.rawCollections];
     final index = collections.indexWhere((c) => c.id == collectionId);
     if (index != -1) {
       final ids = List<String>.from(collections[index].audioItemIds);
       if (!ids.contains(audioId)) {
         ids.add(audioId);
-        collections[index] =
-            collections[index].copyWith(audioItemIds: ids);
+        collections[index] = collections[index].copyWith(audioItemIds: ids);
         state = state.copyWith(rawCollections: collections);
         await _save();
       }
@@ -146,8 +159,25 @@ class CollectionList extends _$CollectionList {
     if (index != -1) {
       final ids = List<String>.from(collections[index].audioItemIds);
       ids.remove(audioId);
-      collections[index] =
-          collections[index].copyWith(audioItemIds: ids);
+      collections[index] = collections[index].copyWith(audioItemIds: ids);
+      state = state.copyWith(rawCollections: collections);
+      await _save();
+    }
+  }
+
+  /// 从所有合集中移除指定音频的引用（当音频从音频库删除时调用）
+  Future<void> removeAudioFromAllCollections(String audioId) async {
+    final collections = [...state.rawCollections];
+    bool changed = false;
+    for (int i = 0; i < collections.length; i++) {
+      if (collections[i].audioItemIds.contains(audioId)) {
+        final ids = List<String>.from(collections[i].audioItemIds);
+        ids.remove(audioId);
+        collections[i] = collections[i].copyWith(audioItemIds: ids);
+        changed = true;
+      }
+    }
+    if (changed) {
       state = state.copyWith(rawCollections: collections);
       await _save();
     }

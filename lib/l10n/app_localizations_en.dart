@@ -386,6 +386,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tapToAddAudio => 'Tap + to add audio files';
 
   @override
+  String get renameAudio => 'Rename';
+
+  @override
+  String get audioName => 'Audio Name';
+
+  @override
+  String get audioAlreadyInCollection => 'Duplicate Audio';
+
+  @override
+  String audioAlreadyInCollectionMessage(String name) {
+    return 'An audio named \"$name\" already exists in this collection.';
+  }
+
+  @override
   String get study => 'Study';
 
   @override

@@ -1,6 +1,9 @@
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 
+/// copyWith 用于区分"未传参"与"显式传 null"的哨兵值
+const _sentinel = Object();
+
 class AudioItem {
   final String id;
   final String name;
@@ -18,7 +21,8 @@ class AudioItem {
     this.totalDuration = 0,
   });
 
-  bool get hasTranscript => transcriptPath != null && transcriptPath!.isNotEmpty;
+  bool get hasTranscript =>
+      transcriptPath != null && transcriptPath!.isNotEmpty;
 
   /// 获取音频文件的完整路径
   Future<String> getFullAudioPath() async {
@@ -34,28 +38,28 @@ class AudioItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'audioPath': audioPath,
-        'transcriptPath': transcriptPath,
-        'addedDate': addedDate.toIso8601String(),
-        'totalDuration': totalDuration,
-      };
+    'id': id,
+    'name': name,
+    'audioPath': audioPath,
+    'transcriptPath': transcriptPath,
+    'addedDate': addedDate.toIso8601String(),
+    'totalDuration': totalDuration,
+  };
 
   factory AudioItem.fromJson(Map<String, dynamic> json) => AudioItem(
-        id: json['id'],
-        name: json['name'],
-        audioPath: json['audioPath'],
-        transcriptPath: json['transcriptPath'],
-        addedDate: DateTime.parse(json['addedDate']),
-        totalDuration: json['totalDuration'] ?? 0,
-      );
+    id: json['id'],
+    name: json['name'],
+    audioPath: json['audioPath'],
+    transcriptPath: json['transcriptPath'],
+    addedDate: DateTime.parse(json['addedDate']),
+    totalDuration: json['totalDuration'] ?? 0,
+  );
 
   AudioItem copyWith({
     String? id,
     String? name,
     String? audioPath,
-    String? transcriptPath,
+    Object? transcriptPath = _sentinel,
     DateTime? addedDate,
     int? totalDuration,
   }) {
@@ -63,7 +67,9 @@ class AudioItem {
       id: id ?? this.id,
       name: name ?? this.name,
       audioPath: audioPath ?? this.audioPath,
-      transcriptPath: transcriptPath ?? this.transcriptPath,
+      transcriptPath: transcriptPath == _sentinel
+          ? this.transcriptPath
+          : transcriptPath as String?,
       addedDate: addedDate ?? this.addedDate,
       totalDuration: totalDuration ?? this.totalDuration,
     );

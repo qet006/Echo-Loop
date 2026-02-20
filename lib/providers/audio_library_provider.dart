@@ -3,6 +3,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../models/audio_item.dart';
 import '../services/storage_service.dart';
+import 'collection_provider.dart';
 
 part 'audio_library_provider.g.dart';
 
@@ -10,17 +11,11 @@ class AudioLibraryState {
   final List<AudioItem> audioItems;
   final bool isLoading;
 
-  const AudioLibraryState({
-    this.audioItems = const [],
-    this.isLoading = false,
-  });
+  const AudioLibraryState({this.audioItems = const [], this.isLoading = false});
 
   bool get isEmpty => audioItems.isEmpty;
 
-  AudioLibraryState copyWith({
-    List<AudioItem>? audioItems,
-    bool? isLoading,
-  }) {
+  AudioLibraryState copyWith({List<AudioItem>? audioItems, bool? isLoading}) {
     return AudioLibraryState(
       audioItems: audioItems ?? this.audioItems,
       isLoading: isLoading ?? this.isLoading,
@@ -64,6 +59,18 @@ class AudioLibrary extends _$AudioLibrary {
       final audioFile = File(fullAudioPath);
       final audioExists = await audioFile.exists();
 
+      // 验证字幕文件是否存在，不存在则清除路径
+      if (audioExists && processedItem.hasTranscript) {
+        final fullTranscriptPath = await processedItem.getFullTranscriptPath();
+        if (fullTranscriptPath != null) {
+          final transcriptFile = File(fullTranscriptPath);
+          if (!await transcriptFile.exists()) {
+            processedItem = processedItem.copyWith(transcriptPath: null);
+            hasMigratedItems = true; // 标记需要保存
+          }
+        }
+      }
+
       if (audioExists) {
         validItems.add(processedItem);
       } else {
@@ -98,14 +105,14 @@ class AudioLibrary extends _$AudioLibrary {
         return null;
       }
 
-      final relativeAudioPath =
-          item.audioPath.substring(docsPath.length + 1);
+      final relativeAudioPath = item.audioPath.substring(docsPath.length + 1);
 
       String? relativeTranscriptPath;
       if (item.transcriptPath != null &&
           item.transcriptPath!.startsWith(docsPath)) {
-        relativeTranscriptPath =
-            item.transcriptPath!.substring(docsPath.length + 1);
+        relativeTranscriptPath = item.transcriptPath!.substring(
+          docsPath.length + 1,
+        );
       } else if (item.transcriptPath != null &&
           !item.transcriptPath!.startsWith('/')) {
         relativeTranscriptPath = item.transcriptPath;
@@ -122,9 +129,7 @@ class AudioLibrary extends _$AudioLibrary {
   }
 
   Future<void> addAudioItem(AudioItem item) async {
-    state = state.copyWith(
-      audioItems: [...state.audioItems, item],
-    );
+    state = state.copyWith(audioItems: [...state.audioItems, item]);
     await _saveLibrary();
   }
 
@@ -167,6 +172,9 @@ class AudioLibrary extends _$AudioLibrary {
       audioItems: state.audioItems.where((item) => item.id != id).toList(),
     );
     await _saveLibrary();
+
+    // 从所有合集中清理对该音频的引用
+    ref.read(collectionListProvider.notifier).removeAudioFromAllCollections(id);
   }
 
   Future<void> updateAudioItem(AudioItem updatedItem) async {

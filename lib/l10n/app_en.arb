@@ -163,6 +163,17 @@
   },
   "emptyCollection": "No audio in this collection",
   "tapToAddAudio": "Tap + to add audio files",
+  "renameAudio": "Rename",
+  "audioName": "Audio Name",
+  "audioAlreadyInCollection": "Duplicate Audio",
+  "audioAlreadyInCollectionMessage": "An audio named \"{name}\" already exists in this collection.",
+  "@audioAlreadyInCollectionMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "study": "Study",
   "favorites": "Favorites",
   "profile": "Profile",

@@ -99,8 +99,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(audioLibraryProvider.notifier).loadLibrary();
-      ref.read(collectionListProvider.notifier).loadCollections();
+      ref.read(audioLibraryProvider.notifier).loadLibrary().then((_) {
+        ref.read(collectionListProvider.notifier).loadCollections();
+      });
     });
   }
 

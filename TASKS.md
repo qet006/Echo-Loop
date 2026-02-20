@@ -27,6 +27,18 @@
 **完成时间**: 2026-02-21
 **Commit**: 11a5eb0
 
+## 优化合集 Tab
+
+- [x] 图标颜色优化：folder/audiotrack 图标从 `onPrimaryContainer` 改为 `primary`（蓝色）
+- [x] 音频菜单改为"重命名 + 删除"（原仅"从合集移除"）
+- [x] 上传同名音频到同一合集时弹出错误提醒
+- [x] 修复字幕标记显示错误：loadLibrary 增加字幕文件存在性验证；AudioItem.copyWith 支持显式 null transcriptPath
+- [x] 去掉图标 CircleAvatar 背景色（backgroundColor 改为 transparent）
+- [x] 修复合集音频数量不正确：删除音频时清理合集引用 + 启动时清理过期引用
+
+**完成时间**: 2026-02-21
+**Commit**: 待提交后更新
+
 ## Milestone 2: 学习流程引擎
 
 - [ ] 设计学习进度数据模型（阶段、小阶段、完成状态、难度）

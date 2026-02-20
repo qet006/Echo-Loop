@@ -134,10 +134,10 @@ class _CollectionAudioTile extends ConsumerWidget {
           : null,
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          backgroundColor: Colors.transparent,
           child: Icon(
             Icons.audiotrack,
-            color: Theme.of(context).colorScheme.onPrimaryContainer,
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         title: Text(
@@ -191,21 +191,34 @@ class _CollectionAudioTile extends ConsumerWidget {
             PopupMenuButton(
               itemBuilder: (context) => [
                 PopupMenuItem(
-                  value: 'remove',
+                  value: 'rename',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.edit, size: 20),
+                      const SizedBox(width: 8),
+                      Text(l10n.renameAudio),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
                   child: Row(
                     children: [
                       Icon(
-                        Icons.remove_circle_outline,
+                        Icons.delete,
+                        size: 20,
                         color: Theme.of(context).colorScheme.error,
                       ),
                       const SizedBox(width: 8),
-                      Text(l10n.removeFromCollection),
+                      Text(l10n.delete),
                     ],
                   ),
                 ),
               ],
               onSelected: (value) {
-                if (value == 'remove') {
+                if (value == 'rename') {
+                  _showRenameAudioDialog(context, ref);
+                } else if (value == 'delete') {
                   _confirmRemove(context, ref);
                 }
               },
@@ -238,6 +251,51 @@ class _CollectionAudioTile extends ConsumerWidget {
 
   String _formatDate(DateTime date) {
     return '${date.month}/${date.day}/${date.year}';
+  }
+
+  /// 重命名音频对话框
+  void _showRenameAudioDialog(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    final controller = TextEditingController(text: audioItem.name);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.renameAudio),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(labelText: l10n.audioName),
+          onSubmitted: (_) {
+            final name = controller.text.trim();
+            if (name.isNotEmpty) {
+              ref
+                  .read(audioLibraryProvider.notifier)
+                  .updateAudioItem(audioItem.copyWith(name: name));
+              Navigator.pop(ctx);
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                ref
+                    .read(audioLibraryProvider.notifier)
+                    .updateAudioItem(audioItem.copyWith(name: name));
+                Navigator.pop(ctx);
+              }
+            },
+            child: Text(l10n.ok),
+          ),
+        ],
+      ),
+    );
   }
 
   void _confirmRemove(BuildContext context, WidgetRef ref) {
@@ -488,6 +546,39 @@ class _AddAudioToCollectionDialogState
 
   Future<void> _addAudio() async {
     if (_audioPath == null) return;
+
+    final l10n = AppLocalizations.of(context)!;
+
+    // 检查当前合集中是否已存在同名音频
+    final collectionState = ref.read(collectionListProvider);
+    final collection = collectionState.rawCollections
+        .where((c) => c.id == widget.collectionId)
+        .firstOrNull;
+    if (collection != null) {
+      final libraryNotifier = ref.read(audioLibraryProvider.notifier);
+      for (final existingId in collection.audioItemIds) {
+        final existingAudio = libraryNotifier.getItemById(existingId);
+        if (existingAudio != null && existingAudio.name == _audioName) {
+          // 合集中已存在同名音频，弹出提醒
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text(l10n.audioAlreadyInCollection),
+                content: Text(l10n.audioAlreadyInCollectionMessage(_audioName)),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(l10n.ok),
+                  ),
+                ],
+              ),
+            );
+          }
+          return;
+        }
+      }
+    }
 
     // 检查是否已存在同名文件
     final library = ref.read(audioLibraryProvider.notifier);

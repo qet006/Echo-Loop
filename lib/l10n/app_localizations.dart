@@ -824,6 +824,30 @@ abstract class AppLocalizations {
   /// **'Tap + to add audio files'**
   String get tapToAddAudio;
 
+  /// No description provided for @renameAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get renameAudio;
+
+  /// No description provided for @audioName.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Name'**
+  String get audioName;
+
+  /// No description provided for @audioAlreadyInCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate Audio'**
+  String get audioAlreadyInCollection;
+
+  /// No description provided for @audioAlreadyInCollectionMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'An audio named \"{name}\" already exists in this collection.'**
+  String audioAlreadyInCollectionMessage(String name);
+
   /// No description provided for @study.
   ///
   /// In en, this message translates to:
