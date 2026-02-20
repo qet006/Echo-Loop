@@ -17,22 +17,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../helpers/mock_providers.dart';
 import '../helpers/test_app.dart';
 
-/// 抑制 PlayerScreen.dispose() 中 ref.read() 触发的 StateError。
-///
-/// PlayerScreen 在 dispose() 中调用 ref.read() 来暂停和保存状态，
-/// 但在测试拆卸时 ref 已经失效。这是一个已知的 production code 问题，
-/// 不影响测试验证目标。需要在 testWidgets 回调体内调用才能生效。
-void _suppressRefAfterDisposeError() {
-  final originalOnError = FlutterError.onError!;
-  FlutterError.onError = (details) {
-    if (details.exception is StateError &&
-        details.exception.toString().contains('Cannot use "ref"')) {
-      return;
-    }
-    originalOnError(details);
-  };
-}
-
 /// 有音频状态的通用 provider overrides
 List<Override> _audioOverrides({
   ListeningPracticeState? practiceState,
@@ -62,7 +46,6 @@ void main() {
   group('PlayerScreen', () {
     group('渲染', () {
       testWidgets('无音频时显示空状态', (tester) async {
-        _suppressRefAfterDisposeError();
         await tester.pumpWidget(
           createTestScreen(const PlayerScreen()),
         );
@@ -72,7 +55,6 @@ void main() {
       });
 
       testWidgets('无音频时 AppBar 显示 Player 标题', (tester) async {
-        _suppressRefAfterDisposeError();
         await tester.pumpWidget(
           createTestScreen(const PlayerScreen()),
         );
@@ -82,7 +64,6 @@ void main() {
       });
 
       testWidgets('有音频时显示音频名称作为标题', (tester) async {
-        _suppressRefAfterDisposeError();
         final item = createTestAudioItem(name: 'My Lesson');
         final sentences = createTestSentences(count: 3);
 
@@ -104,7 +85,6 @@ void main() {
       });
 
       testWidgets('有音频和句子时显示 TabBar', (tester) async {
-        _suppressRefAfterDisposeError();
         final item = createTestAudioItem();
         final sentences = createTestSentences(count: 3);
 
@@ -129,7 +109,6 @@ void main() {
       });
 
       testWidgets('句子列表正确显示', (tester) async {
-        _suppressRefAfterDisposeError();
         final item = createTestAudioItem();
         final sentences = createTestSentences(count: 3);
 
@@ -154,7 +133,6 @@ void main() {
       });
 
       testWidgets('显示 PlaybackControls', (tester) async {
-        _suppressRefAfterDisposeError();
         final item = createTestAudioItem();
         final sentences = createTestSentences(count: 3);
 
@@ -179,7 +157,6 @@ void main() {
       });
 
       testWidgets('AppBar 显示设置按钮', (tester) async {
-        _suppressRefAfterDisposeError();
         await tester.pumpWidget(
           createTestScreen(const PlayerScreen()),
         );
@@ -189,7 +166,6 @@ void main() {
       });
 
       testWidgets('AppBar 显示自动滚动切换按钮', (tester) async {
-        _suppressRefAfterDisposeError();
         await tester.pumpWidget(
           createTestScreen(const PlayerScreen()),
         );
@@ -200,7 +176,6 @@ void main() {
       });
 
       testWidgets('有音频但无字幕时显示无字幕提示', (tester) async {
-        _suppressRefAfterDisposeError();
         final item = createTestAudioItem();
 
         await tester.pumpWidget(
@@ -223,7 +198,6 @@ void main() {
 
     group('交互', () {
       testWidgets('点击设置按钮打开设置对话框', (tester) async {
-        _suppressRefAfterDisposeError();
         await tester.pumpWidget(
           createTestScreen(const PlayerScreen()),
         );
@@ -239,7 +213,6 @@ void main() {
       });
 
       testWidgets('切换全文/书签 Tab', (tester) async {
-        _suppressRefAfterDisposeError();
         final item = createTestAudioItem();
         final sentences = createTestSentences(count: 3);
 

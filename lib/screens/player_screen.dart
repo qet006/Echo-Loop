@@ -49,10 +49,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   }
 
   @override
-  void dispose() {
-    // Save state and pause on dispose
+  void deactivate() {
+    // 在 deactivate 中暂停和保存状态，此时 ref 仍然可用。
+    // dispose 中 ref 已失效，会抛 StateError。
     ref.read(listeningPracticeProvider.notifier).pause();
     ref.read(listeningPracticeProvider.notifier).saveCurrentPlaybackState();
+    super.deactivate();
+  }
+
+  @override
+  void dispose() {
     _tabController.dispose();
     super.dispose();
   }
