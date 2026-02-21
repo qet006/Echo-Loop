@@ -1,5 +1,8 @@
+import 'package:drift/drift.dart';
+
+import '../../database/app_database.dart';
+import '../../database/daos/bookmark_dao.dart';
 import '../../models/sentence.dart';
-import '../../services/storage_service.dart';
 
 /// 书签管理器
 /// 负责书签的添加、删除、加载和保存
@@ -19,22 +22,53 @@ class BookmarkManager {
     return normalized.trim();
   }
 
-  /// 加载书签
-  static Future<Set<int>> loadBookmarks(String audioId) async {
+  /// 加载书签（从 Drift 数据库）
+  static Future<Set<int>> loadBookmarks(
+    String audioId, {
+    required BookmarkDao dao,
+  }) async {
     try {
-      return await StorageService.loadBookmarks(audioId);
+      return await dao.getBookmarkedIndices(audioId);
     } catch (e) {
       print('Error loading bookmarks: $e');
       return {};
     }
   }
 
-  /// 保存书签
-  static Future<void> saveBookmarks(String audioId, Set<int> bookmarks) async {
+  /// 保存单个书签到 Drift 数据库
+  static Future<void> addBookmarkToDb(
+    String audioId,
+    Sentence sentence, {
+    required BookmarkDao dao,
+  }) async {
     try {
-      await StorageService.saveBookmarks(audioId, bookmarks);
+      final now = DateTime.now();
+      await dao.addBookmark(
+        BookmarksCompanion(
+          audioItemId: Value(audioId),
+          sentenceIndex: Value(sentence.index),
+          sentenceText: Value(sentence.text),
+          startTime: Value(sentence.startTime.inMilliseconds / 1000.0),
+          endTime: Value(sentence.endTime.inMilliseconds / 1000.0),
+          createdAt: Value(now),
+          updatedAt: Value(now),
+        ),
+      );
     } catch (e) {
-      print('Error saving bookmarks: $e');
+      print('Error adding bookmark: $e');
+    }
+  }
+
+  /// 从 Drift 数据库移除书签
+  static Future<void> removeBookmarksFromDb(
+    String audioId,
+    Set<int> indices, {
+    required BookmarkDao dao,
+  }) async {
+    try {
+      await dao.removeBookmarks(audioId, indices);
+    } catch (e) {
+      print('Error removing bookmarks: $e');
     }
   }
 

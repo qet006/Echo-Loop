@@ -1,42 +1,41 @@
+import 'package:drift/drift.dart';
 import 'package:just_audio/just_audio.dart' as ja;
-import '../../services/storage_service.dart';
+import '../../database/app_database.dart' hide AudioItem;
+import '../../database/daos/playback_state_dao.dart';
 import '../../models/audio_item.dart';
 import '../../models/listening_practice_state.dart';
 
+/// 播放状态持久化
+/// 使用 Drift 数据库存储播放断点，精简为只存 position + playlistMode
 class PlaybackStateStorage {
   static Future<void> savePlaybackState(
     AudioItem audioItem,
     ja.AudioPlayer audioPlayer,
-    ListeningPracticeState state,
-  ) async {
-    final stateMap = {
-      'position': audioPlayer.position.inMilliseconds,
-      'currentFullIndex': state.currentFullIndex,
-      'currentBookmarkIndex': state.currentBookmarkIndex,
-      'playlistMode': state.playlistMode.index,
-      'timestamp': DateTime.now().toIso8601String(),
-    };
-
-    await StorageService.savePlaybackState(audioItem.id, stateMap);
+    ListeningPracticeState state, {
+    required PlaybackStateDao dao,
+  }) async {
+    await dao.saveState(
+      PlaybackStatesCompanion(
+        audioItemId: Value(audioItem.id),
+        positionMs: Value(audioPlayer.position.inMilliseconds),
+        playlistMode: Value(state.playlistMode.index),
+        savedAt: Value(DateTime.now()),
+      ),
+    );
     print('Saved playback state for ${audioItem.name}');
   }
 
   static Future<PlaybackStateRestoreResult?> loadPlaybackState(
-    String audioId,
-  ) async {
-    final stateMap = await StorageService.loadPlaybackState(audioId);
-    if (stateMap == null) return null;
+    String audioId, {
+    required PlaybackStateDao dao,
+  }) async {
+    final dbState = await dao.getByAudioId(audioId);
+    if (dbState == null) return null;
 
     try {
       return PlaybackStateRestoreResult(
-        position: stateMap['position'] != null
-            ? Duration(milliseconds: stateMap['position'] as int)
-            : null,
-        currentFullIndex: stateMap['currentFullIndex'] as int?,
-        currentBookmarkIndex: stateMap['currentBookmarkIndex'] as int?,
-        playlistMode: stateMap['playlistMode'] != null
-            ? PlaylistMode.values[stateMap['playlistMode'] as int]
-            : null,
+        position: Duration(milliseconds: dbState.positionMs),
+        playlistMode: PlaylistMode.values[dbState.playlistMode],
       );
     } catch (e) {
       print('Error loading playback state: $e');
@@ -45,16 +44,12 @@ class PlaybackStateStorage {
   }
 }
 
+/// 播放状态恢复结果
+/// 精简版：只包含 position 和 playlistMode
+/// currentFullIndex / currentBookmarkIndex 从 position 通过 SentenceTracker 计算
 class PlaybackStateRestoreResult {
   final Duration? position;
-  final int? currentFullIndex;
-  final int? currentBookmarkIndex;
   final PlaylistMode? playlistMode;
 
-  PlaybackStateRestoreResult({
-    this.position,
-    this.currentFullIndex,
-    this.currentBookmarkIndex,
-    this.playlistMode,
-  });
+  PlaybackStateRestoreResult({this.position, this.playlistMode});
 }

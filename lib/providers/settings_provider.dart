@@ -13,10 +13,7 @@ class AppSettingsState {
     this.locale = const Locale('en'),
   });
 
-  AppSettingsState copyWith({
-    ThemeMode? themeMode,
-    Locale? locale,
-  }) {
+  AppSettingsState copyWith({ThemeMode? themeMode, Locale? locale}) {
     return AppSettingsState(
       themeMode: themeMode ?? this.themeMode,
       locale: locale ?? this.locale,

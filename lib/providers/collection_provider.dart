@@ -1,6 +1,8 @@
+import 'package:drift/drift.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../database/app_database.dart' as db;
+import '../database/providers.dart';
 import '../models/collection.dart';
-import '../services/storage_service.dart';
 import 'audio_library_provider.dart';
 
 part 'collection_provider.g.dart';
@@ -15,14 +17,28 @@ class CollectionState {
   final CollectionViewMode viewMode;
   final CollectionSortType sortType;
 
+  /// 缓存每个合集的音频 ID 列表（从 junction 表加载）
+  final Map<String, List<String>> audioIdsMap;
+
   const CollectionState({
     this.rawCollections = const [],
     this.isLoading = false,
     this.viewMode = CollectionViewMode.list,
     this.sortType = CollectionSortType.dateDesc,
+    this.audioIdsMap = const {},
   });
 
   bool get isEmpty => rawCollections.isEmpty;
+
+  /// 获取合集的音频 ID 列表
+  List<String> getAudioIds(String collectionId) {
+    return audioIdsMap[collectionId] ?? [];
+  }
+
+  /// 获取合集的音频数量
+  int getAudioCount(String collectionId) {
+    return audioIdsMap[collectionId]?.length ?? 0;
+  }
 
   List<Collection> get collections {
     final sorted = List<Collection>.from(rawCollections);
@@ -46,12 +62,14 @@ class CollectionState {
     bool? isLoading,
     CollectionViewMode? viewMode,
     CollectionSortType? sortType,
+    Map<String, List<String>>? audioIdsMap,
   }) {
     return CollectionState(
       rawCollections: rawCollections ?? this.rawCollections,
       isLoading: isLoading ?? this.isLoading,
       viewMode: viewMode ?? this.viewMode,
       sortType: sortType ?? this.sortType,
+      audioIdsMap: audioIdsMap ?? this.audioIdsMap,
     );
   }
 }
@@ -65,8 +83,33 @@ class CollectionList extends _$CollectionList {
 
   Future<void> loadCollections() async {
     state = state.copyWith(isLoading: true);
-    final collections = await StorageService.loadCollections();
-    state = state.copyWith(rawCollections: collections, isLoading: false);
+
+    final dao = ref.read(collectionDaoProvider);
+    final dbCollections = await dao.getAllActive();
+
+    final collections = dbCollections
+        .map(
+          (row) => Collection(
+            id: row.id,
+            name: row.name,
+            createdDate: row.createdDate,
+            isStarred: row.isStarred,
+            sortOrder: row.sortOrder,
+          ),
+        )
+        .toList();
+
+    // 加载每个合集的音频 ID 列表
+    final audioIdsMap = <String, List<String>>{};
+    for (final c in collections) {
+      audioIdsMap[c.id] = await dao.getAudioIds(c.id);
+    }
+
+    state = state.copyWith(
+      rawCollections: collections,
+      isLoading: false,
+      audioIdsMap: audioIdsMap,
+    );
 
     // 清理合集中引用了已不存在的音频 ID
     await _cleanupStaleAudioIds();
@@ -75,43 +118,40 @@ class CollectionList extends _$CollectionList {
   /// 清理合集中引用了已不存在的音频 ID
   Future<void> _cleanupStaleAudioIds() async {
     final libraryNotifier = ref.read(audioLibraryProvider.notifier);
-    final collections = [...state.rawCollections];
-    bool changed = false;
+    final collectionDao = ref.read(collectionDaoProvider);
 
-    for (int i = 0; i < collections.length; i++) {
-      final validIds = collections[i].audioItemIds
-          .where((id) => libraryNotifier.getItemById(id) != null)
+    for (final collection in state.rawCollections) {
+      final audioIds = await collectionDao.getAudioIds(collection.id);
+      final invalidIds = audioIds
+          .where((id) => libraryNotifier.getItemById(id) == null)
           .toList();
-      if (validIds.length != collections[i].audioItemIds.length) {
-        collections[i] = collections[i].copyWith(audioItemIds: validIds);
-        changed = true;
-      }
-    }
 
-    if (changed) {
-      state = state.copyWith(rawCollections: collections);
-      await _save();
+      for (final invalidId in invalidIds) {
+        await collectionDao.removeAudio(collection.id, invalidId);
+      }
     }
   }
 
   Future<void> createCollection(String name) async {
+    final now = DateTime.now();
     final collection = Collection(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: now.millisecondsSinceEpoch.toString(),
       name: name,
-      createdDate: DateTime.now(),
+      createdDate: now,
       sortOrder: state.rawCollections.length,
     );
     state = state.copyWith(
       rawCollections: [...state.rawCollections, collection],
     );
-    await _save();
+    await _upsertCollection(collection);
   }
 
   Future<void> deleteCollection(String id) async {
     state = state.copyWith(
       rawCollections: state.rawCollections.where((c) => c.id != id).toList(),
     );
-    await _save();
+    final dao = ref.read(collectionDaoProvider);
+    await dao.hardDelete(id);
   }
 
   Future<void> renameCollection(String id, String newName) async {
@@ -120,7 +160,7 @@ class CollectionList extends _$CollectionList {
     if (index != -1) {
       collections[index] = collections[index].copyWith(name: newName);
       state = state.copyWith(rawCollections: collections);
-      await _save();
+      await _upsertCollection(collections[index]);
     }
   }
 
@@ -132,21 +172,21 @@ class CollectionList extends _$CollectionList {
         isStarred: !collections[index].isStarred,
       );
       state = state.copyWith(rawCollections: collections);
-      await _save();
+      await _upsertCollection(collections[index]);
     }
   }
 
   Future<void> addAudioToCollection(String collectionId, String audioId) async {
-    final collections = [...state.rawCollections];
-    final index = collections.indexWhere((c) => c.id == collectionId);
-    if (index != -1) {
-      final ids = List<String>.from(collections[index].audioItemIds);
-      if (!ids.contains(audioId)) {
-        ids.add(audioId);
-        collections[index] = collections[index].copyWith(audioItemIds: ids);
-        state = state.copyWith(rawCollections: collections);
-        await _save();
-      }
+    final dao = ref.read(collectionDaoProvider);
+    await dao.addAudio(collectionId, audioId);
+
+    // 更新缓存
+    final newMap = Map<String, List<String>>.from(state.audioIdsMap);
+    final ids = List<String>.from(newMap[collectionId] ?? []);
+    if (!ids.contains(audioId)) {
+      ids.add(audioId);
+      newMap[collectionId] = ids;
+      state = state.copyWith(audioIdsMap: newMap);
     }
   }
 
@@ -154,33 +194,37 @@ class CollectionList extends _$CollectionList {
     String collectionId,
     String audioId,
   ) async {
-    final collections = [...state.rawCollections];
-    final index = collections.indexWhere((c) => c.id == collectionId);
-    if (index != -1) {
-      final ids = List<String>.from(collections[index].audioItemIds);
-      ids.remove(audioId);
-      collections[index] = collections[index].copyWith(audioItemIds: ids);
-      state = state.copyWith(rawCollections: collections);
-      await _save();
-    }
+    final dao = ref.read(collectionDaoProvider);
+    await dao.removeAudio(collectionId, audioId);
+
+    // 更新缓存
+    final newMap = Map<String, List<String>>.from(state.audioIdsMap);
+    final ids = List<String>.from(newMap[collectionId] ?? []);
+    ids.remove(audioId);
+    newMap[collectionId] = ids;
+    state = state.copyWith(audioIdsMap: newMap);
   }
 
   /// 从所有合集中移除指定音频的引用（当音频从音频库删除时调用）
+  /// CASCADE 已自动清理 junction 表，此方法仅更新内存缓存
   Future<void> removeAudioFromAllCollections(String audioId) async {
-    final collections = [...state.rawCollections];
-    bool changed = false;
-    for (int i = 0; i < collections.length; i++) {
-      if (collections[i].audioItemIds.contains(audioId)) {
-        final ids = List<String>.from(collections[i].audioItemIds);
-        ids.remove(audioId);
-        collections[i] = collections[i].copyWith(audioItemIds: ids);
-        changed = true;
-      }
+    final newMap = Map<String, List<String>>.from(state.audioIdsMap);
+    for (final key in newMap.keys) {
+      newMap[key] = List<String>.from(newMap[key]!)..remove(audioId);
     }
-    if (changed) {
-      state = state.copyWith(rawCollections: collections);
-      await _save();
-    }
+    state = state.copyWith(audioIdsMap: newMap);
+  }
+
+  /// 获取合集中的音频 ID 列表
+  Future<List<String>> getAudioIdsForCollection(String collectionId) async {
+    final dao = ref.read(collectionDaoProvider);
+    return dao.getAudioIds(collectionId);
+  }
+
+  /// 获取合集中的音频数量
+  Future<int> getAudioCountForCollection(String collectionId) async {
+    final dao = ref.read(collectionDaoProvider);
+    return dao.getAudioCount(collectionId);
   }
 
   Collection? getCollectionById(String id) {
@@ -220,7 +264,10 @@ class CollectionList extends _$CollectionList {
     }
 
     state = state.copyWith(rawCollections: collections);
-    await _save();
+    // 批量更新排序
+    for (final c in collections) {
+      await _upsertCollection(c);
+    }
   }
 
   Future<void> applyCustomOrder(List<String> orderedIds) async {
@@ -232,10 +279,23 @@ class CollectionList extends _$CollectionList {
       }
     }
     state = state.copyWith(rawCollections: collections);
-    await _save();
+    for (final c in collections) {
+      await _upsertCollection(c);
+    }
   }
 
-  Future<void> _save() async {
-    await StorageService.saveCollections(state.rawCollections);
+  /// 将 Collection 模型写入 Drift 数据库
+  Future<void> _upsertCollection(Collection collection) async {
+    final dao = ref.read(collectionDaoProvider);
+    await dao.upsert(
+      db.CollectionsCompanion(
+        id: Value(collection.id),
+        name: Value(collection.name),
+        createdDate: Value(collection.createdDate),
+        isStarred: Value(collection.isStarred),
+        sortOrder: Value(collection.sortOrder),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 }

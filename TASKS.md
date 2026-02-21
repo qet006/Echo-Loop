@@ -1,7 +1,29 @@
 # Fluency 任务清单
 
-> 最后更新：2026-02-20
+> 最后更新：2026-02-21
 > 当前焦点：Milestone 2 - 学习流程引擎
+
+---
+
+## 基础设施：SharedPreferences → Drift 迁移
+
+- [x] 添加 drift, sqlite3_flutter_libs, drift_dev 依赖
+- [x] 定义 5 张表（audio_items, collections, collection_audio_items, bookmarks, playback_states）+ 枚举 + 数据库 + 索引
+- [x] 编写 4 个 DAO（AudioItemDao, CollectionDao, BookmarkDao, PlaybackStateDao）+ 29 个 DAO 测试
+- [x] 编写 SP → Drift 一次性迁移服务 + 7 个迁移测试
+- [x] 改造 main.dart（数据库初始化 + 迁移 + Provider override）
+- [x] 改造 AudioLibrary Provider（数据源 → AudioItemDao）
+- [x] 改造 Collection Provider + Collection 模型（junction 表 + audioIdsMap 缓存 + 移除 audioItemIds）
+- [x] 改造 BookmarkManager（数据源 → BookmarkDao，增强版书签存 text/startTime/endTime）
+- [x] 改造 PlaybackStateStorage（数据源 → PlaybackStateDao，精简为只存 position_ms）
+- [x] 清理 StorageService（仅保留 PlaybackSettings 方法）
+
+**完成时间**: 2026-02-21
+**Commit**: 待提交
+**变更点**:
+- 新建 16 个文件（表定义、DAO、数据库、迁移服务、Provider、枚举、测试）
+- 修改 12 个文件（main.dart、4 个 Provider、模型、屏幕、测试）
+- 全量测试 197 通过，集成测试 5 通过，macOS 构建成功
 
 ---
 

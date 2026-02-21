@@ -47,6 +47,8 @@ dependencies:
   shared_preferences: ^2.2.2
   path: ^1.8.3
   intl: ^0.20.2
+  drift: ^2.25.0
+  sqlite3_flutter_libs: ^0.5.31
   scrollable_positioned_list: ^0.3.8
   package_info_plus: ^9.0.0
   universal_io: ^2.2.2
@@ -67,6 +69,7 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.4
   riverpod_generator: ^2.6.3
   build_runner: ^2.4.14
+  drift_dev: ^2.25.0
   custom_lint: ^0.7.1
   riverpod_lint: ^2.6.3
 

@@ -55,7 +55,6 @@ Collection createTestCollection({
   String name = 'Test Collection',
   bool isStarred = false,
   int sortOrder = 0,
-  List<String> audioItemIds = const [],
   DateTime? createdDate,
 }) {
   return Collection(
@@ -64,7 +63,6 @@ Collection createTestCollection({
     createdDate: createdDate ?? DateTime(2026, 1, 1),
     isStarred: isStarred,
     sortOrder: sortOrder,
-    audioItemIds: audioItemIds,
   );
 }
 
@@ -106,9 +104,7 @@ class TestAudioLibrary extends AudioLibrary {
 
   @override
   Future<void> addAudioItem(AudioItem item) async {
-    state = state.copyWith(
-      audioItems: [...state.audioItems, item],
-    );
+    state = state.copyWith(audioItems: [...state.audioItems, item]);
   }
 
   @override
@@ -204,9 +200,7 @@ class TestCollectionList extends CollectionList {
 class TestListeningPractice extends ListeningPractice {
   final ListeningPracticeState _initialState;
 
-  TestListeningPractice([
-    this._initialState = const ListeningPracticeState(),
-  ]);
+  TestListeningPractice([this._initialState = const ListeningPracticeState()]);
 
   @override
   ListeningPracticeState build() => _initialState;
@@ -291,8 +285,8 @@ class TestAudioEngine extends AudioEngine {
   TestAudioEngine({
     AudioEngineState initialState = const AudioEngineState(),
     bool isPlaying = false,
-  })  : _initialState = initialState,
-        _isPlaying = isPlaying;
+  }) : _initialState = initialState,
+       _isPlaying = isPlaying;
 
   @override
   AudioEngineState build() => _initialState;

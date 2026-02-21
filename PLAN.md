@@ -1,7 +1,7 @@
 # Fluency 项目规划
 
 > 最后更新：2026-02-21
-> 当前阶段：Milestone 1 已完成 ✅，Milestone 2 计划中
+> 当前阶段：Milestone 1 已完成 ✅，Drift 迁移已完成 ✅，Milestone 2 计划中
 
 ## 项目概述
 
@@ -24,8 +24,25 @@ lib/
 │   ├── playback_settings.dart       #   播放设置（循环、速度、间隔等）
 │   ├── audio_engine_state.dart      #   音频引擎状态快照
 │   └── listening_practice_state.dart#   学习会话完整状态
+├── database/                        # Drift (SQLite) 数据库层
+│   ├── app_database.dart            #   数据库定义 + 连接 + 索引
+│   ├── enums.dart                   #   SyncStatus 枚举
+│   ├── providers.dart               #   数据库 + DAO 的 Riverpod Provider
+│   ├── tables/                      #   5 张表定义
+│   │   ├── audio_items.dart
+│   │   ├── collections.dart
+│   │   ├── collection_audio_items.dart
+│   │   ├── bookmarks.dart
+│   │   └── playback_states.dart
+│   ├── daos/                        #   4 个 DAO
+│   │   ├── audio_item_dao.dart
+│   │   ├── collection_dao.dart
+│   │   ├── bookmark_dao.dart
+│   │   └── playback_state_dao.dart
+│   └── migration/
+│       └── sp_to_drift_migration.dart  # SP → Drift 一次性迁移
 ├── services/                        # 基础服务（无状态/单例）
-│   ├── storage_service.dart         #   SharedPreferences 持久化封装
+│   ├── storage_service.dart         #   SharedPreferences（仅 PlaybackSettings）
 │   └── subtitle_parser.dart         #   SRT/VTT 字幕解析
 ├── providers/                       # Riverpod 状态管理（代码生成）
 │   ├── audio_library_provider.dart  #   音频库管理（导入/删除/路径迁移）
@@ -56,6 +73,7 @@ lib/
 
 test/                                # 单元测试 + Widget 测试
 ├── helpers/                         #   测试辅助（mock_providers, test_app）
+├── database/                        #   DAO 测试 + 迁移测试
 ├── models/                          #   6 个模型测试
 ├── providers/                       #   Provider 测试（含 listening_practice/）
 ├── screens/                         #   4 个页面 Widget 测试
@@ -76,7 +94,8 @@ integration_test/                    # 端到端集成测试
 | `audio_engine_provider.dart` | ~160 | 底层音频引擎，封装 just_audio |
 | `player_screen.dart` | — | 播放器 UI，用户交互最集中的页面 |
 | `app_theme.dart` | ~236 | 全局主题定义，修改视觉从这里开始 |
-| `storage_service.dart` | ~127 | 所有持久化逻辑的入口 |
+| `app_database.dart` | — | Drift 数据库定义（5 表 + 4 DAO + 索引） |
+| `storage_service.dart` | — | SharedPreferences（仅 PlaybackSettings） |
 | `METHOD.md` | — | 学习方法论完整设计，Milestone 2 的需求文档 |
 
 ---
@@ -107,29 +126,40 @@ integration_test/                    # 端到端集成测试
 ```
 FluencyApp (main.dart)
 ├── AppTheme (theme)
-├── AppSettings Provider (主题/语言)
-├── AudioLibrary Provider (音频文件管理)
-├── CollectionList Provider (合集管理)
-└── Screens
-    └── PlayerScreen → ListeningPractice Provider
-                        ├── AudioEngine Provider → just_audio
+├── AppSettings Provider (主题/语言) → SharedPreferences
+├── AudioLibrary Provider → AudioItemDao ──┐
+├── CollectionList Provider → CollectionDao ├──→ AppDatabase (Drift/SQLite)
+└── Screens                                 │
+    └── PlayerScreen → ListeningPractice    │
+                        ├── AudioEngine → just_audio
                         ├── SentenceTracker (二分查找)
-                        ├── BookmarkManager (书签持久化)
-                        ├── PlaybackStateStorage (断点恢复)
-                        └── StorageService → SharedPreferences
+                        ├── BookmarkManager → BookmarkDao ──┤
+                        ├── PlaybackStateStorage → PlaybackStateDao ┘
+                        └── StorageService → SharedPreferences (仅 PlaybackSettings)
 ```
 
 ### 数据持久化
 
-全部使用 SharedPreferences，按 key 分区存储：
+业务数据使用 Drift (SQLite)，纯设置使用 SharedPreferences：
 
-| Key 模式 | 内容 |
-|----------|------|
-| `audio_library` | 音频库元数据列表 |
-| `collections` | 合集列表 |
-| `playback_settings` | 播放设置 |
-| `bookmarks_<audioId>` | 每个音频的书签索引 |
-| `playback_state_<audioId>` | 每个音频的播放断点 |
+**Drift (SQLite) — 5 张表**：
+
+| 表 | 说明 |
+|----|------|
+| `audio_items` | 音频元数据（含 sync 字段） |
+| `collections` | 合集（含 sync 字段） |
+| `collection_audio_items` | Junction 表（多对多关联） |
+| `bookmarks` | 增强版书签（存 text/startTime/endTime） |
+| `playback_states` | 播放断点（仅 position_ms + playlistMode） |
+
+**SharedPreferences — 纯设置项**：
+
+| Key | 内容 |
+|-----|------|
+| `playback_settings` | 播放设置（速度、循环等） |
+| `theme_mode` | UI 主题 |
+| `locale` | 语言 |
+| `drift_migration_v1_complete` | 迁移完成标记 |
 
 ### 国际化
 
@@ -188,16 +218,17 @@ FluencyApp (main.dart)
 
 **切换条件**：`autoPlayNextSentenceEnabled=true` 且 `loopEnabled=false` 时为连续模式，否则为字幕驱动模式。
 
-### ADR-6: SharedPreferences 作为唯一持久化方案
+### ADR-6: Drift (SQLite) 作为业务数据持久化方案
 
-**决策**：当前阶段所有数据使用 SharedPreferences 存储，不引入数据库。
+**决策**：业务数据（音频、合集、书签、播放状态）使用 Drift (SQLite)，纯设置/偏好保留在 SharedPreferences。
 
 **原因**：
-- 数据量小（音频元数据、设置、书签索引），SharedPreferences 足够
-- 减少依赖复杂度，加快开发速度
-- Milestone 2 的学习进度数据量增大后，可能需要迁移到 SQLite/Drift
+- Milestone 2 学习流程需要复杂查询（进度、间隔复习调度），关系型数据库更适合
+- Junction 表管理多对多关系比 JSON 数组更可靠
+- 增强版书签存储 text/startTime/endTime，防止字幕重新解析后索引错位
+- 所有主要表预留 sync 字段（updatedAt/deletedAt/syncStatus），为未来服务器同步做准备
 
-**风险**：如果单个音频的书签/进度数据量很大，SharedPreferences 的序列化性能可能成为瓶颈。Milestone 4 需评估是否迁移。
+**迁移**：SP → Drift 一次性迁移在首次启动时自动执行，单事务保证原子性。旧 SP 数据不删除，迁移标记 `drift_migration_v1_complete` 防止重复执行。
 
 ---
 

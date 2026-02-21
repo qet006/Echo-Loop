@@ -1,8 +1,10 @@
+import 'package:drift/drift.dart';
 import 'package:universal_io/io.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../database/app_database.dart' as db;
+import '../database/providers.dart';
 import '../models/audio_item.dart';
-import '../services/storage_service.dart';
 import 'collection_provider.dart';
 
 part 'audio_library_provider.g.dart';
@@ -33,10 +35,24 @@ class AudioLibrary extends _$AudioLibrary {
   Future<void> loadLibrary() async {
     state = state.copyWith(isLoading: true);
 
-    final allItems = await StorageService.loadAudioLibrary();
+    final dao = ref.read(audioItemDaoProvider);
+    final dbItems = await dao.getAllActive();
+
+    // 将 Drift 数据转换为模型
+    final allItems = dbItems
+        .map(
+          (row) => AudioItem(
+            id: row.id,
+            name: row.name,
+            audioPath: row.audioPath,
+            transcriptPath: row.transcriptPath,
+            addedDate: row.addedDate,
+            totalDuration: row.totalDuration,
+          ),
+        )
+        .toList();
 
     final validItems = <AudioItem>[];
-    bool hasInvalidItems = false;
     bool hasMigratedItems = false;
 
     for (final item in allItems) {
@@ -49,7 +65,6 @@ class AudioLibrary extends _$AudioLibrary {
           hasMigratedItems = true;
           print('Migrated ${item.name} from absolute to relative path');
         } else {
-          hasInvalidItems = true;
           print('Failed to migrate ${item.name}, marking as invalid');
           continue;
         }
@@ -66,7 +81,7 @@ class AudioLibrary extends _$AudioLibrary {
           final transcriptFile = File(fullTranscriptPath);
           if (!await transcriptFile.exists()) {
             processedItem = processedItem.copyWith(transcriptPath: null);
-            hasMigratedItems = true; // 标记需要保存
+            hasMigratedItems = true;
           }
         }
       }
@@ -74,7 +89,8 @@ class AudioLibrary extends _$AudioLibrary {
       if (audioExists) {
         validItems.add(processedItem);
       } else {
-        hasInvalidItems = true;
+        // 软删除无效音频
+        await dao.softDelete(item.id);
         print(
           'Removed invalid audio item: ${processedItem.name} (audio file not found at: $fullAudioPath)',
         );
@@ -83,16 +99,12 @@ class AudioLibrary extends _$AudioLibrary {
 
     state = state.copyWith(audioItems: validItems, isLoading: false);
 
-    if (hasInvalidItems || hasMigratedItems) {
-      await _saveLibrary();
-      if (hasInvalidItems) {
-        print(
-          'Cleaned up ${allItems.length - validItems.length} invalid audio items',
-        );
+    if (hasMigratedItems) {
+      // 更新迁移后的音频项到数据库
+      for (final item in validItems) {
+        await _upsertItem(item);
       }
-      if (hasMigratedItems) {
-        print('Migrated paths from absolute to relative format');
-      }
+      print('Migrated paths from absolute to relative format');
     }
   }
 
@@ -130,7 +142,7 @@ class AudioLibrary extends _$AudioLibrary {
 
   Future<void> addAudioItem(AudioItem item) async {
     state = state.copyWith(audioItems: [...state.audioItems, item]);
-    await _saveLibrary();
+    await _upsertItem(item);
   }
 
   Future<void> removeAudioItem(String id) async {
@@ -171,9 +183,12 @@ class AudioLibrary extends _$AudioLibrary {
     state = state.copyWith(
       audioItems: state.audioItems.where((item) => item.id != id).toList(),
     );
-    await _saveLibrary();
 
-    // 从所有合集中清理对该音频的引用
+    // 硬删除（CASCADE 会自动清理 junction、bookmarks、playback_states）
+    final dao = ref.read(audioItemDaoProvider);
+    await dao.hardDelete(id);
+
+    // 从所有合集中清理对该音频的引用（更新 Provider 内存状态）
     ref.read(collectionListProvider.notifier).removeAudioFromAllCollections(id);
   }
 
@@ -183,7 +198,7 @@ class AudioLibrary extends _$AudioLibrary {
     if (index != -1) {
       items[index] = updatedItem;
       state = state.copyWith(audioItems: items);
-      await _saveLibrary();
+      await _upsertItem(updatedItem);
     }
   }
 
@@ -195,7 +210,19 @@ class AudioLibrary extends _$AudioLibrary {
     }
   }
 
-  Future<void> _saveLibrary() async {
-    await StorageService.saveAudioLibrary(state.audioItems);
+  /// 将 AudioItem 模型写入 Drift 数据库
+  Future<void> _upsertItem(AudioItem item) async {
+    final dao = ref.read(audioItemDaoProvider);
+    await dao.upsert(
+      db.AudioItemsCompanion(
+        id: Value(item.id),
+        name: Value(item.name),
+        audioPath: Value(item.audioPath),
+        transcriptPath: Value(item.transcriptPath),
+        addedDate: Value(item.addedDate),
+        totalDuration: Value(item.totalDuration),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 }

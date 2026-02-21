@@ -1,0 +1,34 @@
+import 'package:drift/drift.dart';
+
+/// 音频元数据表
+class AudioItems extends Table {
+  /// UUID 主键
+  TextColumn get id => text()();
+
+  /// 音频名称
+  TextColumn get name => text()();
+
+  /// 音频文件相对路径
+  TextColumn get audioPath => text()();
+
+  /// 字幕文件相对路径（可选）
+  TextColumn get transcriptPath => text().nullable()();
+
+  /// 添加时间
+  DateTimeColumn get addedDate => dateTime()();
+
+  /// 时长（秒）
+  IntColumn get totalDuration => integer().withDefault(const Constant(0))();
+
+  /// 最后修改时间
+  DateTimeColumn get updatedAt => dateTime()();
+
+  /// 软删除标记
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  /// 同步状态：0=synced, 1=pendingUpload, 2=pendingDelete
+  IntColumn get syncStatus => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}

@@ -4,7 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'l10n/app_localizations.dart';
+import 'database/app_database.dart';
+import 'database/providers.dart';
+import 'database/migration/sp_to_drift_migration.dart';
 import 'providers/audio_library_provider.dart';
 import 'providers/collection_provider.dart';
 import 'providers/settings_provider.dart';
@@ -19,6 +23,22 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final packageInfo = await PackageInfo.fromPlatform();
+
+  // 初始化数据库
+  final database = AppDatabase(openConnection());
+
+  // 执行 SP → Drift 迁移
+  final prefs = await SharedPreferences.getInstance();
+  final migration = SpToDriftMigration(
+    database,
+    prefs,
+    subtitleLoader: defaultSubtitleLoader,
+  );
+  try {
+    await migration.migrate();
+  } catch (e) {
+    print('SP → Drift 迁移失败，下次启动重试: $e');
+  }
 
   if (!kIsWeb) {
     try {
@@ -48,7 +68,12 @@ void main() async {
     print('Web platform: skipping audio session configuration');
   }
 
-  runApp(ProviderScope(child: FluencyApp(packageInfo: packageInfo)));
+  runApp(
+    ProviderScope(
+      overrides: [appDatabaseProvider.overrideWithValue(database)],
+      child: FluencyApp(packageInfo: packageInfo),
+    ),
+  );
 }
 
 class FluencyApp extends ConsumerWidget {

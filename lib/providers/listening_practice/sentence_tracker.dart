@@ -41,17 +41,18 @@ class SentenceTracker {
 
     return -1;
   }
-  
+
   /// 找到最接近的书签句子
   static int? findClosestBookmark(
     List<Sentence> bookmarkedSentences,
     Duration position,
   ) {
     if (bookmarkedSentences.isEmpty) return null;
-    
+
     int closestIdx = bookmarkedSentences.first.index;
-    Duration closestDiff = (bookmarkedSentences.first.startTime - position).abs();
-    
+    Duration closestDiff = (bookmarkedSentences.first.startTime - position)
+        .abs();
+
     for (var s in bookmarkedSentences) {
       final diff = (s.startTime - position).abs();
       if (diff < closestDiff) {
@@ -59,7 +60,7 @@ class SentenceTracker {
         closestIdx = s.index;
       }
     }
-    
+
     return closestIdx;
   }
 }

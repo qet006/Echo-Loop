@@ -238,6 +238,7 @@ class _CollectionGridTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
+    final collectionState = ref.watch(collectionListProvider);
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -339,7 +340,7 @@ class _CollectionGridTile extends ConsumerWidget {
               const SizedBox(height: 2),
               // 音频数量
               Text(
-                l10n.audioCount(collection.audioCount),
+                l10n.audioCount(collectionState.getAudioCount(collection.id)),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
@@ -375,6 +376,7 @@ class _CollectionListTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
+    final collectionState = ref.watch(collectionListProvider);
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: ListTile(
@@ -394,7 +396,7 @@ class _CollectionListTile extends ConsumerWidget {
         subtitle: Row(
           children: [
             Text(
-              l10n.audioCount(collection.audioCount),
+              l10n.audioCount(collectionState.getAudioCount(collection.id)),
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(width: 12),

@@ -35,8 +35,9 @@ class CollectionDetailScreen extends ConsumerWidget {
       );
     }
 
-    // 获取合集中的音频项
-    final audioItems = collection.audioItemIds
+    // 获取合集中的音频项（从 junction 表缓存中读取）
+    final audioIds = collectionState.getAudioIds(collectionId);
+    final audioItems = audioIds
         .map((id) => ref.read(audioLibraryProvider.notifier).getItemById(id))
         .whereType<AudioItem>()
         .toList();
@@ -556,7 +557,8 @@ class _AddAudioToCollectionDialogState
         .firstOrNull;
     if (collection != null) {
       final libraryNotifier = ref.read(audioLibraryProvider.notifier);
-      for (final existingId in collection.audioItemIds) {
+      final existingAudioIds = collectionState.getAudioIds(widget.collectionId);
+      for (final existingId in existingAudioIds) {
         final existingAudio = libraryNotifier.getItemById(existingId);
         if (existingAudio != null && existingAudio.name == _audioName) {
           // 合集中已存在同名音频，弹出提醒

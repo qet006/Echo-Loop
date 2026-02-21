@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:just_audio/just_audio.dart' as ja;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../database/providers.dart';
 import '../../models/audio_item.dart';
 import '../../models/sentence.dart';
 import '../../models/playback_settings.dart';
@@ -36,8 +37,7 @@ class ListeningPractice extends _$ListeningPractice {
     // defer listener setup to after first build
     Future.microtask(() {
       _positionSub = _engine.absolutePositionStream.listen(_onPositionChanged);
-      _playerStateSub =
-          _engine.playerStateStream.listen(_onPlayerStateChanged);
+      _playerStateSub = _engine.playerStateStream.listen(_onPlayerStateChanged);
     });
   }
 
@@ -138,21 +138,29 @@ class ListeningPractice extends _$ListeningPractice {
 
       final sentences = await _engine.loadTranscript(audioItem);
 
-      final storedBookmarks =
-          await BookmarkManager.loadBookmarks(audioItem.id);
+      final bookmarkDao = ref.read(bookmarkDaoProvider);
+      final storedBookmarks = await BookmarkManager.loadBookmarks(
+        audioItem.id,
+        dao: bookmarkDao,
+      );
       var bookmarkedIndices = Set<int>.from(storedBookmarks);
 
       final isFirstLoad = storedBookmarks.isEmpty;
       if (isFirstLoad) {
-        final autoBookmarks =
-            BookmarkManager.autoAddBracketBookmarks(sentences);
+        final autoBookmarks = BookmarkManager.autoAddBracketBookmarks(
+          sentences,
+        );
         bookmarkedIndices = {...bookmarkedIndices, ...autoBookmarks};
 
         if (autoBookmarks.isNotEmpty) {
-          await BookmarkManager.saveBookmarks(
-            audioItem.id,
-            bookmarkedIndices,
-          );
+          // 将自动书签写入数据库
+          for (final idx in autoBookmarks) {
+            await BookmarkManager.addBookmarkToDb(
+              audioItem.id,
+              sentences[idx],
+              dao: bookmarkDao,
+            );
+          }
         }
       }
 
@@ -161,9 +169,11 @@ class ListeningPractice extends _$ListeningPractice {
       for (int i = 0; i < sentences.length; i++) {
         final text = sentences[i].text.trim();
         if (text.startsWith('[') && text.endsWith(']') && text.length > 2) {
-          cleanedSentences.add(sentences[i].copyWith(
-            text: text.substring(1, text.length - 1).trim(),
-          ));
+          cleanedSentences.add(
+            sentences[i].copyWith(
+              text: text.substring(1, text.length - 1).trim(),
+            ),
+          );
         } else {
           cleanedSentences.add(sentences[i]);
         }
@@ -197,24 +207,20 @@ class ListeningPractice extends _$ListeningPractice {
   }
 
   Future<void> _restorePlaybackState(AudioItem audioItem) async {
-    final result =
-        await PlaybackStateStorage.loadPlaybackState(audioItem.id);
+    final playbackStateDao = ref.read(playbackStateDaoProvider);
+    final result = await PlaybackStateStorage.loadPlaybackState(
+      audioItem.id,
+      dao: playbackStateDao,
+    );
     if (result == null) return;
 
     try {
       if (result.playlistMode != null) {
         state = state.copyWith(playlistMode: result.playlistMode);
       }
-      if (result.currentFullIndex != null) {
-        state = state.copyWith(currentFullIndex: result.currentFullIndex);
-      }
-      if (result.currentBookmarkIndex != null) {
-        state = state.copyWith(
-          currentBookmarkIndex: result.currentBookmarkIndex,
-        );
-      }
       if (result.position != null) {
         await _engine.seek(result.position!);
+        // 从 position 计算 currentFullIndex（由 SentenceTracker 自动处理）
       }
       print('Restored playback state for ${audioItem.name}');
     } catch (e) {
@@ -237,9 +243,7 @@ class ListeningPractice extends _$ListeningPractice {
       if (bookmarked.isEmpty) return;
       if (state.currentBookmarkIndex == null ||
           !state.bookmarkedIndices.contains(state.currentBookmarkIndex)) {
-        state = state.copyWith(
-          currentBookmarkIndex: bookmarked.first.index,
-        );
+        state = state.copyWith(currentBookmarkIndex: bookmarked.first.index);
       }
     } else {
       if (state.currentFullIndex == null ||
@@ -320,7 +324,8 @@ class ListeningPractice extends _$ListeningPractice {
     while (true) {
       if (audioLoopCount > 0) {
         if (!state.settings.loopAudioEnabled) break;
-        final shouldLoop = state.settings.loopAudio == 0 ||
+        final shouldLoop =
+            state.settings.loopAudio == 0 ||
             audioLoopCount < state.settings.loopAudio;
         if (!shouldLoop) break;
       }
@@ -347,8 +352,7 @@ class ListeningPractice extends _$ListeningPractice {
         await _engine.playClipWithLoops(
           sentence,
           sessionId,
-          loopCount:
-              state.settings.loopEnabled ? state.settings.loopCount : 1,
+          loopCount: state.settings.loopEnabled ? state.settings.loopCount : 1,
           interval: state.settings.pauseInterval,
         );
 
@@ -371,8 +375,7 @@ class ListeningPractice extends _$ListeningPractice {
             await _engine.playerStateStream.firstWhere(
               (playerState) =>
                   !playerState.playing ||
-                  playerState.processingState ==
-                      ja.ProcessingState.completed,
+                  playerState.processingState == ja.ProcessingState.completed,
             );
           }
           return;
@@ -459,10 +462,7 @@ class ListeningPractice extends _$ListeningPractice {
       await pause();
     }
 
-    state = state.copyWith(
-      currentFullIndex: index,
-      lastPlayedFullIndex: index,
-    );
+    state = state.copyWith(currentFullIndex: index, lastPlayedFullIndex: index);
 
     if (state.currentAudioItem != null) {
       await _engine.clearClip();
@@ -692,10 +692,20 @@ class ListeningPractice extends _$ListeningPractice {
     }
 
     if (state.currentAudioItem != null) {
-      await BookmarkManager.saveBookmarks(
-        state.currentAudioItem!.id,
-        state.bookmarkedIndices,
-      );
+      final bookmarkDao = ref.read(bookmarkDaoProvider);
+      if (isRemoving) {
+        await BookmarkManager.removeBookmarksFromDb(
+          state.currentAudioItem!.id,
+          indicesToRemove,
+          dao: bookmarkDao,
+        );
+      } else {
+        await BookmarkManager.addBookmarkToDb(
+          state.currentAudioItem!.id,
+          state.sentences[index],
+          dao: bookmarkDao,
+        );
+      }
     }
 
     if (inBookmarksMode &&
@@ -709,10 +719,12 @@ class ListeningPractice extends _$ListeningPractice {
     final oldSettings = state.settings;
     final wasPlaying = _engine.isPlaying;
 
-    final oldContinuousMode = state.playlistMode == PlaylistMode.full &&
+    final oldContinuousMode =
+        state.playlistMode == PlaylistMode.full &&
         oldSettings.autoPlayNextSentenceEnabled &&
         !oldSettings.loopEnabled;
-    final newContinuousMode = state.playlistMode == PlaylistMode.full &&
+    final newContinuousMode =
+        state.playlistMode == PlaylistMode.full &&
         newSettings.autoPlayNextSentenceEnabled &&
         !newSettings.loopEnabled;
     final modeWillChange = oldContinuousMode != newContinuousMode;
@@ -743,9 +755,7 @@ class ListeningPractice extends _$ListeningPractice {
     if (mode == PlaylistMode.full) {
       if (state.currentFullIndex != null &&
           state.currentFullIndex! < state.sentences.length) {
-        await _engine.seek(
-          state.sentences[state.currentFullIndex!].startTime,
-        );
+        await _engine.seek(state.sentences[state.currentFullIndex!].startTime);
       } else if (state.sentences.isNotEmpty) {
         state = state.copyWith(currentFullIndex: 0);
         await _engine.seek(state.sentences[0].startTime);
@@ -761,9 +771,7 @@ class ListeningPractice extends _$ListeningPractice {
           state.sentences[state.currentBookmarkIndex!].startTime,
         );
       } else {
-        state = state.copyWith(
-          currentBookmarkIndex: bookmarked.first.index,
-        );
+        state = state.copyWith(currentBookmarkIndex: bookmarked.first.index);
         await _engine.seek(bookmarked.first.startTime);
       }
     }
@@ -772,10 +780,12 @@ class ListeningPractice extends _$ListeningPractice {
   Future<void> saveCurrentPlaybackState() async {
     if (state.currentAudioItem == null) return;
 
+    final playbackStateDao = ref.read(playbackStateDaoProvider);
     await PlaybackStateStorage.savePlaybackState(
       state.currentAudioItem!,
       _engine.audioPlayer,
       state,
+      dao: playbackStateDao,
     );
   }
 }

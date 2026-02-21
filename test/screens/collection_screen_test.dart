@@ -56,13 +56,11 @@ void main() {
           id: '1',
           name: 'English Lessons',
           isStarred: true,
-          audioItemIds: ['a1', 'a2'],
         );
         final c2 = createTestCollection(
           id: '2',
           name: 'Podcasts',
           isStarred: false,
-          audioItemIds: ['a3'],
         );
 
         await tester.pumpWidget(
@@ -76,6 +74,10 @@ void main() {
                   CollectionState(
                     rawCollections: [c1, c2],
                     viewMode: CollectionViewMode.list,
+                    audioIdsMap: {
+                      '1': ['a1', 'a2'],
+                      '2': ['a3'],
+                    },
                   ),
                 ),
               ),
