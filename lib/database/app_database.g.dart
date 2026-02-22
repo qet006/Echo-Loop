@@ -2609,6 +2609,17 @@ class $LearningProgressesTable extends LearningProgresses
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _intensiveListenSentenceIndexMeta =
+      const VerificationMeta('intensiveListenSentenceIndex');
+  @override
+  late final GeneratedColumn<int> intensiveListenSentenceIndex =
+      GeneratedColumn<int>(
+        'intensive_listen_sentence_index',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -2631,6 +2642,7 @@ class $LearningProgressesTable extends LearningProgresses
     currentStageStartedAt,
     totalStudyDurationMs,
     blindListenPassCount,
+    intensiveListenSentenceIndex,
     updatedAt,
   ];
   @override
@@ -2725,6 +2737,15 @@ class $LearningProgressesTable extends LearningProgresses
         ),
       );
     }
+    if (data.containsKey('intensive_listen_sentence_index')) {
+      context.handle(
+        _intensiveListenSentenceIndexMeta,
+        intensiveListenSentenceIndex.isAcceptableOrUnknown(
+          data['intensive_listen_sentence_index']!,
+          _intensiveListenSentenceIndexMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -2778,6 +2799,10 @@ class $LearningProgressesTable extends LearningProgresses
         DriftSqlType.int,
         data['${effectivePrefix}blind_listen_pass_count'],
       )!,
+      intensiveListenSentenceIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}intensive_listen_sentence_index'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -2820,6 +2845,9 @@ class LearningProgressesData extends DataClass
   /// 盲听已完成遍数（用户可随时查看）
   final int blindListenPassCount;
 
+  /// 精听断点续学句子索引（null 表示从头开始）
+  final int? intensiveListenSentenceIndex;
+
   /// 最后更新时间
   final DateTime updatedAt;
   const LearningProgressesData({
@@ -2832,6 +2860,7 @@ class LearningProgressesData extends DataClass
     this.currentStageStartedAt,
     required this.totalStudyDurationMs,
     required this.blindListenPassCount,
+    this.intensiveListenSentenceIndex,
     required this.updatedAt,
   });
   @override
@@ -2856,6 +2885,11 @@ class LearningProgressesData extends DataClass
     }
     map['total_study_duration_ms'] = Variable<int>(totalStudyDurationMs);
     map['blind_listen_pass_count'] = Variable<int>(blindListenPassCount);
+    if (!nullToAbsent || intensiveListenSentenceIndex != null) {
+      map['intensive_listen_sentence_index'] = Variable<int>(
+        intensiveListenSentenceIndex,
+      );
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -2877,6 +2911,10 @@ class LearningProgressesData extends DataClass
           : Value(currentStageStartedAt),
       totalStudyDurationMs: Value(totalStudyDurationMs),
       blindListenPassCount: Value(blindListenPassCount),
+      intensiveListenSentenceIndex:
+          intensiveListenSentenceIndex == null && nullToAbsent
+          ? const Value.absent()
+          : Value(intensiveListenSentenceIndex),
       updatedAt: Value(updatedAt),
     );
   }
@@ -2906,6 +2944,9 @@ class LearningProgressesData extends DataClass
       blindListenPassCount: serializer.fromJson<int>(
         json['blindListenPassCount'],
       ),
+      intensiveListenSentenceIndex: serializer.fromJson<int?>(
+        json['intensiveListenSentenceIndex'],
+      ),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -2928,6 +2969,9 @@ class LearningProgressesData extends DataClass
       ),
       'totalStudyDurationMs': serializer.toJson<int>(totalStudyDurationMs),
       'blindListenPassCount': serializer.toJson<int>(blindListenPassCount),
+      'intensiveListenSentenceIndex': serializer.toJson<int?>(
+        intensiveListenSentenceIndex,
+      ),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -2942,6 +2986,7 @@ class LearningProgressesData extends DataClass
     Value<DateTime?> currentStageStartedAt = const Value.absent(),
     int? totalStudyDurationMs,
     int? blindListenPassCount,
+    Value<int?> intensiveListenSentenceIndex = const Value.absent(),
     DateTime? updatedAt,
   }) => LearningProgressesData(
     audioItemId: audioItemId ?? this.audioItemId,
@@ -2959,6 +3004,9 @@ class LearningProgressesData extends DataClass
         : this.currentStageStartedAt,
     totalStudyDurationMs: totalStudyDurationMs ?? this.totalStudyDurationMs,
     blindListenPassCount: blindListenPassCount ?? this.blindListenPassCount,
+    intensiveListenSentenceIndex: intensiveListenSentenceIndex.present
+        ? intensiveListenSentenceIndex.value
+        : this.intensiveListenSentenceIndex,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   LearningProgressesData copyWithCompanion(LearningProgressesCompanion data) {
@@ -2990,6 +3038,9 @@ class LearningProgressesData extends DataClass
       blindListenPassCount: data.blindListenPassCount.present
           ? data.blindListenPassCount.value
           : this.blindListenPassCount,
+      intensiveListenSentenceIndex: data.intensiveListenSentenceIndex.present
+          ? data.intensiveListenSentenceIndex.value
+          : this.intensiveListenSentenceIndex,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -3006,6 +3057,9 @@ class LearningProgressesData extends DataClass
           ..write('currentStageStartedAt: $currentStageStartedAt, ')
           ..write('totalStudyDurationMs: $totalStudyDurationMs, ')
           ..write('blindListenPassCount: $blindListenPassCount, ')
+          ..write(
+            'intensiveListenSentenceIndex: $intensiveListenSentenceIndex, ',
+          )
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -3022,6 +3076,7 @@ class LearningProgressesData extends DataClass
     currentStageStartedAt,
     totalStudyDurationMs,
     blindListenPassCount,
+    intensiveListenSentenceIndex,
     updatedAt,
   );
   @override
@@ -3037,6 +3092,8 @@ class LearningProgressesData extends DataClass
           other.currentStageStartedAt == this.currentStageStartedAt &&
           other.totalStudyDurationMs == this.totalStudyDurationMs &&
           other.blindListenPassCount == this.blindListenPassCount &&
+          other.intensiveListenSentenceIndex ==
+              this.intensiveListenSentenceIndex &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -3051,6 +3108,7 @@ class LearningProgressesCompanion
   final Value<DateTime?> currentStageStartedAt;
   final Value<int> totalStudyDurationMs;
   final Value<int> blindListenPassCount;
+  final Value<int?> intensiveListenSentenceIndex;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const LearningProgressesCompanion({
@@ -3063,6 +3121,7 @@ class LearningProgressesCompanion
     this.currentStageStartedAt = const Value.absent(),
     this.totalStudyDurationMs = const Value.absent(),
     this.blindListenPassCount = const Value.absent(),
+    this.intensiveListenSentenceIndex = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -3076,6 +3135,7 @@ class LearningProgressesCompanion
     this.currentStageStartedAt = const Value.absent(),
     this.totalStudyDurationMs = const Value.absent(),
     this.blindListenPassCount = const Value.absent(),
+    this.intensiveListenSentenceIndex = const Value.absent(),
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   }) : audioItemId = Value(audioItemId),
@@ -3090,6 +3150,7 @@ class LearningProgressesCompanion
     Expression<DateTime>? currentStageStartedAt,
     Expression<int>? totalStudyDurationMs,
     Expression<int>? blindListenPassCount,
+    Expression<int>? intensiveListenSentenceIndex,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -3108,6 +3169,8 @@ class LearningProgressesCompanion
         'total_study_duration_ms': totalStudyDurationMs,
       if (blindListenPassCount != null)
         'blind_listen_pass_count': blindListenPassCount,
+      if (intensiveListenSentenceIndex != null)
+        'intensive_listen_sentence_index': intensiveListenSentenceIndex,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -3123,6 +3186,7 @@ class LearningProgressesCompanion
     Value<DateTime?>? currentStageStartedAt,
     Value<int>? totalStudyDurationMs,
     Value<int>? blindListenPassCount,
+    Value<int?>? intensiveListenSentenceIndex,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -3138,6 +3202,8 @@ class LearningProgressesCompanion
           currentStageStartedAt ?? this.currentStageStartedAt,
       totalStudyDurationMs: totalStudyDurationMs ?? this.totalStudyDurationMs,
       blindListenPassCount: blindListenPassCount ?? this.blindListenPassCount,
+      intensiveListenSentenceIndex:
+          intensiveListenSentenceIndex ?? this.intensiveListenSentenceIndex,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -3183,6 +3249,11 @@ class LearningProgressesCompanion
         blindListenPassCount.value,
       );
     }
+    if (intensiveListenSentenceIndex.present) {
+      map['intensive_listen_sentence_index'] = Variable<int>(
+        intensiveListenSentenceIndex.value,
+      );
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -3204,6 +3275,9 @@ class LearningProgressesCompanion
           ..write('currentStageStartedAt: $currentStageStartedAt, ')
           ..write('totalStudyDurationMs: $totalStudyDurationMs, ')
           ..write('blindListenPassCount: $blindListenPassCount, ')
+          ..write(
+            'intensiveListenSentenceIndex: $intensiveListenSentenceIndex, ',
+          )
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -6063,6 +6137,7 @@ typedef $$LearningProgressesTableCreateCompanionBuilder =
       Value<DateTime?> currentStageStartedAt,
       Value<int> totalStudyDurationMs,
       Value<int> blindListenPassCount,
+      Value<int?> intensiveListenSentenceIndex,
       required DateTime updatedAt,
       Value<int> rowid,
     });
@@ -6077,6 +6152,7 @@ typedef $$LearningProgressesTableUpdateCompanionBuilder =
       Value<DateTime?> currentStageStartedAt,
       Value<int> totalStudyDurationMs,
       Value<int> blindListenPassCount,
+      Value<int?> intensiveListenSentenceIndex,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -6166,6 +6242,11 @@ class $$LearningProgressesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get intensiveListenSentenceIndex => $composableBuilder(
+    column: $table.intensiveListenSentenceIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
@@ -6241,6 +6322,11 @@ class $$LearningProgressesTableOrderingComposer
 
   ColumnOrderings<int> get blindListenPassCount => $composableBuilder(
     column: $table.blindListenPassCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get intensiveListenSentenceIndex => $composableBuilder(
+    column: $table.intensiveListenSentenceIndex,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -6322,6 +6408,11 @@ class $$LearningProgressesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get intensiveListenSentenceIndex => $composableBuilder(
+    column: $table.intensiveListenSentenceIndex,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
@@ -6391,6 +6482,7 @@ class $$LearningProgressesTableTableManager
                 Value<DateTime?> currentStageStartedAt = const Value.absent(),
                 Value<int> totalStudyDurationMs = const Value.absent(),
                 Value<int> blindListenPassCount = const Value.absent(),
+                Value<int?> intensiveListenSentenceIndex = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LearningProgressesCompanion(
@@ -6403,6 +6495,7 @@ class $$LearningProgressesTableTableManager
                 currentStageStartedAt: currentStageStartedAt,
                 totalStudyDurationMs: totalStudyDurationMs,
                 blindListenPassCount: blindListenPassCount,
+                intensiveListenSentenceIndex: intensiveListenSentenceIndex,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -6417,6 +6510,7 @@ class $$LearningProgressesTableTableManager
                 Value<DateTime?> currentStageStartedAt = const Value.absent(),
                 Value<int> totalStudyDurationMs = const Value.absent(),
                 Value<int> blindListenPassCount = const Value.absent(),
+                Value<int?> intensiveListenSentenceIndex = const Value.absent(),
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => LearningProgressesCompanion.insert(
@@ -6429,6 +6523,7 @@ class $$LearningProgressesTableTableManager
                 currentStageStartedAt: currentStageStartedAt,
                 totalStudyDurationMs: totalStudyDurationMs,
                 blindListenPassCount: blindListenPassCount,
+                intensiveListenSentenceIndex: intensiveListenSentenceIndex,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),

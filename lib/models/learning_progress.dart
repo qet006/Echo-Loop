@@ -33,6 +33,9 @@ class LearningProgress {
   /// 盲听已完成遍数
   final int blindListenPassCount;
 
+  /// 精听断点续学句子索引（null 表示从头开始）
+  final int? intensiveListenSentenceIndex;
+
   /// 最后更新时间
   final DateTime updatedAt;
 
@@ -46,6 +49,7 @@ class LearningProgress {
     this.currentStageStartedAt,
     this.totalStudyDurationMs = 0,
     this.blindListenPassCount = 0,
+    this.intensiveListenSentenceIndex,
     required this.updatedAt,
   });
 
@@ -143,7 +147,9 @@ class LearningProgress {
     DateTime? currentStageStartedAt,
     int? totalStudyDurationMs,
     int? blindListenPassCount,
+    int? intensiveListenSentenceIndex,
     DateTime? updatedAt,
+    bool clearIntensiveListenSentenceIndex = false,
   }) {
     return LearningProgress(
       audioItemId: audioItemId ?? this.audioItemId,
@@ -157,6 +163,9 @@ class LearningProgress {
           currentStageStartedAt ?? this.currentStageStartedAt,
       totalStudyDurationMs: totalStudyDurationMs ?? this.totalStudyDurationMs,
       blindListenPassCount: blindListenPassCount ?? this.blindListenPassCount,
+      intensiveListenSentenceIndex: clearIntensiveListenSentenceIndex
+          ? null
+          : (intensiveListenSentenceIndex ?? this.intensiveListenSentenceIndex),
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }

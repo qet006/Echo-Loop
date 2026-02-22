@@ -33,8 +33,23 @@ class BookmarkDao extends DatabaseAccessor<AppDatabase>
   }
 
   /// 添加书签
+  ///
+  /// 以 (audioItemId, sentenceIndex) 为冲突键，冲突时更新已有行。
   Future<void> addBookmark(BookmarksCompanion entry) {
-    return into(bookmarks).insertOnConflictUpdate(entry);
+    return into(bookmarks).insert(
+      entry,
+      onConflict: DoUpdate(
+        (old) => BookmarksCompanion(
+          sentenceText: entry.sentenceText,
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+          updatedAt: entry.updatedAt,
+          deletedAt: const Value(null),
+          syncStatus: const Value(0),
+        ),
+        target: [bookmarks.audioItemId, bookmarks.sentenceIndex],
+      ),
+    );
   }
 
   /// 批量添加书签（用于迁移）

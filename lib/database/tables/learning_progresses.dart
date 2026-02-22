@@ -39,6 +39,9 @@ class LearningProgresses extends Table {
   IntColumn get blindListenPassCount =>
       integer().withDefault(const Constant(0))();
 
+  /// 精听断点续学句子索引（null 表示从头开始）
+  IntColumn get intensiveListenSentenceIndex => integer().nullable()();
+
   /// 最后更新时间
   DateTimeColumn get updatedAt => dateTime()();
 

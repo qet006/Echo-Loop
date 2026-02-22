@@ -47,7 +47,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration {
@@ -61,24 +61,15 @@ class AppDatabase extends _$AppDatabase {
         if (from < 2) {
           await m.createTable(learningProgresses);
         }
-        // v2→v3：learning_progresses 的 currentStage/currentSubStage 从 INT 改为 TEXT
+        // v2→v7：learning_progresses 多次变更（列类型、新增列等）
         // App 尚未发布，直接重建表
-        if (from < 3) {
+        if (from < 7) {
           await m.deleteTable('learning_progresses');
           await m.createTable(learningProgresses);
-        }
-        // v3→v4：learning_progresses 新增 3 列 + 新建 stage_completions 表
-        // App 尚未发布，直接重建
-        if (from < 4) {
-          await m.deleteTable('learning_progresses');
-          await m.createTable(learningProgresses);
-          await m.createTable(stageCompletions);
-        }
-        // v4→v5：learning_progresses 新增 blindListenPassCount 列
-        // App 尚未发布，直接重建
-        if (from < 5) {
-          await m.deleteTable('learning_progresses');
-          await m.createTable(learningProgresses);
+          // v4 新增 stage_completions 表
+          if (from < 4) {
+            await m.createTable(stageCompletions);
+          }
         }
         // v5→v6：audio_items 新增 sentenceCount、wordCount 列
         if (from < 6) {
