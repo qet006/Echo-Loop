@@ -53,10 +53,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
   @override
   void deactivate() {
-    // 在 deactivate 中暂停和保存状态，此时 ref 仍然可用。
-    // dispose 中 ref 已失效，会抛 StateError。
-    ref.read(listeningPracticeProvider.notifier).pause();
-    ref.read(listeningPracticeProvider.notifier).saveCurrentPlaybackState();
+    // 延迟到下一帧执行，避免在 widget 树销毁过程中修改 provider state
+    final notifier = ref.read(listeningPracticeProvider.notifier);
+    Future(() {
+      notifier.pause();
+      notifier.saveCurrentPlaybackState();
+    });
     super.deactivate();
   }
 
