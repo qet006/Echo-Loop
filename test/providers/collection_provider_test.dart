@@ -107,7 +107,6 @@ void main() {
         expect(sorted[1].id, '3'); // 1月12日
         expect(sorted[2].id, '1'); // 1月10日
       });
-
     });
 
     group('copyWith', () {

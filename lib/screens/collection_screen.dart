@@ -318,9 +318,7 @@ class _CollectionGridTile extends ConsumerWidget {
 class _CollectionListTile extends ConsumerWidget {
   final Collection collection;
 
-  const _CollectionListTile({
-    required this.collection,
-  });
+  const _CollectionListTile({required this.collection});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
