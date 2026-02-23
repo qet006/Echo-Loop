@@ -1,0 +1,204 @@
+/// 句子播放引擎（公共逻辑）
+///
+/// 提取精听和跟读共享的播放循环逻辑：
+/// - N 遍播放 + 遍间停顿
+/// - 句间自动推进
+/// - 倒计时 UI 更新
+/// - sessionId 守护防止异步竞态
+///
+/// 各 Provider 通过组合此类实现各自的播放流程，
+/// 状态更新通过回调方式传回给宿主 Provider。
+library;
+
+import 'dart:async';
+import 'dart:math' as math;
+import '../../models/sentence.dart';
+import '../audio_engine/audio_engine_provider.dart';
+
+/// 停顿时长计算器函数签名
+///
+/// 根据句子时长返回停顿时长，不同模式有不同的计算策略。
+typedef PauseCalculator = Duration Function(Duration sentenceDuration);
+
+/// 句子播放引擎
+///
+/// 封装 N 遍播放循环 + 遍间/句间停顿 + 倒计时 UI 更新。
+/// 通过构造参数注入 AudioEngine 的获取方式，
+/// 状态更新通过回调参数传回给宿主。
+class SentencePlaybackEngine {
+  /// 获取 AudioEngine 实例的工厂函数
+  final AudioEngine Function() _getEngine;
+
+  /// 倒计时 Timer（遍间/句间停顿 UI 更新用）
+  Timer? _countdownTimer;
+
+  /// 当前播放循环的 sessionId
+  int _currentSessionId = -1;
+
+  SentencePlaybackEngine({required AudioEngine Function() getEngine})
+      : _getEngine = getEngine;
+
+  /// 当前 sessionId（供外部查询）
+  int get currentSessionId => _currentSessionId;
+
+  /// 播放句子循环：播放 [repeatCount] 遍，遍间停顿
+  ///
+  /// [sentence] 要播放的句子
+  /// [repeatCount] 总遍数
+  /// [pauseCalculator] 停顿时长计算函数
+  /// [onPlayCountChanged] 每遍开始时回调（playCount 从 1 开始）
+  /// [onPauseStarted] 遍间停顿开始时回调（传入停顿总时长）
+  /// [onPauseEnded] 遍间停顿结束时回调
+  /// [onTick] 倒计时每 100ms 回调一次（传入剩余时长）
+  /// [onAllPlaysCompleted] 所有遍数播完后回调
+  ///
+  /// 返回时表示播放完成或被中断。
+  Future<void> playSentenceLoop({
+    required Sentence sentence,
+    required int repeatCount,
+    required PauseCalculator pauseCalculator,
+    required void Function(int playCount) onPlayCountChanged,
+    required void Function(Duration pauseDuration) onPauseStarted,
+    required void Function() onPauseEnded,
+    required void Function(Duration remaining) onTick,
+    required Future<void> Function() onAllPlaysCompleted,
+  }) async {
+    final engine = _getEngine();
+    _currentSessionId = engine.newSession();
+    final sessionId = _currentSessionId;
+
+    for (int playCount = 1; playCount <= repeatCount; playCount++) {
+      if (!engine.isActiveSession(sessionId)) return;
+
+      onPlayCountChanged(playCount);
+
+      await engine.playClipOnce(sentence, sessionId);
+
+      if (!engine.isActiveSession(sessionId)) return;
+
+      // 遍间停顿（最后一遍不停顿）
+      if (playCount < repeatCount) {
+        final pauseDur = pauseCalculator(sentence.duration);
+        onPauseStarted(pauseDur);
+        _startCountdown(pauseDur, onTick);
+
+        await Future.delayed(pauseDur);
+
+        _cancelCountdown();
+
+        if (!engine.isActiveSession(sessionId)) return;
+        onPauseEnded();
+      }
+    }
+
+    // 所有遍数播完
+    if (engine.isActiveSession(sessionId)) {
+      await onAllPlaysCompleted();
+    }
+  }
+
+  /// 执行句间停顿
+  ///
+  /// 停顿结束后调用 [onAdvance]，期间用 [onTick] 更新倒计时。
+  /// 停顿开始前会创建新 session，确保期间用户操作可中断。
+  Future<void> autoAdvance({
+    required Duration pauseDuration,
+    required void Function(Duration pauseDuration) onPauseStarted,
+    required void Function(Duration remaining) onTick,
+    required Future<void> Function() onAdvance,
+  }) async {
+    final engine = _getEngine();
+    _currentSessionId = engine.newSession();
+    final sessionId = _currentSessionId;
+
+    onPauseStarted(pauseDuration);
+    _startCountdown(pauseDuration, onTick);
+
+    await Future.delayed(pauseDuration);
+
+    _cancelCountdown();
+
+    if (!engine.isActiveSession(sessionId)) return;
+    await onAdvance();
+  }
+
+  /// 使当前 session 失效并暂停引擎
+  void invalidateSession() {
+    final engine = _getEngine();
+    engine.pause();
+    _currentSessionId = -1;
+    _cancelCountdown();
+  }
+
+  /// 创建新 session 并返回 sessionId
+  int newSession() {
+    final engine = _getEngine();
+    _currentSessionId = engine.newSession();
+    return _currentSessionId;
+  }
+
+  /// 检查指定 sessionId 是否仍有效
+  bool isActiveSession(int sessionId) {
+    return _getEngine().isActiveSession(sessionId);
+  }
+
+  /// 播放单句一遍（用于标注重播等场景）
+  Future<void> playOnce(Sentence sentence) async {
+    final engine = _getEngine();
+    _currentSessionId = engine.newSession();
+    final sessionId = _currentSessionId;
+    await engine.playClipOnce(sentence, sessionId);
+  }
+
+  /// 清理资源
+  void cleanup() {
+    _cancelCountdown();
+    _currentSessionId = -1;
+  }
+
+  /// 启动倒计时 Timer（每 100ms 更新 UI）
+  void _startCountdown(Duration total, void Function(Duration) onTick) {
+    _cancelCountdown();
+    final startTime = DateTime.now();
+
+    _countdownTimer = Timer.periodic(const Duration(milliseconds: 100), (
+      timer,
+    ) {
+      final elapsed = DateTime.now().difference(startTime);
+      final remaining = total - elapsed;
+      if (remaining <= Duration.zero) {
+        timer.cancel();
+        return;
+      }
+      onTick(remaining);
+    });
+  }
+
+  /// 取消倒计时
+  void _cancelCountdown() {
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+  }
+}
+
+/// 跟读模式停顿计算：max(句长×2, 2000ms)
+///
+/// 给用户足够的跟读时间。
+Duration listenAndRepeatPauseCalculator(Duration sentenceDuration) {
+  final ms = sentenceDuration.inMilliseconds;
+  return Duration(milliseconds: math.max(ms * 2, 2000));
+}
+
+/// 根据难度等级返回目标播放遍数
+///
+/// veryEasy/easy=2, medium=3, hard=4, veryHard=5
+int targetPlayCountForDifficulty(int difficultyValue) {
+  return switch (difficultyValue) {
+    0 => 2, // veryEasy
+    1 => 2, // easy
+    2 => 3, // medium
+    3 => 4, // hard
+    4 => 5, // veryHard
+    _ => 3, // 默认
+  };
+}

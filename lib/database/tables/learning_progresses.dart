@@ -42,6 +42,9 @@ class LearningProgresses extends Table {
   /// 精听断点续学句子索引（null 表示从头开始）
   IntColumn get intensiveListenSentenceIndex => integer().nullable()();
 
+  /// 跟读断点续学句子索引（null 表示从头开始）
+  IntColumn get shadowingSentenceIndex => integer().nullable()();
+
   /// 最后更新时间
   DateTimeColumn get updatedAt => dateTime()();
 

@@ -22,6 +22,10 @@ import '../services/subtitle_parser.dart';
 import '../theme/app_theme.dart';
 import '../widgets/blind_listen_briefing_sheet.dart';
 import '../widgets/intensive_listen/intensive_listen_briefing_sheet.dart';
+import '../widgets/listen_and_repeat/listen_and_repeat_briefing_sheet.dart';
+import '../providers/listening_practice/bookmark_manager.dart';
+import '../database/providers.dart';
+import '../providers/learning_session/sentence_playback_engine.dart';
 
 /// 学习计划表页面
 class LearningPlanScreen extends ConsumerStatefulWidget {
@@ -76,6 +80,8 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       _startBlindListen(context, progress);
     } else if (currentSubStage == SubStageType.intensiveListen) {
       _startIntensiveListen(context);
+    } else if (currentSubStage == SubStageType.listenAndRepeat) {
+      _startListenAndRepeat(context);
     } else {
       // 其他子步骤 → 直接导航到播放器
       if (widget.collectionId != null) {
@@ -156,6 +162,76 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         }
       },
     );
+  }
+
+  /// 进入难句跟读
+  void _startListenAndRepeat(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final lpState = ref.read(listeningPracticeProvider);
+
+    // 无字幕则提示
+    if (lpState.sentences.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.intensiveListenNoSubtitle),
+          content: Text(l10n.intensiveListenNoSubtitleMessage),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.ok),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // 读取难句书签数量
+    final bookmarkDao = ref.read(bookmarkDaoProvider);
+    BookmarkManager.loadBookmarks(
+      widget.audioItemId,
+      dao: bookmarkDao,
+    ).then((difficultIndices) {
+      if (!mounted) return;
+
+      if (difficultIndices.isEmpty) {
+        // 无难句 → 跳过跟读，显示提示
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.listenAndRepeatNoDifficultSentences)),
+        );
+        return;
+      }
+
+      // 计算预估遍数（取第一个难句的难度作为预览）
+      final progress = ref
+          .read(learningProgressNotifierProvider)
+          .progressMap[widget.audioItemId];
+      final playCount =
+          targetPlayCountForDifficulty(progress?.difficulty.index ?? 2);
+
+      showListenAndRepeatBriefingSheet(
+        context: context,
+        difficultCount: difficultIndices.length,
+        playCount: playCount,
+        onStartPractice: () async {
+          await ref
+              .read(learningSessionProvider.notifier)
+              .enterListenAndRepeatMode(
+                widget.audioItemId,
+                lpState.sentences,
+              );
+          if (mounted) {
+            context.push(
+              AppRoutes.listenAndRepeatPlayer(
+                widget.collectionId,
+                widget.audioItemId,
+              ),
+            );
+          }
+        },
+      );
+    });
   }
 
   @override
@@ -487,6 +563,8 @@ class _FirstStudySection extends ConsumerWidget {
             onTap = () => _startFreePlayBlindListen(context, ref);
           } else if (isCompleted && subStage == SubStageType.intensiveListen) {
             onTap = () => _startFreePlayIntensiveListen(context, ref);
+          } else if (isCompleted && subStage == SubStageType.listenAndRepeat) {
+            onTap = () => _startFreePlayListenAndRepeat(context, ref);
           }
 
           return _StepCard(
@@ -535,6 +613,28 @@ class _FirstStudySection extends ConsumerWidget {
         );
     if (context.mounted) {
       context.push(AppRoutes.intensiveListenPlayer(collectionId, audioItemId));
+    }
+  }
+
+  /// 进入自由练习跟读模式（直接进入，不弹 briefing sheet）
+  Future<void> _startFreePlayListenAndRepeat(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final lpState = ref.read(listeningPracticeProvider);
+    if (lpState.sentences.isEmpty) return;
+
+    await ref
+        .read(learningSessionProvider.notifier)
+        .enterListenAndRepeatMode(
+          audioItemId,
+          lpState.sentences,
+          isFreePlay: true,
+        );
+    if (context.mounted) {
+      context.push(
+        AppRoutes.listenAndRepeatPlayer(collectionId, audioItemId),
+      );
     }
   }
 }

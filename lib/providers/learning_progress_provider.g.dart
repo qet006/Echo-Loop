@@ -7,7 +7,7 @@ part of 'learning_progress_provider.dart';
 // **************************************************************************
 
 String _$learningProgressNotifierHash() =>
-    r'843b80980e3ce69a7313910da075f25eb0bd5b55';
+    r'e6634a83c6ed426e8e990612e4d061c74c28c150';
 
 /// 学习进度管理 Provider
 ///

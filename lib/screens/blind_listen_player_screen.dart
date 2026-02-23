@@ -456,7 +456,7 @@ class _BlindListenPlayerScreenState
 bool _hasPlayerScreen(SubStageType type) => switch (type) {
   SubStageType.blindListen => true,
   SubStageType.intensiveListen => true,
-  SubStageType.listenAndRepeat => false,
+  SubStageType.listenAndRepeat => true,
   SubStageType.retell => false,
 };
 

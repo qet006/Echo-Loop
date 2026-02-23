@@ -67,9 +67,9 @@ class AppDatabase extends _$AppDatabase {
         if (from < 2) {
           await m.createTable(learningProgresses);
         }
-        // v2→v7：learning_progresses 多次变更（列类型、新增列等）
+        // v2→v8：learning_progresses 多次变更（列类型、新增列等）
         // App 尚未发布，直接重建表
-        if (from < 7) {
+        if (from < 8) {
           await m.deleteTable('learning_progresses');
           await m.createTable(learningProgresses);
           // v4 新增 stage_completions 表

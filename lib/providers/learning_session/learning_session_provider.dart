@@ -15,6 +15,9 @@ import '../learning_progress_provider.dart';
 import '../listening_practice/listening_practice_provider.dart';
 import 'blind_listen_player_provider.dart';
 import 'intensive_listen_player_provider.dart';
+import 'listen_and_repeat_player_provider.dart';
+import 'sentence_playback_engine.dart';
+import '../../database/providers.dart';
 
 part 'learning_session_provider.g.dart';
 
@@ -25,6 +28,9 @@ enum LearningMode {
 
   /// 逐句精听
   intensiveListen,
+
+  /// 难句跟读
+  listenAndRepeat,
 }
 
 /// 学习会话状态
@@ -205,6 +211,61 @@ class LearningSession extends _$LearningSession {
     await intensivePlayer.initialize(sentences, startIndex: startIndex);
   }
 
+  /// 进入难句跟读模式
+  ///
+  /// 1. 保存当前用户播放设置
+  /// 2. 暂停 LP 的 stream 监听
+  /// 3. 从 BookmarkDao 读取难句索引集 → 过滤句子
+  /// 4. 从 LearningProgress 读取断点 shadowingSentenceIndex
+  /// 5. 根据 difficulty 计算 targetPlayCount
+  /// 6. 初始化 ListenAndRepeatPlayer
+  Future<void> enterListenAndRepeatMode(
+    String audioItemId,
+    List<Sentence> allSentences, {
+    bool isFreePlay = false,
+  }) async {
+    final practice = ref.read(listeningPracticeProvider.notifier);
+    final currentSettings = ref.read(listeningPracticeProvider).settings;
+
+    // 从数据库读取难句索引
+    final bookmarkDao = ref.read(bookmarkDaoProvider);
+    final bookmarkedIndices = await bookmarkDao.getBookmarkedIndices(
+      audioItemId,
+    );
+
+    // 过滤出难句列表
+    final difficultSentences = allSentences
+        .where((s) => bookmarkedIndices.contains(s.index))
+        .toList();
+
+    // 从数据库读取断点和难度
+    final progress = ref
+        .read(learningProgressNotifierProvider)
+        .progressMap[audioItemId];
+    final startIndex = progress?.shadowingSentenceIndex ?? 0;
+    final difficultyValue = progress?.difficulty.value ?? 2;
+    final targetPlayCount = targetPlayCountForDifficulty(difficultyValue);
+
+    state = state.copyWith(
+      learningMode: LearningMode.listenAndRepeat,
+      blindListenCompleted: false,
+      audioItemId: audioItemId,
+      savedSettings: currentSettings,
+      isFreePlay: isFreePlay,
+    );
+
+    // 暂停 LP 的 stream 监听
+    practice.suspendListeners();
+
+    // 初始化跟读播放器
+    final player = ref.read(listenAndRepeatPlayerProvider.notifier);
+    await player.initialize(
+      difficultSentences,
+      startIndex: startIndex,
+      targetPlayCount: targetPlayCount,
+    );
+  }
+
   /// 退出学习模式
   ///
   /// 根据当前学习模式分支处理：停止播放、释放资源、恢复 LP 监听。
@@ -223,6 +284,10 @@ class LearningSession extends _$LearningSession {
       // 释放精听播放器资源
       final intensivePlayer = ref.read(intensiveListenPlayerProvider.notifier);
       intensivePlayer.disposePlayer();
+    } else if (mode == LearningMode.listenAndRepeat) {
+      // 释放跟读播放器资源
+      final player = ref.read(listenAndRepeatPlayerProvider.notifier);
+      player.disposePlayer();
     }
 
     // 通用：清除 clip 防止残留影响 LP 的 absolutePositionStream

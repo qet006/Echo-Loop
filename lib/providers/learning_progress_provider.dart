@@ -213,6 +213,27 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     state = state.copyWith(progressMap: newMap);
   }
 
+  /// 保存跟读断点句子索引
+  Future<void> saveShadowingSentenceIndex(
+    String audioItemId,
+    int? sentenceIndex,
+  ) async {
+    final progress = state.progressMap[audioItemId];
+    if (progress == null) return;
+
+    final updated = progress.copyWith(
+      shadowingSentenceIndex: sentenceIndex,
+      clearShadowingSentenceIndex: sentenceIndex == null,
+      updatedAt: DateTime.now(),
+    );
+
+    await _persistProgress(updated);
+
+    final newMap = Map<String, LearningProgress>.from(state.progressMap);
+    newMap[audioItemId] = updated;
+    state = state.copyWith(progressMap: newMap);
+  }
+
   /// 保存精听断点句子索引
   Future<void> saveIntensiveListenSentenceIndex(
     String audioItemId,
@@ -251,6 +272,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
         intensiveListenSentenceIndex: Value(
           progress.intensiveListenSentenceIndex,
         ),
+        shadowingSentenceIndex: Value(progress.shadowingSentenceIndex),
         updatedAt: Value(progress.updatedAt),
       ),
     );
@@ -269,6 +291,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
       totalStudyDurationMs: row.totalStudyDurationMs,
       blindListenPassCount: row.blindListenPassCount,
       intensiveListenSentenceIndex: row.intensiveListenSentenceIndex,
+      shadowingSentenceIndex: row.shadowingSentenceIndex,
       updatedAt: row.updatedAt,
     );
   }

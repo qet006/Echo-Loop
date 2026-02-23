@@ -18,6 +18,7 @@ import '../screens/learning_plan_screen.dart';
 import '../screens/player_screen.dart';
 import '../screens/blind_listen_player_screen.dart';
 import '../screens/intensive_listen_player_screen.dart';
+import '../screens/listen_and_repeat_player_screen.dart';
 import 'main_shell.dart';
 
 /// 全局根导航器 key
@@ -53,6 +54,12 @@ abstract class AppRoutes {
       collectionId != null
       ? '/collections/$collectionId/$audioId/intensive-listen'
       : '/audio/$audioId/intensive-listen';
+
+  /// 跟读播放器页路径
+  static String listenAndRepeatPlayer(String? collectionId, String audioId) =>
+      collectionId != null
+      ? '/collections/$collectionId/$audioId/listen-and-repeat'
+      : '/audio/$audioId/listen-and-repeat';
 
   /// 独立音频学习计划页路径（不依赖合集）
   static String audioLearningPlan(String audioId) => '/audio/$audioId/plan';
@@ -145,6 +152,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+      GoRoute(
+        path: '/audio/:audioId/listen-and-repeat',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final audioId = state.pathParameters['audioId']!;
+          return ListenAndRepeatPlayerScreen(
+            collectionId: null,
+            audioItemId: audioId,
+          );
+        },
+      ),
       // 详情页放在 shell 外部，全屏显示
       GoRoute(
         path: '/collections/:collectionId',
@@ -190,6 +208,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               final collectionId = state.pathParameters['collectionId']!;
               final audioId = state.pathParameters['audioId']!;
               return IntensiveListenPlayerScreen(
+                collectionId: collectionId,
+                audioItemId: audioId,
+              );
+            },
+          ),
+          GoRoute(
+            path: ':audioId/listen-and-repeat',
+            parentNavigatorKey: rootNavigatorKey,
+            builder: (context, state) {
+              final collectionId = state.pathParameters['collectionId']!;
+              final audioId = state.pathParameters['audioId']!;
+              return ListenAndRepeatPlayerScreen(
                 collectionId: collectionId,
                 audioItemId: audioId,
               );

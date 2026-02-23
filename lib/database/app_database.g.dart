@@ -2671,6 +2671,16 @@ class $LearningProgressesTable extends LearningProgresses
         type: DriftSqlType.int,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _shadowingSentenceIndexMeta =
+      const VerificationMeta('shadowingSentenceIndex');
+  @override
+  late final GeneratedColumn<int> shadowingSentenceIndex = GeneratedColumn<int>(
+    'shadowing_sentence_index',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -2694,6 +2704,7 @@ class $LearningProgressesTable extends LearningProgresses
     totalStudyDurationMs,
     blindListenPassCount,
     intensiveListenSentenceIndex,
+    shadowingSentenceIndex,
     updatedAt,
   ];
   @override
@@ -2797,6 +2808,15 @@ class $LearningProgressesTable extends LearningProgresses
         ),
       );
     }
+    if (data.containsKey('shadowing_sentence_index')) {
+      context.handle(
+        _shadowingSentenceIndexMeta,
+        shadowingSentenceIndex.isAcceptableOrUnknown(
+          data['shadowing_sentence_index']!,
+          _shadowingSentenceIndexMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -2854,6 +2874,10 @@ class $LearningProgressesTable extends LearningProgresses
         DriftSqlType.int,
         data['${effectivePrefix}intensive_listen_sentence_index'],
       ),
+      shadowingSentenceIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}shadowing_sentence_index'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -2899,6 +2923,9 @@ class LearningProgressesData extends DataClass
   /// 精听断点续学句子索引（null 表示从头开始）
   final int? intensiveListenSentenceIndex;
 
+  /// 跟读断点续学句子索引（null 表示从头开始）
+  final int? shadowingSentenceIndex;
+
   /// 最后更新时间
   final DateTime updatedAt;
   const LearningProgressesData({
@@ -2912,6 +2939,7 @@ class LearningProgressesData extends DataClass
     required this.totalStudyDurationMs,
     required this.blindListenPassCount,
     this.intensiveListenSentenceIndex,
+    this.shadowingSentenceIndex,
     required this.updatedAt,
   });
   @override
@@ -2941,6 +2969,9 @@ class LearningProgressesData extends DataClass
         intensiveListenSentenceIndex,
       );
     }
+    if (!nullToAbsent || shadowingSentenceIndex != null) {
+      map['shadowing_sentence_index'] = Variable<int>(shadowingSentenceIndex);
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -2966,6 +2997,9 @@ class LearningProgressesData extends DataClass
           intensiveListenSentenceIndex == null && nullToAbsent
           ? const Value.absent()
           : Value(intensiveListenSentenceIndex),
+      shadowingSentenceIndex: shadowingSentenceIndex == null && nullToAbsent
+          ? const Value.absent()
+          : Value(shadowingSentenceIndex),
       updatedAt: Value(updatedAt),
     );
   }
@@ -2998,6 +3032,9 @@ class LearningProgressesData extends DataClass
       intensiveListenSentenceIndex: serializer.fromJson<int?>(
         json['intensiveListenSentenceIndex'],
       ),
+      shadowingSentenceIndex: serializer.fromJson<int?>(
+        json['shadowingSentenceIndex'],
+      ),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -3023,6 +3060,7 @@ class LearningProgressesData extends DataClass
       'intensiveListenSentenceIndex': serializer.toJson<int?>(
         intensiveListenSentenceIndex,
       ),
+      'shadowingSentenceIndex': serializer.toJson<int?>(shadowingSentenceIndex),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -3038,6 +3076,7 @@ class LearningProgressesData extends DataClass
     int? totalStudyDurationMs,
     int? blindListenPassCount,
     Value<int?> intensiveListenSentenceIndex = const Value.absent(),
+    Value<int?> shadowingSentenceIndex = const Value.absent(),
     DateTime? updatedAt,
   }) => LearningProgressesData(
     audioItemId: audioItemId ?? this.audioItemId,
@@ -3058,6 +3097,9 @@ class LearningProgressesData extends DataClass
     intensiveListenSentenceIndex: intensiveListenSentenceIndex.present
         ? intensiveListenSentenceIndex.value
         : this.intensiveListenSentenceIndex,
+    shadowingSentenceIndex: shadowingSentenceIndex.present
+        ? shadowingSentenceIndex.value
+        : this.shadowingSentenceIndex,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   LearningProgressesData copyWithCompanion(LearningProgressesCompanion data) {
@@ -3092,6 +3134,9 @@ class LearningProgressesData extends DataClass
       intensiveListenSentenceIndex: data.intensiveListenSentenceIndex.present
           ? data.intensiveListenSentenceIndex.value
           : this.intensiveListenSentenceIndex,
+      shadowingSentenceIndex: data.shadowingSentenceIndex.present
+          ? data.shadowingSentenceIndex.value
+          : this.shadowingSentenceIndex,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -3111,6 +3156,7 @@ class LearningProgressesData extends DataClass
           ..write(
             'intensiveListenSentenceIndex: $intensiveListenSentenceIndex, ',
           )
+          ..write('shadowingSentenceIndex: $shadowingSentenceIndex, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -3128,6 +3174,7 @@ class LearningProgressesData extends DataClass
     totalStudyDurationMs,
     blindListenPassCount,
     intensiveListenSentenceIndex,
+    shadowingSentenceIndex,
     updatedAt,
   );
   @override
@@ -3145,6 +3192,7 @@ class LearningProgressesData extends DataClass
           other.blindListenPassCount == this.blindListenPassCount &&
           other.intensiveListenSentenceIndex ==
               this.intensiveListenSentenceIndex &&
+          other.shadowingSentenceIndex == this.shadowingSentenceIndex &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -3160,6 +3208,7 @@ class LearningProgressesCompanion
   final Value<int> totalStudyDurationMs;
   final Value<int> blindListenPassCount;
   final Value<int?> intensiveListenSentenceIndex;
+  final Value<int?> shadowingSentenceIndex;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const LearningProgressesCompanion({
@@ -3173,6 +3222,7 @@ class LearningProgressesCompanion
     this.totalStudyDurationMs = const Value.absent(),
     this.blindListenPassCount = const Value.absent(),
     this.intensiveListenSentenceIndex = const Value.absent(),
+    this.shadowingSentenceIndex = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -3187,6 +3237,7 @@ class LearningProgressesCompanion
     this.totalStudyDurationMs = const Value.absent(),
     this.blindListenPassCount = const Value.absent(),
     this.intensiveListenSentenceIndex = const Value.absent(),
+    this.shadowingSentenceIndex = const Value.absent(),
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   }) : audioItemId = Value(audioItemId),
@@ -3202,6 +3253,7 @@ class LearningProgressesCompanion
     Expression<int>? totalStudyDurationMs,
     Expression<int>? blindListenPassCount,
     Expression<int>? intensiveListenSentenceIndex,
+    Expression<int>? shadowingSentenceIndex,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -3222,6 +3274,8 @@ class LearningProgressesCompanion
         'blind_listen_pass_count': blindListenPassCount,
       if (intensiveListenSentenceIndex != null)
         'intensive_listen_sentence_index': intensiveListenSentenceIndex,
+      if (shadowingSentenceIndex != null)
+        'shadowing_sentence_index': shadowingSentenceIndex,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -3238,6 +3292,7 @@ class LearningProgressesCompanion
     Value<int>? totalStudyDurationMs,
     Value<int>? blindListenPassCount,
     Value<int?>? intensiveListenSentenceIndex,
+    Value<int?>? shadowingSentenceIndex,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -3255,6 +3310,8 @@ class LearningProgressesCompanion
       blindListenPassCount: blindListenPassCount ?? this.blindListenPassCount,
       intensiveListenSentenceIndex:
           intensiveListenSentenceIndex ?? this.intensiveListenSentenceIndex,
+      shadowingSentenceIndex:
+          shadowingSentenceIndex ?? this.shadowingSentenceIndex,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -3305,6 +3362,11 @@ class LearningProgressesCompanion
         intensiveListenSentenceIndex.value,
       );
     }
+    if (shadowingSentenceIndex.present) {
+      map['shadowing_sentence_index'] = Variable<int>(
+        shadowingSentenceIndex.value,
+      );
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -3329,6 +3391,7 @@ class LearningProgressesCompanion
           ..write(
             'intensiveListenSentenceIndex: $intensiveListenSentenceIndex, ',
           )
+          ..write('shadowingSentenceIndex: $shadowingSentenceIndex, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -7084,6 +7147,7 @@ typedef $$LearningProgressesTableCreateCompanionBuilder =
       Value<int> totalStudyDurationMs,
       Value<int> blindListenPassCount,
       Value<int?> intensiveListenSentenceIndex,
+      Value<int?> shadowingSentenceIndex,
       required DateTime updatedAt,
       Value<int> rowid,
     });
@@ -7099,6 +7163,7 @@ typedef $$LearningProgressesTableUpdateCompanionBuilder =
       Value<int> totalStudyDurationMs,
       Value<int> blindListenPassCount,
       Value<int?> intensiveListenSentenceIndex,
+      Value<int?> shadowingSentenceIndex,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -7193,6 +7258,11 @@ class $$LearningProgressesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get shadowingSentenceIndex => $composableBuilder(
+    column: $table.shadowingSentenceIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
@@ -7273,6 +7343,11 @@ class $$LearningProgressesTableOrderingComposer
 
   ColumnOrderings<int> get intensiveListenSentenceIndex => $composableBuilder(
     column: $table.intensiveListenSentenceIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get shadowingSentenceIndex => $composableBuilder(
+    column: $table.shadowingSentenceIndex,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -7359,6 +7434,11 @@ class $$LearningProgressesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get shadowingSentenceIndex => $composableBuilder(
+    column: $table.shadowingSentenceIndex,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
@@ -7429,6 +7509,7 @@ class $$LearningProgressesTableTableManager
                 Value<int> totalStudyDurationMs = const Value.absent(),
                 Value<int> blindListenPassCount = const Value.absent(),
                 Value<int?> intensiveListenSentenceIndex = const Value.absent(),
+                Value<int?> shadowingSentenceIndex = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LearningProgressesCompanion(
@@ -7442,6 +7523,7 @@ class $$LearningProgressesTableTableManager
                 totalStudyDurationMs: totalStudyDurationMs,
                 blindListenPassCount: blindListenPassCount,
                 intensiveListenSentenceIndex: intensiveListenSentenceIndex,
+                shadowingSentenceIndex: shadowingSentenceIndex,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -7457,6 +7539,7 @@ class $$LearningProgressesTableTableManager
                 Value<int> totalStudyDurationMs = const Value.absent(),
                 Value<int> blindListenPassCount = const Value.absent(),
                 Value<int?> intensiveListenSentenceIndex = const Value.absent(),
+                Value<int?> shadowingSentenceIndex = const Value.absent(),
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => LearningProgressesCompanion.insert(
@@ -7470,6 +7553,7 @@ class $$LearningProgressesTableTableManager
                 totalStudyDurationMs: totalStudyDurationMs,
                 blindListenPassCount: blindListenPassCount,
                 intensiveListenSentenceIndex: intensiveListenSentenceIndex,
+                shadowingSentenceIndex: shadowingSentenceIndex,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
