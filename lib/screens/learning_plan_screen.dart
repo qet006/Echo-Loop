@@ -27,6 +27,17 @@ import '../providers/listening_practice/bookmark_manager.dart';
 import '../database/providers.dart';
 import '../providers/learning_session/sentence_playback_engine.dart';
 
+/// 实时查询指定音频的书签数量（难句数）
+///
+/// 使用 StreamProvider 监听 bookmarks 表变化，确保难句数实时更新。
+final _bookmarkCountProvider =
+    StreamProvider.family.autoDispose<int, String>((ref, audioItemId) {
+  final bookmarkDao = ref.watch(bookmarkDaoProvider);
+  return bookmarkDao
+      .watchByAudioId(audioItemId)
+      .map((bookmarks) => bookmarks.length);
+});
+
 /// 学习计划表页面
 class LearningPlanScreen extends ConsumerStatefulWidget {
   /// 合集 ID（从独立音频路由进入时为 null）
@@ -539,21 +550,31 @@ class _FirstStudySection extends ConsumerWidget {
           final isCurrent =
               progress?.isCurrentSubStage(firstLearnStage, subStage) ?? false;
 
-          // 盲听步骤显示已听遍数 + 难度
+          // 各步骤显示完成统计
           String? subtitle;
           if (subStage == SubStageType.blindListen) {
+            // 盲听：已听遍数 + 难度
             final passCount = progress?.blindListenPassCount ?? 0;
             final parts = <String>[];
             if (passCount > 0) {
               parts.add(l10n.blindListenPassInfo(passCount));
             }
-            // 盲听已完成时显示用户选择的难度
             if (progress?.isSubStageCompleted(firstLearnStage, subStage) ??
                 false) {
               parts.add(l10n.difficultyLabel(progress!.difficulty.label));
             }
             if (parts.isNotEmpty) {
               subtitle = parts.join(' · ');
+            }
+          } else if (subStage == SubStageType.intensiveListen) {
+            // 精听：仅当前或已完成步骤显示统计
+            if (isCompleted || isCurrent) {
+              subtitle = _buildIntensiveListenSubtitle(ref, l10n);
+            }
+          } else if (subStage == SubStageType.listenAndRepeat) {
+            // 跟读：仅当前或已完成步骤显示统计
+            if (isCompleted || isCurrent) {
+              subtitle = _buildShadowingSubtitle(ref, l10n);
             }
           }
 
@@ -581,6 +602,46 @@ class _FirstStudySection extends ConsumerWidget {
         }),
       ],
     );
+  }
+
+  /// 构建精听卡片副标题（实时难句数 + 总完成遍数）
+  String? _buildIntensiveListenSubtitle(WidgetRef ref, AppLocalizations l10n) {
+    final parts = <String>[];
+
+    // 实时查询书签数量（难句数）
+    final bookmarkCount = ref.watch(
+      _bookmarkCountProvider(audioItemId),
+    ).valueOrNull ?? 0;
+    if (bookmarkCount > 0) {
+      parts.add(l10n.difficultSentenceCount(bookmarkCount));
+    }
+
+    // 精听总完成遍数
+    if (progress?.intensiveListenPassCount case final count? when count > 0) {
+      parts.add(l10n.intensiveListenPassInfo(count));
+    }
+
+    return parts.isNotEmpty ? parts.join(' · ') : null;
+  }
+
+  /// 构建跟读卡片副标题（实时难句数 + 总完成遍数）
+  String? _buildShadowingSubtitle(WidgetRef ref, AppLocalizations l10n) {
+    final parts = <String>[];
+
+    // 实时查询书签数量（难句数）
+    final bookmarkCount = ref.watch(
+      _bookmarkCountProvider(audioItemId),
+    ).valueOrNull ?? 0;
+    if (bookmarkCount > 0) {
+      parts.add(l10n.difficultSentenceCount(bookmarkCount));
+    }
+
+    // 跟读总完成遍数
+    if (progress?.shadowingPassCount case final count? when count > 0) {
+      parts.add(l10n.shadowingPassInfo(count));
+    }
+
+    return parts.isNotEmpty ? parts.join(' · ') : null;
   }
 
   /// 进入自由练习盲听模式（直接进入，不弹 briefing sheet）
