@@ -311,8 +311,6 @@ class _BlindListenPlayerScreenState
       }
     });
 
-    final currentPass = session.blindListenPassCount;
-
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
@@ -348,19 +346,6 @@ class _BlindListenPlayerScreenState
         appBar: AppBar(
           title: Text(l10n.blindListenAppBarTitle),
           centerTitle: true,
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: AppSpacing.m),
-              child: Center(
-                child: Text(
-                  l10n.blindListenPassLabel(currentPass),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ),
-          ],
         ),
         body: Column(
           children: [
@@ -419,7 +404,7 @@ class _BlindListenPlayerScreenState
                     ),
                     const SizedBox(height: AppSpacing.l),
 
-                    // 倒计时 / 遍数信息区域（固定高度，避免布局跳动）
+                    // 倒计时信息区域（固定高度，避免布局跳动）
                     SizedBox(
                       height: 64,
                       child: _countdownRemaining != null
@@ -429,14 +414,7 @@ class _BlindListenPlayerScreenState
                               l10n: l10n,
                               onSkip: _skipCountdown,
                             )
-                          : Center(
-                              child: Text(
-                                l10n.blindListenPassLabel(currentPass),
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
+                          : const SizedBox.shrink(),
                     ),
                   ],
                 ),
