@@ -664,6 +664,10 @@
   "transcriptionProcessing": "Transcribing...",
   "transcriptionComplete": "Complete!",
   "transcriptionFailed": "Transcription failed",
+  "transcriptionErrorConnection": "Unable to connect to server",
+  "transcriptionErrorTimeout": "Request timed out, please retry",
+  "transcriptionErrorServer": "Server error, please retry later",
+  "transcriptionErrorUnknown": "Something went wrong",
   "deleteSubtitleConfirm": "Are you sure you want to delete the subtitle?",
   "deleteSubtitleWarning": "Deleting the subtitle will affect learning progress.",
   "languageMulti": "Mixed Languages",
@@ -671,6 +675,7 @@
   "overwriteExistingSubtitle": "Overwrite existing subtitle?",
   "overwriteExistingSubtitleMessage": "This will replace the current subtitle. Continue?",
   "overwrite": "Overwrite",
+  "currentSubtitleExists": "Current: Has Subtitle",
   "currentSubtitleLocal": "Current: Local Upload",
   "currentSubtitleAi": "Current: AI ({language})",
   "@currentSubtitleAi": {

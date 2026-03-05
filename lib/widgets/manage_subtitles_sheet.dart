@@ -121,33 +121,26 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
             // 标题行 + 删除按钮
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.manageSubtitles,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                  Expanded(
+                    child: Text(
+                      l10n.manageSubtitles,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
-                      // 删除按钮（仅有字幕且非进度模式时显示）
-                      if (audioItem.hasTranscript && !isTaskActive)
-                        IconButton(
-                          onPressed: () =>
-                              _handleDeleteSubtitle(context, audioItem),
-                          icon: const Icon(Icons.delete_outline, size: 20),
-                          color: theme.colorScheme.onSurfaceVariant,
-                          tooltip: l10n.deleteSubtitle,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  _buildStatusChip(l10n, theme, audioItem),
+                  // 删除按钮（仅有字幕且非进度模式时显示）
+                  if (audioItem.hasTranscript && !isTaskActive)
+                    IconButton(
+                      onPressed: () =>
+                          _handleDeleteSubtitle(context, audioItem),
+                      icon: const Icon(Icons.delete_outline, size: 20),
+                      color: theme.colorScheme.onSurfaceVariant,
+                      tooltip: l10n.deleteSubtitle,
+                      visualDensity: VisualDensity.compact,
+                    ),
                 ],
               ),
             ),
@@ -319,7 +312,7 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
               child: Text(
-                taskState.message,
+                _localizedErrorMessage(l10n, taskState.message),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -332,20 +325,14 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
     );
   }
 
-  /// 获取当前字幕状态文字
-  String _getStatusText(AppLocalizations l10n, AudioItem audioItem) {
-    if (!audioItem.hasTranscript) return l10n.noSubtitleYet;
-    switch (audioItem.transcriptSource) {
-      case TranscriptSource.local:
-        return l10n.currentSubtitleLocal;
-      case TranscriptSource.ai:
-        final lang = audioItem.transcriptLanguage == 'multi'
-            ? l10n.languageMulti
-            : l10n.languageEnglish;
-        return l10n.currentSubtitleAi(lang);
-      case null:
-        return l10n.currentSubtitleLocal;
-    }
+  /// 将错误码转换为本地化的用户友好提示
+  String _localizedErrorMessage(AppLocalizations l10n, String code) {
+    return switch (code) {
+      'connection' => l10n.transcriptionErrorConnection,
+      'timeout' => l10n.transcriptionErrorTimeout,
+      'server' => l10n.transcriptionErrorServer,
+      _ => l10n.transcriptionErrorUnknown,
+    };
   }
 
   /// 构建选项卡片列表（替代 RadioListTile）
@@ -542,56 +529,6 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  /// 构建字幕状态标签（带图标的圆角标签）
-  Widget _buildStatusChip(
-    AppLocalizations l10n,
-    ThemeData theme,
-    AudioItem audioItem,
-  ) {
-    final statusText = _getStatusText(l10n, audioItem);
-    final hasTranscript = audioItem.hasTranscript;
-    final IconData iconData;
-    if (!hasTranscript) {
-      iconData = Icons.subtitles_off_outlined;
-    } else if (audioItem.transcriptSource == TranscriptSource.ai) {
-      iconData = Icons.auto_awesome;
-    } else {
-      iconData = Icons.folder_outlined;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: hasTranscript
-            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
-            : theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            iconData,
-            size: 14,
-            color: hasTranscript
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            statusText,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: hasTranscript
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
       ),
     );
   }

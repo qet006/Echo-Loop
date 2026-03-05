@@ -1165,6 +1165,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get transcriptionFailed => '转录失败';
 
   @override
+  String get transcriptionErrorConnection => '无法连接服务器';
+
+  @override
+  String get transcriptionErrorTimeout => '请求超时，请重试';
+
+  @override
+  String get transcriptionErrorServer => '服务器错误，请稍后重试';
+
+  @override
+  String get transcriptionErrorUnknown => '出了点问题';
+
+  @override
   String get deleteSubtitleConfirm => '确定删除字幕？';
 
   @override
@@ -1184,6 +1196,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get overwrite => '覆盖';
+
+  @override
+  String get currentSubtitleExists => '当前：已有字幕';
 
   @override
   String get currentSubtitleLocal => '当前：本地上传';

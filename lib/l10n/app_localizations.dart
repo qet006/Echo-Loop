@@ -2186,6 +2186,30 @@ abstract class AppLocalizations {
   /// **'Transcription failed'**
   String get transcriptionFailed;
 
+  /// No description provided for @transcriptionErrorConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to connect to server'**
+  String get transcriptionErrorConnection;
+
+  /// No description provided for @transcriptionErrorTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Request timed out, please retry'**
+  String get transcriptionErrorTimeout;
+
+  /// No description provided for @transcriptionErrorServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Server error, please retry later'**
+  String get transcriptionErrorServer;
+
+  /// No description provided for @transcriptionErrorUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong'**
+  String get transcriptionErrorUnknown;
+
   /// No description provided for @deleteSubtitleConfirm.
   ///
   /// In en, this message translates to:
@@ -2227,6 +2251,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Overwrite'**
   String get overwrite;
+
+  /// No description provided for @currentSubtitleExists.
+  ///
+  /// In en, this message translates to:
+  /// **'Current: Has Subtitle'**
+  String get currentSubtitleExists;
 
   /// No description provided for @currentSubtitleLocal.
   ///

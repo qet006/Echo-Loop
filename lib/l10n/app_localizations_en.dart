@@ -1198,6 +1198,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get transcriptionFailed => 'Transcription failed';
 
   @override
+  String get transcriptionErrorConnection => 'Unable to connect to server';
+
+  @override
+  String get transcriptionErrorTimeout => 'Request timed out, please retry';
+
+  @override
+  String get transcriptionErrorServer => 'Server error, please retry later';
+
+  @override
+  String get transcriptionErrorUnknown => 'Something went wrong';
+
+  @override
   String get deleteSubtitleConfirm =>
       'Are you sure you want to delete the subtitle?';
 
@@ -1220,6 +1232,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get overwrite => 'Overwrite';
+
+  @override
+  String get currentSubtitleExists => 'Current: Has Subtitle';
 
   @override
   String get currentSubtitleLocal => 'Current: Local Upload';

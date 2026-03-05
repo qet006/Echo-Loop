@@ -151,6 +151,7 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
       _updateState(audioId, const TranscriptionUploading());
       final mimeType = _getMimeType(fullPath);
       final fileSize = await fileOps.getFileSize(fullPath);
+      print('[TRANSCRIPTION] Step 2: sha256=$sha256, size=$fileSize');
 
       final uploadResp = await api.getUploadUrl(
         sha256: sha256,
@@ -208,10 +209,7 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
       }
 
       if (submitResp.jobId == null) {
-        _updateState(
-          audioId,
-          const TranscriptionFailed(message: 'No job ID returned'),
-        );
+        _updateState(audioId, const TranscriptionFailed(message: 'server'));
         return;
       }
 
@@ -226,12 +224,14 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
       );
     } on DioException catch (e) {
       if (e.type == DioExceptionType.cancel) return;
+      print('[TRANSCRIPTION] DioException: ${e.type} ${e.message} ${e.error}');
       _updateState(
         audioId,
-        TranscriptionFailed(message: e.message ?? 'Network error'),
+        TranscriptionFailed(message: _userFriendlyError(e)),
       );
     } catch (e) {
-      _updateState(audioId, TranscriptionFailed(message: e.toString()));
+      print('[TRANSCRIPTION] Error: $e');
+      _updateState(audioId, const TranscriptionFailed(message: 'unknown'));
     }
   }
 
@@ -245,6 +245,18 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
   /// 清除已完成/失败的状态
   void clearState(String audioId) {
     state = Map.of(state)..remove(audioId);
+  }
+
+  /// 将 DioException 转换为简短的错误码
+  String _userFriendlyError(DioException e) {
+    return switch (e.type) {
+      DioExceptionType.connectionError ||
+      DioExceptionType.connectionTimeout => 'connection',
+      DioExceptionType.sendTimeout ||
+      DioExceptionType.receiveTimeout => 'timeout',
+      DioExceptionType.badResponse => 'server',
+      _ => 'unknown',
+    };
   }
 
   // ─── 内部方法 ──────────────────────────────────────────
@@ -290,9 +302,7 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
         if (status.isFailed) {
           _updateState(
             audioItem.id,
-            TranscriptionFailed(
-              message: status.errorMessage ?? 'Transcription failed',
-            ),
+            const TranscriptionFailed(message: 'server'),
           );
           return;
         }
@@ -303,10 +313,7 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
     }
 
     // 超时
-    _updateState(
-      audioItem.id,
-      const TranscriptionFailed(message: 'Transcription timed out'),
-    );
+    _updateState(audioItem.id, const TranscriptionFailed(message: 'timeout'));
   }
 
   /// 保存转录结果到本地 SRT 文件并更新 AudioItem
