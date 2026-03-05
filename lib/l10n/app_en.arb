@@ -652,5 +652,38 @@
 
   "developer": "Developer",
   "unlockAllReviews": "Unlock All Reviews",
-  "unlockAllReviewsDescription": "Skip review time locks for testing"
+  "unlockAllReviewsDescription": "Skip review time locks for testing",
+
+  "manageSubtitles": "Manage Subtitles",
+  "localUpload": "Local Upload",
+  "aiTranscription": "AI Transcription",
+  "deleteSubtitle": "Delete Subtitle",
+  "startTranscription": "Start Transcription",
+  "alreadyTranscribedWithOption": "Already transcribed with this option",
+  "transcriptionUploading": "Uploading...",
+  "transcriptionProcessing": "Transcribing...",
+  "transcriptionComplete": "Complete!",
+  "transcriptionFailed": "Transcription failed",
+  "deleteSubtitleConfirm": "Are you sure you want to delete the subtitle?",
+  "deleteSubtitleWarning": "Deleting the subtitle will affect learning progress.",
+  "languageMulti": "Mixed Languages",
+  "selectLanguage": "Select Language",
+  "overwriteExistingSubtitle": "Overwrite existing subtitle?",
+  "overwriteExistingSubtitleMessage": "This will replace the current subtitle. Continue?",
+  "overwrite": "Overwrite",
+  "currentSubtitleLocal": "Current: Local Upload",
+  "currentSubtitleAi": "Current: AI ({language})",
+  "@currentSubtitleAi": {
+    "placeholders": {
+      "language": { "type": "String" }
+    }
+  },
+  "noSubtitleYet": "No subtitle yet",
+  "retryTranscription": "Retry",
+  "transcriptionFailedMessage": "Error: {message}",
+  "@transcriptionFailedMessage": {
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  }
 }

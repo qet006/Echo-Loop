@@ -2125,6 +2125,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Skip review time locks for testing'**
   String get unlockAllReviewsDescription;
+
+  /// No description provided for @manageSubtitles.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Subtitles'**
+  String get manageSubtitles;
+
+  /// No description provided for @localUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Upload'**
+  String get localUpload;
+
+  /// No description provided for @aiTranscription.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Transcription'**
+  String get aiTranscription;
+
+  /// No description provided for @deleteSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Subtitle'**
+  String get deleteSubtitle;
+
+  /// No description provided for @startTranscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Transcription'**
+  String get startTranscription;
+
+  /// No description provided for @alreadyTranscribedWithOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Already transcribed with this option'**
+  String get alreadyTranscribedWithOption;
+
+  /// No description provided for @transcriptionUploading.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading...'**
+  String get transcriptionUploading;
+
+  /// No description provided for @transcriptionProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribing...'**
+  String get transcriptionProcessing;
+
+  /// No description provided for @transcriptionComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete!'**
+  String get transcriptionComplete;
+
+  /// No description provided for @transcriptionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcription failed'**
+  String get transcriptionFailed;
+
+  /// No description provided for @deleteSubtitleConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete the subtitle?'**
+  String get deleteSubtitleConfirm;
+
+  /// No description provided for @deleteSubtitleWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting the subtitle will affect learning progress.'**
+  String get deleteSubtitleWarning;
+
+  /// No description provided for @languageMulti.
+  ///
+  /// In en, this message translates to:
+  /// **'Mixed Languages'**
+  String get languageMulti;
+
+  /// No description provided for @selectLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Language'**
+  String get selectLanguage;
+
+  /// No description provided for @overwriteExistingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Overwrite existing subtitle?'**
+  String get overwriteExistingSubtitle;
+
+  /// No description provided for @overwriteExistingSubtitleMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This will replace the current subtitle. Continue?'**
+  String get overwriteExistingSubtitleMessage;
+
+  /// No description provided for @overwrite.
+  ///
+  /// In en, this message translates to:
+  /// **'Overwrite'**
+  String get overwrite;
+
+  /// No description provided for @currentSubtitleLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Current: Local Upload'**
+  String get currentSubtitleLocal;
+
+  /// No description provided for @currentSubtitleAi.
+  ///
+  /// In en, this message translates to:
+  /// **'Current: AI ({language})'**
+  String currentSubtitleAi(String language);
+
+  /// No description provided for @noSubtitleYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No subtitle yet'**
+  String get noSubtitleYet;
+
+  /// No description provided for @retryTranscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retryTranscription;
+
+  /// No description provided for @transcriptionFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {message}'**
+  String transcriptionFailedMessage(String message);
 }
 
 class _AppLocalizationsDelegate

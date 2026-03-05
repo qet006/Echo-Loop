@@ -29,6 +29,15 @@ class AudioItems extends Table {
   /// 是否星标
   BoolColumn get isStarred => boolean().withDefault(const Constant(false))();
 
+  /// 字幕来源：0=local, 1=ai, null=无字幕
+  IntColumn get transcriptSource => integer().nullable()();
+
+  /// 音频文件 SHA256 指纹（缓存，避免重复计算）
+  TextColumn get audioSha256 => text().nullable()();
+
+  /// AI 转录使用的语言（'en' / 'multi'）
+  TextColumn get transcriptLanguage => text().nullable()();
+
   /// 最后修改时间
   DateTimeColumn get updatedAt => dateTime()();
 

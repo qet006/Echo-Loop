@@ -510,5 +510,38 @@
 
   "developer": "开发者",
   "unlockAllReviews": "解锁所有复习",
-  "unlockAllReviewsDescription": "跳过复习时间锁，用于测试"
+  "unlockAllReviewsDescription": "跳过复习时间锁，用于测试",
+
+  "manageSubtitles": "管理字幕",
+  "localUpload": "本地上传",
+  "aiTranscription": "AI 转录",
+  "deleteSubtitle": "删除字幕",
+  "startTranscription": "开始转录",
+  "alreadyTranscribedWithOption": "已使用该选项转录",
+  "transcriptionUploading": "上传中…",
+  "transcriptionProcessing": "转录中…",
+  "transcriptionComplete": "完成！",
+  "transcriptionFailed": "转录失败",
+  "deleteSubtitleConfirm": "确定删除字幕？",
+  "deleteSubtitleWarning": "删除字幕将影响学习进度。",
+  "languageMulti": "混合语言",
+  "selectLanguage": "选择语言",
+  "overwriteExistingSubtitle": "覆盖现有字幕？",
+  "overwriteExistingSubtitleMessage": "这将替换当前字幕，确定继续吗？",
+  "overwrite": "覆盖",
+  "currentSubtitleLocal": "当前：本地上传",
+  "currentSubtitleAi": "当前：AI 转录（{language}）",
+  "@currentSubtitleAi": {
+    "placeholders": {
+      "language": { "type": "String" }
+    }
+  },
+  "noSubtitleYet": "暂无字幕",
+  "retryTranscription": "重试",
+  "transcriptionFailedMessage": "错误：{message}",
+  "@transcriptionFailedMessage": {
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  }
 }

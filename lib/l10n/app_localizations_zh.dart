@@ -1133,4 +1133,74 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get unlockAllReviewsDescription => '跳过复习时间锁，用于测试';
+
+  @override
+  String get manageSubtitles => '管理字幕';
+
+  @override
+  String get localUpload => '本地上传';
+
+  @override
+  String get aiTranscription => 'AI 转录';
+
+  @override
+  String get deleteSubtitle => '删除字幕';
+
+  @override
+  String get startTranscription => '开始转录';
+
+  @override
+  String get alreadyTranscribedWithOption => '已使用该选项转录';
+
+  @override
+  String get transcriptionUploading => '上传中…';
+
+  @override
+  String get transcriptionProcessing => '转录中…';
+
+  @override
+  String get transcriptionComplete => '完成！';
+
+  @override
+  String get transcriptionFailed => '转录失败';
+
+  @override
+  String get deleteSubtitleConfirm => '确定删除字幕？';
+
+  @override
+  String get deleteSubtitleWarning => '删除字幕将影响学习进度。';
+
+  @override
+  String get languageMulti => '混合语言';
+
+  @override
+  String get selectLanguage => '选择语言';
+
+  @override
+  String get overwriteExistingSubtitle => '覆盖现有字幕？';
+
+  @override
+  String get overwriteExistingSubtitleMessage => '这将替换当前字幕，确定继续吗？';
+
+  @override
+  String get overwrite => '覆盖';
+
+  @override
+  String get currentSubtitleLocal => '当前：本地上传';
+
+  @override
+  String currentSubtitleAi(String language) {
+    return '当前：AI 转录（$language）';
+  }
+
+  @override
+  String get noSubtitleYet => '暂无字幕';
+
+  @override
+  String get retryTranscription => '重试';
+
+  @override
+  String transcriptionFailedMessage(String message) {
+    return '错误：$message';
+  }
 }

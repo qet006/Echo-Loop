@@ -1165,4 +1165,78 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get unlockAllReviewsDescription =>
       'Skip review time locks for testing';
+
+  @override
+  String get manageSubtitles => 'Manage Subtitles';
+
+  @override
+  String get localUpload => 'Local Upload';
+
+  @override
+  String get aiTranscription => 'AI Transcription';
+
+  @override
+  String get deleteSubtitle => 'Delete Subtitle';
+
+  @override
+  String get startTranscription => 'Start Transcription';
+
+  @override
+  String get alreadyTranscribedWithOption =>
+      'Already transcribed with this option';
+
+  @override
+  String get transcriptionUploading => 'Uploading...';
+
+  @override
+  String get transcriptionProcessing => 'Transcribing...';
+
+  @override
+  String get transcriptionComplete => 'Complete!';
+
+  @override
+  String get transcriptionFailed => 'Transcription failed';
+
+  @override
+  String get deleteSubtitleConfirm =>
+      'Are you sure you want to delete the subtitle?';
+
+  @override
+  String get deleteSubtitleWarning =>
+      'Deleting the subtitle will affect learning progress.';
+
+  @override
+  String get languageMulti => 'Mixed Languages';
+
+  @override
+  String get selectLanguage => 'Select Language';
+
+  @override
+  String get overwriteExistingSubtitle => 'Overwrite existing subtitle?';
+
+  @override
+  String get overwriteExistingSubtitleMessage =>
+      'This will replace the current subtitle. Continue?';
+
+  @override
+  String get overwrite => 'Overwrite';
+
+  @override
+  String get currentSubtitleLocal => 'Current: Local Upload';
+
+  @override
+  String currentSubtitleAi(String language) {
+    return 'Current: AI ($language)';
+  }
+
+  @override
+  String get noSubtitleYet => 'No subtitle yet';
+
+  @override
+  String get retryTranscription => 'Retry';
+
+  @override
+  String transcriptionFailedMessage(String message) {
+    return 'Error: $message';
+  }
 }

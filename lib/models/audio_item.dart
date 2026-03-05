@@ -4,6 +4,22 @@ import 'package:path/path.dart' as path;
 /// copyWith 用于区分"未传参"与"显式传 null"的哨兵值
 const _sentinel = Object();
 
+/// 字幕来源枚举
+enum TranscriptSource {
+  /// 本地文件上传
+  local,
+
+  /// AI 转录生成
+  ai;
+
+  /// 从整数值创建（数据库存储用）
+  static TranscriptSource? fromIndex(int? index) {
+    if (index == null) return null;
+    if (index >= 0 && index < values.length) return values[index];
+    return null;
+  }
+}
+
 class AudioItem {
   final String id;
   final String name;
@@ -15,6 +31,15 @@ class AudioItem {
   final int wordCount;
   final bool isStarred;
 
+  /// 字幕来源：null 表示无字幕
+  final TranscriptSource? transcriptSource;
+
+  /// 音频文件 SHA256 指纹（缓存，避免重复计算）
+  final String? audioSha256;
+
+  /// AI 转录使用的语言（'en' / 'multi'）
+  final String? transcriptLanguage;
+
   AudioItem({
     required this.id,
     required this.name,
@@ -25,6 +50,9 @@ class AudioItem {
     this.sentenceCount = 0,
     this.wordCount = 0,
     this.isStarred = false,
+    this.transcriptSource,
+    this.audioSha256,
+    this.transcriptLanguage,
   });
 
   bool get hasTranscript =>
@@ -53,6 +81,9 @@ class AudioItem {
     'sentenceCount': sentenceCount,
     'wordCount': wordCount,
     'isStarred': isStarred,
+    'transcriptSource': transcriptSource?.index,
+    'audioSha256': audioSha256,
+    'transcriptLanguage': transcriptLanguage,
   };
 
   factory AudioItem.fromJson(Map<String, dynamic> json) => AudioItem(
@@ -65,6 +96,9 @@ class AudioItem {
     sentenceCount: json['sentenceCount'] ?? 0,
     wordCount: json['wordCount'] ?? 0,
     isStarred: json['isStarred'] ?? false,
+    transcriptSource: TranscriptSource.fromIndex(json['transcriptSource']),
+    audioSha256: json['audioSha256'],
+    transcriptLanguage: json['transcriptLanguage'],
   );
 
   AudioItem copyWith({
@@ -77,6 +111,9 @@ class AudioItem {
     int? sentenceCount,
     int? wordCount,
     bool? isStarred,
+    Object? transcriptSource = _sentinel,
+    Object? audioSha256 = _sentinel,
+    Object? transcriptLanguage = _sentinel,
   }) {
     return AudioItem(
       id: id ?? this.id,
@@ -90,6 +127,15 @@ class AudioItem {
       sentenceCount: sentenceCount ?? this.sentenceCount,
       wordCount: wordCount ?? this.wordCount,
       isStarred: isStarred ?? this.isStarred,
+      transcriptSource: transcriptSource == _sentinel
+          ? this.transcriptSource
+          : transcriptSource as TranscriptSource?,
+      audioSha256: audioSha256 == _sentinel
+          ? this.audioSha256
+          : audioSha256 as String?,
+      transcriptLanguage: transcriptLanguage == _sentinel
+          ? this.transcriptLanguage
+          : transcriptLanguage as String?,
     );
   }
 }

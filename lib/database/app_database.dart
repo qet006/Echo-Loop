@@ -53,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration {
@@ -84,6 +84,28 @@ class AppDatabase extends _$AppDatabase {
             'difficult_practice_sentence_index',
             'INTEGER',
           );
+        }
+        // v12→v13：audio_items 新增 transcript_source, audio_sha256, transcript_language 列
+        if (from < 13) {
+          await _addColumnIfNotExists(
+            'audio_items',
+            'transcript_source',
+            'INTEGER',
+          );
+          await _addColumnIfNotExists('audio_items', 'audio_sha256', 'TEXT');
+          await _addColumnIfNotExists(
+            'audio_items',
+            'transcript_language',
+            'TEXT',
+          );
+          // 回填：已有字幕的记录设 transcript_source = 0 (local)
+          await customStatement('''
+            UPDATE audio_items
+            SET transcript_source = 0
+            WHERE transcript_path IS NOT NULL
+              AND transcript_path != ''
+              AND transcript_source IS NULL
+          ''');
         }
         // v7→v8：audio_items 新增 isStarred 列
         if (from < 8) {

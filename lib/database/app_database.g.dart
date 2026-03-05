@@ -111,6 +111,39 @@ class $AudioItemsTable extends AudioItems
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _transcriptSourceMeta = const VerificationMeta(
+    'transcriptSource',
+  );
+  @override
+  late final GeneratedColumn<int> transcriptSource = GeneratedColumn<int>(
+    'transcript_source',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _audioSha256Meta = const VerificationMeta(
+    'audioSha256',
+  );
+  @override
+  late final GeneratedColumn<String> audioSha256 = GeneratedColumn<String>(
+    'audio_sha256',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _transcriptLanguageMeta =
+      const VerificationMeta('transcriptLanguage');
+  @override
+  late final GeneratedColumn<String> transcriptLanguage =
+      GeneratedColumn<String>(
+        'transcript_language',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -156,6 +189,9 @@ class $AudioItemsTable extends AudioItems
     sentenceCount,
     wordCount,
     isStarred,
+    transcriptSource,
+    audioSha256,
+    transcriptLanguage,
     updatedAt,
     deletedAt,
     syncStatus,
@@ -240,6 +276,33 @@ class $AudioItemsTable extends AudioItems
         isStarred.isAcceptableOrUnknown(data['is_starred']!, _isStarredMeta),
       );
     }
+    if (data.containsKey('transcript_source')) {
+      context.handle(
+        _transcriptSourceMeta,
+        transcriptSource.isAcceptableOrUnknown(
+          data['transcript_source']!,
+          _transcriptSourceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('audio_sha256')) {
+      context.handle(
+        _audioSha256Meta,
+        audioSha256.isAcceptableOrUnknown(
+          data['audio_sha256']!,
+          _audioSha256Meta,
+        ),
+      );
+    }
+    if (data.containsKey('transcript_language')) {
+      context.handle(
+        _transcriptLanguageMeta,
+        transcriptLanguage.isAcceptableOrUnknown(
+          data['transcript_language']!,
+          _transcriptLanguageMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -305,6 +368,18 @@ class $AudioItemsTable extends AudioItems
         DriftSqlType.bool,
         data['${effectivePrefix}is_starred'],
       )!,
+      transcriptSource: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}transcript_source'],
+      ),
+      audioSha256: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}audio_sha256'],
+      ),
+      transcriptLanguage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}transcript_language'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -354,6 +429,15 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
   /// 是否星标
   final bool isStarred;
 
+  /// 字幕来源：0=local, 1=ai, null=无字幕
+  final int? transcriptSource;
+
+  /// 音频文件 SHA256 指纹（缓存，避免重复计算）
+  final String? audioSha256;
+
+  /// AI 转录使用的语言（'en' / 'multi'）
+  final String? transcriptLanguage;
+
   /// 最后修改时间
   final DateTime updatedAt;
 
@@ -372,6 +456,9 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     required this.sentenceCount,
     required this.wordCount,
     required this.isStarred,
+    this.transcriptSource,
+    this.audioSha256,
+    this.transcriptLanguage,
     required this.updatedAt,
     this.deletedAt,
     required this.syncStatus,
@@ -390,6 +477,15 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     map['sentence_count'] = Variable<int>(sentenceCount);
     map['word_count'] = Variable<int>(wordCount);
     map['is_starred'] = Variable<bool>(isStarred);
+    if (!nullToAbsent || transcriptSource != null) {
+      map['transcript_source'] = Variable<int>(transcriptSource);
+    }
+    if (!nullToAbsent || audioSha256 != null) {
+      map['audio_sha256'] = Variable<String>(audioSha256);
+    }
+    if (!nullToAbsent || transcriptLanguage != null) {
+      map['transcript_language'] = Variable<String>(transcriptLanguage);
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
@@ -411,6 +507,15 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       sentenceCount: Value(sentenceCount),
       wordCount: Value(wordCount),
       isStarred: Value(isStarred),
+      transcriptSource: transcriptSource == null && nullToAbsent
+          ? const Value.absent()
+          : Value(transcriptSource),
+      audioSha256: audioSha256 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(audioSha256),
+      transcriptLanguage: transcriptLanguage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(transcriptLanguage),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
@@ -434,6 +539,11 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       sentenceCount: serializer.fromJson<int>(json['sentenceCount']),
       wordCount: serializer.fromJson<int>(json['wordCount']),
       isStarred: serializer.fromJson<bool>(json['isStarred']),
+      transcriptSource: serializer.fromJson<int?>(json['transcriptSource']),
+      audioSha256: serializer.fromJson<String?>(json['audioSha256']),
+      transcriptLanguage: serializer.fromJson<String?>(
+        json['transcriptLanguage'],
+      ),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
       syncStatus: serializer.fromJson<int>(json['syncStatus']),
@@ -452,6 +562,9 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       'sentenceCount': serializer.toJson<int>(sentenceCount),
       'wordCount': serializer.toJson<int>(wordCount),
       'isStarred': serializer.toJson<bool>(isStarred),
+      'transcriptSource': serializer.toJson<int?>(transcriptSource),
+      'audioSha256': serializer.toJson<String?>(audioSha256),
+      'transcriptLanguage': serializer.toJson<String?>(transcriptLanguage),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'syncStatus': serializer.toJson<int>(syncStatus),
@@ -468,6 +581,9 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     int? sentenceCount,
     int? wordCount,
     bool? isStarred,
+    Value<int?> transcriptSource = const Value.absent(),
+    Value<String?> audioSha256 = const Value.absent(),
+    Value<String?> transcriptLanguage = const Value.absent(),
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
     int? syncStatus,
@@ -483,6 +599,13 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     sentenceCount: sentenceCount ?? this.sentenceCount,
     wordCount: wordCount ?? this.wordCount,
     isStarred: isStarred ?? this.isStarred,
+    transcriptSource: transcriptSource.present
+        ? transcriptSource.value
+        : this.transcriptSource,
+    audioSha256: audioSha256.present ? audioSha256.value : this.audioSha256,
+    transcriptLanguage: transcriptLanguage.present
+        ? transcriptLanguage.value
+        : this.transcriptLanguage,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
     syncStatus: syncStatus ?? this.syncStatus,
@@ -504,6 +627,15 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           : this.sentenceCount,
       wordCount: data.wordCount.present ? data.wordCount.value : this.wordCount,
       isStarred: data.isStarred.present ? data.isStarred.value : this.isStarred,
+      transcriptSource: data.transcriptSource.present
+          ? data.transcriptSource.value
+          : this.transcriptSource,
+      audioSha256: data.audioSha256.present
+          ? data.audioSha256.value
+          : this.audioSha256,
+      transcriptLanguage: data.transcriptLanguage.present
+          ? data.transcriptLanguage.value
+          : this.transcriptLanguage,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
       syncStatus: data.syncStatus.present
@@ -524,6 +656,9 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           ..write('sentenceCount: $sentenceCount, ')
           ..write('wordCount: $wordCount, ')
           ..write('isStarred: $isStarred, ')
+          ..write('transcriptSource: $transcriptSource, ')
+          ..write('audioSha256: $audioSha256, ')
+          ..write('transcriptLanguage: $transcriptLanguage, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('syncStatus: $syncStatus')
@@ -542,6 +677,9 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     sentenceCount,
     wordCount,
     isStarred,
+    transcriptSource,
+    audioSha256,
+    transcriptLanguage,
     updatedAt,
     deletedAt,
     syncStatus,
@@ -559,6 +697,9 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           other.sentenceCount == this.sentenceCount &&
           other.wordCount == this.wordCount &&
           other.isStarred == this.isStarred &&
+          other.transcriptSource == this.transcriptSource &&
+          other.audioSha256 == this.audioSha256 &&
+          other.transcriptLanguage == this.transcriptLanguage &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
           other.syncStatus == this.syncStatus);
@@ -574,6 +715,9 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
   final Value<int> sentenceCount;
   final Value<int> wordCount;
   final Value<bool> isStarred;
+  final Value<int?> transcriptSource;
+  final Value<String?> audioSha256;
+  final Value<String?> transcriptLanguage;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
   final Value<int> syncStatus;
@@ -588,6 +732,9 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     this.sentenceCount = const Value.absent(),
     this.wordCount = const Value.absent(),
     this.isStarred = const Value.absent(),
+    this.transcriptSource = const Value.absent(),
+    this.audioSha256 = const Value.absent(),
+    this.transcriptLanguage = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -603,6 +750,9 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     this.sentenceCount = const Value.absent(),
     this.wordCount = const Value.absent(),
     this.isStarred = const Value.absent(),
+    this.transcriptSource = const Value.absent(),
+    this.audioSha256 = const Value.absent(),
+    this.transcriptLanguage = const Value.absent(),
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -622,6 +772,9 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     Expression<int>? sentenceCount,
     Expression<int>? wordCount,
     Expression<bool>? isStarred,
+    Expression<int>? transcriptSource,
+    Expression<String>? audioSha256,
+    Expression<String>? transcriptLanguage,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
     Expression<int>? syncStatus,
@@ -637,6 +790,9 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
       if (sentenceCount != null) 'sentence_count': sentenceCount,
       if (wordCount != null) 'word_count': wordCount,
       if (isStarred != null) 'is_starred': isStarred,
+      if (transcriptSource != null) 'transcript_source': transcriptSource,
+      if (audioSha256 != null) 'audio_sha256': audioSha256,
+      if (transcriptLanguage != null) 'transcript_language': transcriptLanguage,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (syncStatus != null) 'sync_status': syncStatus,
@@ -654,6 +810,9 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     Value<int>? sentenceCount,
     Value<int>? wordCount,
     Value<bool>? isStarred,
+    Value<int?>? transcriptSource,
+    Value<String?>? audioSha256,
+    Value<String?>? transcriptLanguage,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
     Value<int>? syncStatus,
@@ -669,6 +828,9 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
       sentenceCount: sentenceCount ?? this.sentenceCount,
       wordCount: wordCount ?? this.wordCount,
       isStarred: isStarred ?? this.isStarred,
+      transcriptSource: transcriptSource ?? this.transcriptSource,
+      audioSha256: audioSha256 ?? this.audioSha256,
+      transcriptLanguage: transcriptLanguage ?? this.transcriptLanguage,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       syncStatus: syncStatus ?? this.syncStatus,
@@ -706,6 +868,15 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     if (isStarred.present) {
       map['is_starred'] = Variable<bool>(isStarred.value);
     }
+    if (transcriptSource.present) {
+      map['transcript_source'] = Variable<int>(transcriptSource.value);
+    }
+    if (audioSha256.present) {
+      map['audio_sha256'] = Variable<String>(audioSha256.value);
+    }
+    if (transcriptLanguage.present) {
+      map['transcript_language'] = Variable<String>(transcriptLanguage.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -733,6 +904,9 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
           ..write('sentenceCount: $sentenceCount, ')
           ..write('wordCount: $wordCount, ')
           ..write('isStarred: $isStarred, ')
+          ..write('transcriptSource: $transcriptSource, ')
+          ..write('audioSha256: $audioSha256, ')
+          ..write('transcriptLanguage: $transcriptLanguage, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('syncStatus: $syncStatus, ')
@@ -5091,6 +5265,9 @@ typedef $$AudioItemsTableCreateCompanionBuilder =
       Value<int> sentenceCount,
       Value<int> wordCount,
       Value<bool> isStarred,
+      Value<int?> transcriptSource,
+      Value<String?> audioSha256,
+      Value<String?> transcriptLanguage,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> syncStatus,
@@ -5107,6 +5284,9 @@ typedef $$AudioItemsTableUpdateCompanionBuilder =
       Value<int> sentenceCount,
       Value<int> wordCount,
       Value<bool> isStarred,
+      Value<int?> transcriptSource,
+      Value<String?> audioSha256,
+      Value<String?> transcriptLanguage,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> syncStatus,
@@ -5307,6 +5487,21 @@ class $$AudioItemsTableFilterComposer
 
   ColumnFilters<bool> get isStarred => $composableBuilder(
     column: $table.isStarred,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get transcriptSource => $composableBuilder(
+    column: $table.transcriptSource,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get audioSha256 => $composableBuilder(
+    column: $table.audioSha256,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get transcriptLanguage => $composableBuilder(
+    column: $table.transcriptLanguage,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5530,6 +5725,21 @@ class $$AudioItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get transcriptSource => $composableBuilder(
+    column: $table.transcriptSource,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get audioSha256 => $composableBuilder(
+    column: $table.audioSha256,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get transcriptLanguage => $composableBuilder(
+    column: $table.transcriptLanguage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -5587,6 +5797,21 @@ class $$AudioItemsTableAnnotationComposer
 
   GeneratedColumn<bool> get isStarred =>
       $composableBuilder(column: $table.isStarred, builder: (column) => column);
+
+  GeneratedColumn<int> get transcriptSource => $composableBuilder(
+    column: $table.transcriptSource,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get audioSha256 => $composableBuilder(
+    column: $table.audioSha256,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get transcriptLanguage => $composableBuilder(
+    column: $table.transcriptLanguage,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -5796,6 +6021,9 @@ class $$AudioItemsTableTableManager
                 Value<int> sentenceCount = const Value.absent(),
                 Value<int> wordCount = const Value.absent(),
                 Value<bool> isStarred = const Value.absent(),
+                Value<int?> transcriptSource = const Value.absent(),
+                Value<String?> audioSha256 = const Value.absent(),
+                Value<String?> transcriptLanguage = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> syncStatus = const Value.absent(),
@@ -5810,6 +6038,9 @@ class $$AudioItemsTableTableManager
                 sentenceCount: sentenceCount,
                 wordCount: wordCount,
                 isStarred: isStarred,
+                transcriptSource: transcriptSource,
+                audioSha256: audioSha256,
+                transcriptLanguage: transcriptLanguage,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 syncStatus: syncStatus,
@@ -5826,6 +6057,9 @@ class $$AudioItemsTableTableManager
                 Value<int> sentenceCount = const Value.absent(),
                 Value<int> wordCount = const Value.absent(),
                 Value<bool> isStarred = const Value.absent(),
+                Value<int?> transcriptSource = const Value.absent(),
+                Value<String?> audioSha256 = const Value.absent(),
+                Value<String?> transcriptLanguage = const Value.absent(),
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> syncStatus = const Value.absent(),
@@ -5840,6 +6074,9 @@ class $$AudioItemsTableTableManager
                 sentenceCount: sentenceCount,
                 wordCount: wordCount,
                 isStarred: isStarred,
+                transcriptSource: transcriptSource,
+                audioSha256: audioSha256,
+                transcriptLanguage: transcriptLanguage,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 syncStatus: syncStatus,
