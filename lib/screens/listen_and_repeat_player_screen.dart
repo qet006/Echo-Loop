@@ -403,65 +403,39 @@ class _ListenAndRepeatPlayerScreenState
                     ),
                     const SizedBox(height: AppSpacing.m),
 
-                    // 遍数（始终显示）+ 停顿倒计时（倒计时期间显示）
+                    // 倒计时控制（上） + 播放遍数（下）
                     SizedBox(
-                      height: 80,
+                      height: 72,
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.end,
                         children: [
+                          if (playerState.isPauseBetweenPlays)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: AppSpacing.xs,
+                              ),
+                              child: _CountdownChip(
+                                remaining: playerState.pauseRemaining,
+                                total: playerState.pauseDuration,
+                                isPaused: playerState.isCountdownPaused,
+                                onTap: playerState.isCountdownPaused
+                                    ? () => player.resumeCountdown()
+                                    : () => player.pauseCountdown(),
+                              ),
+                            ),
                           Text(
                             l10n.listenAndRepeatPlayCount(
                               playerState.currentPlayCount,
                               playerState.settings.repeatCount,
                             ),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant
+                                  .withValues(alpha: 0.5),
                             ),
                           ),
-                          if (playerState.isPauseBetweenPlays)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                top: AppSpacing.xs,
-                              ),
-                              child: _PauseCountdownIndicator(
-                                remaining: playerState.pauseRemaining,
-                                total: playerState.pauseDuration,
-                                isBetweenSentences:
-                                    playerState.isPauseBetweenSentences,
-                                l10n: l10n,
-                              ),
-                            ),
                         ],
                       ),
                     ),
-                    // 倒计时控制按钮（仅在倒计时期间显示）
-                    if (playerState.isPauseBetweenPlays)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          IconButton(
-                            onPressed: playerState.isCountdownPaused
-                                ? () => player.resumeCountdown()
-                                : () => player.pauseCountdown(),
-                            icon: Icon(
-                              playerState.isCountdownPaused
-                                  ? Icons.play_arrow
-                                  : Icons.pause,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.l),
-                          IconButton(
-                            onPressed: () =>
-                                player.toggleCountdownFastForward(),
-                            icon: Icon(
-                              Icons.fast_forward,
-                              color: playerState.isCountdownFastForward
-                                  ? theme.colorScheme.primary
-                                  : null,
-                            ),
-                          ),
-                        ],
-                      ),
                   ],
                 ),
               ),
@@ -553,18 +527,20 @@ class _ProgressSection extends StatelessWidget {
   }
 }
 
-/// 间隔倒计时指示器
-class _PauseCountdownIndicator extends StatelessWidget {
+/// 倒计时控制按钮
+///
+/// 圆形按钮，外围带进度环，内部显示暂停/恢复图标，右侧显示秒数。
+class _CountdownChip extends StatelessWidget {
   final Duration remaining;
   final Duration total;
-  final bool isBetweenSentences;
-  final AppLocalizations l10n;
+  final bool isPaused;
+  final VoidCallback onTap;
 
-  const _PauseCountdownIndicator({
+  const _CountdownChip({
     required this.remaining,
     required this.total,
-    required this.isBetweenSentences,
-    required this.l10n,
+    required this.isPaused,
+    required this.onTap,
   });
 
   @override
@@ -575,32 +551,52 @@ class _PauseCountdownIndicator extends StatelessWidget {
     final progress = totalMs > 0 ? 1.0 - (remainingMs / totalMs) : 1.0;
     final seconds = (remainingMs / 1000).ceil();
 
-    final label = isBetweenSentences
-        ? l10n.listenAndRepeatPauseBetweenSentences(seconds)
-        : l10n.listenAndRepeatPauseBetweenPlays(seconds);
-
-    return Column(
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${seconds}s',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.s),
-        SizedBox(
-          width: 120,
-          child: LinearProgressIndicator(
-            value: progress.clamp(0.0, 1.0),
-            borderRadius: BorderRadius.circular(2),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: 28,
+            height: 28,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: progress.clamp(0.0, 1.0),
+                  strokeWidth: 2.5,
+                  strokeCap: StrokeCap.round,
+                  backgroundColor: theme.colorScheme.primary.withValues(
+                    alpha: 0.12,
+                  ),
+                  valueColor: AlwaysStoppedAnimation(
+                    theme.colorScheme.primary.withValues(alpha: 0.6),
+                  ),
+                ),
+                Icon(
+                  isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                  size: 16,
+                  color: theme.colorScheme.primary,
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
 /// 底部播放控制
+///
+/// 布局：[上一句] --- [播放/暂停] --- [下一句]
 class _PlaybackControls extends StatelessWidget {
   final ListenAndRepeatPlayerState playerState;
   final VoidCallback onPrevious;
@@ -618,63 +614,85 @@ class _PlaybackControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
+    final canGoPrev = playerState.currentSentenceIndex > 0;
+    final canGoNext =
+        playerState.currentSentenceIndex < playerState.totalSentences - 1;
+
+    return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.l,
-        AppSpacing.m,
+        AppSpacing.xs,
         AppSpacing.l,
-        AppSpacing.xl,
+        AppSpacing.l,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 上一句
-          IconButton(
-            onPressed: playerState.currentSentenceIndex <= 0
-                ? null
-                : onPrevious,
-            icon: const Icon(Icons.skip_previous, size: 32),
-            color: theme.colorScheme.onSurface,
+          _NavButton(
+            icon: Icons.skip_previous_rounded,
+            enabled: canGoPrev,
+            onTap: canGoPrev ? onPrevious : null,
           ),
-          const SizedBox(width: AppSpacing.l),
+          const SizedBox(width: 48),
 
-          // 播放/暂停
           GestureDetector(
             onTap: onPlayPause,
             child: Container(
-              width: 64,
-              height: 64,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
                 color: theme.colorScheme.primary,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
+                    color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
               child: Icon(
-                playerState.isPlaying ? Icons.pause : Icons.play_arrow,
-                size: 32,
+                playerState.isPlaying
+                    ? Icons.pause_rounded
+                    : Icons.play_arrow_rounded,
+                size: 28,
                 color: theme.colorScheme.onPrimary,
               ),
             ),
           ),
-          const SizedBox(width: AppSpacing.l),
+          const SizedBox(width: 48),
 
-          // 下一句
-          IconButton(
-            onPressed:
-                playerState.currentSentenceIndex >=
-                    playerState.totalSentences - 1
-                ? null
-                : onNext,
-            icon: const Icon(Icons.skip_next, size: 32),
-            color: theme.colorScheme.onSurface,
+          _NavButton(
+            icon: Icons.skip_next_rounded,
+            enabled: canGoNext,
+            onTap: canGoNext ? onNext : null,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 导航按钮（上一句/下一句）
+class _NavButton extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback? onTap;
+
+  const _NavButton({required this.icon, required this.enabled, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedOpacity(
+        opacity: enabled ? 0.6 : 0.15,
+        duration: const Duration(milliseconds: 150),
+        child: Icon(
+          icon,
+          size: 32,
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
       ),
     );
   }

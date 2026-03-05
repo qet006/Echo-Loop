@@ -324,8 +324,6 @@ class _ReviewDifficultPracticeScreenState
                         onPauseCountdown: () => playerState.isCountdownPaused
                             ? player.resumeCountdown()
                             : player.pauseCountdown(),
-                        onFastForward: () =>
-                            player.toggleCountdownFastForward(),
                         sentenceText: currentSentence?.text,
                       ),
               ),
@@ -424,7 +422,6 @@ class _NormalModeView extends StatelessWidget {
   final VoidCallback onCantUnderstand;
   final VoidCallback onRemoveDifficult;
   final VoidCallback onPauseCountdown;
-  final VoidCallback onFastForward;
   final String? sentenceText;
 
   const _NormalModeView({
@@ -437,18 +434,18 @@ class _NormalModeView extends StatelessWidget {
     required this.onCantUnderstand,
     required this.onRemoveDifficult,
     required this.onPauseCountdown,
-    required this.onFastForward,
     this.sentenceText,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.l),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 难句标记行（始终已标记，点击可取消）
+          const SizedBox(height: AppSpacing.s),
+
+          // 难句标记行
           GestureDetector(
             onTap: onRemoveDifficult,
             child: Row(
@@ -483,12 +480,22 @@ class _NormalModeView extends StatelessWidget {
             ),
           ),
 
-          // 固定高度区域：盲听状态（播放中显示）+ 倒计时（倒计时期间显示）
+          // 倒计时控制（上） + 盲听状态标签（下）
           SizedBox(
-            height: 80,
+            height: 72,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (playerState.isPauseBetweenPlays)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: _CountdownChip(
+                      remaining: playerState.pauseRemaining,
+                      total: playerState.pauseDuration,
+                      isPaused: playerState.isCountdownPaused,
+                      onTap: onPauseCountdown,
+                    ),
+                  ),
                 if (playerState.isPlaying)
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -508,80 +515,33 @@ class _NormalModeView extends StatelessWidget {
                       ),
                     ],
                   ),
-                if (playerState.isPauseBetweenPlays)
-                  Padding(
-                    padding: const EdgeInsets.only(top: AppSpacing.xs),
-                    child: _PauseCountdownIndicator(
-                      remaining: playerState.pauseRemaining,
-                      total: playerState.pauseDuration,
-                      l10n: l10n,
-                    ),
-                  ),
               ],
             ),
           ),
 
-          const SizedBox(height: AppSpacing.l),
+          const SizedBox(height: AppSpacing.m),
 
-          // 固定高度的底部按钮区域，避免倒计时控制按钮出现时布局跳动
-          SizedBox(
-            height: 96,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                // 倒计时控制按钮行（仅倒计时期间显示）
-                if (playerState.isPauseBetweenPlays)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        onPressed: onPauseCountdown,
-                        icon: Icon(
-                          playerState.isCountdownPaused
-                              ? Icons.play_arrow
-                              : Icons.pause,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.l),
-                      IconButton(
-                        onPressed: onFastForward,
-                        icon: Icon(
-                          Icons.fast_forward,
-                          color: playerState.isCountdownFastForward
-                              ? theme.colorScheme.primary
-                              : null,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                if (playerState.isPauseBetweenPlays)
-                  const SizedBox(height: AppSpacing.s),
-
-                // 偷看/听不懂按钮（始终显示）
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Listener(
-                      onPointerDown: (_) => onPeekStart(),
-                      onPointerUp: (_) => onPeekEnd(),
-                      onPointerCancel: (_) => onPeekEnd(),
-                      child: OutlinedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.visibility),
-                        label: Text(l10n.intensiveListenPeek),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.m),
-                    FilledButton.tonal(
-                      onPressed: onCantUnderstand,
-                      child: Text(l10n.intensiveListenCantUnderstand),
-                    ),
-                  ],
+          // 偷看/听不懂按钮
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Listener(
+                onPointerDown: (_) => onPeekStart(),
+                onPointerUp: (_) => onPeekEnd(),
+                onPointerCancel: (_) => onPeekEnd(),
+                child: _ActionChip(
+                  icon: Icons.visibility_outlined,
+                  label: l10n.intensiveListenPeek,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: AppSpacing.s),
+              FilledButton.tonal(
+                onPressed: onCantUnderstand,
+                child: Text(l10n.intensiveListenCantUnderstand),
+              ),
+            ],
           ),
+          const SizedBox(height: AppSpacing.s),
         ],
       ),
     );
@@ -619,16 +579,20 @@ class _HiddenTextPlaceholder extends StatelessWidget {
   }
 }
 
-/// 句间停顿倒计时指示器
-class _PauseCountdownIndicator extends StatelessWidget {
+/// 倒计时控制按钮
+///
+/// 圆形按钮，外围带进度环，内部显示暂停/恢复图标，右侧显示秒数。
+class _CountdownChip extends StatelessWidget {
   final Duration remaining;
   final Duration total;
-  final AppLocalizations l10n;
+  final bool isPaused;
+  final VoidCallback onTap;
 
-  const _PauseCountdownIndicator({
+  const _CountdownChip({
     required this.remaining,
     required this.total,
-    required this.l10n,
+    required this.isPaused,
+    required this.onTap,
   });
 
   @override
@@ -639,24 +603,45 @@ class _PauseCountdownIndicator extends StatelessWidget {
     final progress = totalMs > 0 ? 1.0 - (remainingMs / totalMs) : 1.0;
     final seconds = (remainingMs / 1000).ceil();
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          l10n.reviewDifficultPracticeAdvancing(seconds),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${seconds}s',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.s),
-        SizedBox(
-          width: 120,
-          child: LinearProgressIndicator(
-            value: progress.clamp(0.0, 1.0),
-            borderRadius: BorderRadius.circular(2),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: 28,
+            height: 28,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: progress.clamp(0.0, 1.0),
+                  strokeWidth: 2.5,
+                  strokeCap: StrokeCap.round,
+                  backgroundColor: theme.colorScheme.primary.withValues(
+                    alpha: 0.12,
+                  ),
+                  valueColor: AlwaysStoppedAnimation(
+                    theme.colorScheme.primary.withValues(alpha: 0.6),
+                  ),
+                ),
+                Icon(
+                  isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                  size: 16,
+                  color: theme.colorScheme.primary,
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -747,7 +732,43 @@ class _AnnotationReplayView extends StatelessWidget {
   }
 }
 
+/// 操作按钮（偷看字幕 / 听不懂）
+class _ActionChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _ActionChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// 底部播放控制
+///
+/// 布局：[上一句] --- [播放/暂停] --- [下一句]
 class _PlaybackControls extends StatelessWidget {
   final ReviewDifficultPracticeState playerState;
   final VoidCallback onPrevious;
@@ -765,39 +786,36 @@ class _PlaybackControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // 标注重播模式下播放按钮禁用
     final isPlayDisabled = playerState.isAnnotationReplay;
-
-    // 标注模式和标注重播模式下禁用导航
-    // 仅标注重播模式下禁用（自动播放中不应干预）
     final isNavDisabled = playerState.isAnnotationReplay;
 
-    return Container(
+    final canGoPrev = !isNavDisabled && playerState.currentSentenceIndex > 0;
+    final canGoNext =
+        !isNavDisabled &&
+        playerState.currentSentenceIndex < playerState.totalSentences - 1;
+
+    return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.l,
-        AppSpacing.m,
+        AppSpacing.xs,
         AppSpacing.l,
-        AppSpacing.xl,
+        AppSpacing.l,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 上一句
-          IconButton(
-            onPressed: isNavDisabled || playerState.currentSentenceIndex <= 0
-                ? null
-                : onPrevious,
-            icon: const Icon(Icons.skip_previous, size: 32),
-            color: theme.colorScheme.onSurface,
+          _NavButton(
+            icon: Icons.skip_previous_rounded,
+            enabled: canGoPrev,
+            onTap: canGoPrev ? onPrevious : null,
           ),
-          const SizedBox(width: AppSpacing.l),
+          const SizedBox(width: 48),
 
-          // 播放/暂停
           GestureDetector(
             onTap: isPlayDisabled ? null : onPlayPause,
             child: Container(
-              width: 64,
-              height: 64,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
                 color: isPlayDisabled
                     ? theme.colorScheme.surfaceContainerHighest
@@ -808,36 +826,57 @@ class _PlaybackControls extends StatelessWidget {
                     : [
                         BoxShadow(
                           color: theme.colorScheme.primary.withValues(
-                            alpha: 0.3,
+                            alpha: 0.15,
                           ),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
                       ],
               ),
               child: Icon(
-                playerState.isPlaying ? Icons.pause : Icons.play_arrow,
-                size: 32,
+                playerState.isPlaying
+                    ? Icons.pause_rounded
+                    : Icons.play_arrow_rounded,
+                size: 28,
                 color: isPlayDisabled
                     ? theme.colorScheme.onSurfaceVariant
                     : theme.colorScheme.onPrimary,
               ),
             ),
           ),
-          const SizedBox(width: AppSpacing.l),
+          const SizedBox(width: 48),
 
-          // 下一句
-          IconButton(
-            onPressed:
-                isNavDisabled ||
-                    playerState.currentSentenceIndex >=
-                        playerState.totalSentences - 1
-                ? null
-                : onNext,
-            icon: const Icon(Icons.skip_next, size: 32),
-            color: theme.colorScheme.onSurface,
+          _NavButton(
+            icon: Icons.skip_next_rounded,
+            enabled: canGoNext,
+            onTap: canGoNext ? onNext : null,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 导航按钮（上一句/下一句）
+class _NavButton extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback? onTap;
+
+  const _NavButton({required this.icon, required this.enabled, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedOpacity(
+        opacity: enabled ? 0.6 : 0.15,
+        duration: const Duration(milliseconds: 150),
+        child: Icon(
+          icon,
+          size: 32,
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
       ),
     );
   }

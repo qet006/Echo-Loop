@@ -335,41 +335,21 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen> {
 
             const SizedBox(height: AppSpacing.s),
 
-            // 阶段指示器
-            _PhaseIndicator(state: state, l10n: l10n),
+            // 阶段指示器 + 倒计时控制
+            _PhaseIndicator(
+              state: state,
+              l10n: l10n,
+              onPauseResume: state.isCountdownPaused
+                  ? () => player.resumeCountdown()
+                  : () => player.pauseCountdown(),
+            ),
 
-            // 倒计时控制按钮（仅在复述倒计时期间显示）
-            if (state.isRetellCountdown)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    onPressed: state.isCountdownPaused
-                        ? () => player.resumeCountdown()
-                        : () => player.pauseCountdown(),
-                    icon: Icon(
-                      state.isCountdownPaused ? Icons.play_arrow : Icons.pause,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.l),
-                  IconButton(
-                    onPressed: () => player.toggleCountdownFastForward(),
-                    icon: Icon(
-                      Icons.fast_forward,
-                      color: state.isCountdownFastForward
-                          ? Theme.of(context).colorScheme.primary
-                          : null,
-                    ),
-                  ),
-                ],
-              ),
-
-            const SizedBox(height: AppSpacing.s),
+            const SizedBox(height: AppSpacing.m),
 
             // 底部控制
             _BottomControls(state: state, player: player, l10n: l10n),
 
-            const SizedBox(height: AppSpacing.m),
+            const SizedBox(height: AppSpacing.l),
           ],
         ),
       ),
@@ -377,96 +357,166 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen> {
   }
 }
 
-/// 阶段指示器：listening/retelling 状态 + 倒计时
-///
-/// 布局与精听/跟读页面的倒计时指示器保持一致：
-/// 文字标签居中 + 120px 短进度条，固定 64px 高度防止阶段切换跳动。
+/// 阶段指示器：listening/retelling 状态
 class _PhaseIndicator extends StatelessWidget {
   final RetellPlayerState state;
   final AppLocalizations l10n;
+  final VoidCallback onPauseResume;
 
-  const _PhaseIndicator({required this.state, required this.l10n});
+  const _PhaseIndicator({
+    required this.state,
+    required this.l10n,
+    required this.onPauseResume,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return SizedBox(
-      height: 64,
-      child: Center(
-        child: state.phase == RetellPhase.listening
-            ? _buildListeningIndicator(theme)
-            : _buildRetellingIndicator(theme),
-      ),
-    );
-  }
-
-  /// listening 阶段：图标+文字（上行） + 遍数（下行）
-  Widget _buildListeningIndicator(ThemeData theme) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
+    // listening 阶段，固定高度与 retelling 阶段一致，避免切换时跳动
+    if (state.phase == RetellPhase.listening) {
+      return SizedBox(
+        height: 72,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.headphones, size: 20, color: theme.colorScheme.primary),
-            const SizedBox(width: AppSpacing.s),
-            Text(
-              l10n.retellListeningPhase,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w500,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.headphones,
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: AppSpacing.s),
+                Text(
+                  l10n.retellListeningPhase,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
+            if (state.settings.repeatCount > 1) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                l10n.retellRepeatInfo(
+                  state.currentRepeatCount,
+                  state.settings.repeatCount,
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.5,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
-        if (state.settings.repeatCount > 1) ...[
-          const SizedBox(height: AppSpacing.xs),
+      );
+    }
+
+    // retelling 阶段：倒计时控制（上） + 提示文字（下）
+    return SizedBox(
+      height: 72,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          if (state.isRetellCountdown)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+              child: _CountdownChip(
+                remaining: state.pauseRemaining,
+                total: state.pauseDuration,
+                isPaused: state.isCountdownPaused,
+                onTap: onPauseResume,
+              ),
+            ),
           Text(
-            l10n.retellRepeatInfo(
-              state.currentRepeatCount,
-              state.settings.repeatCount,
+            l10n.retellRetellingCountdown(
+              (state.pauseRemaining.inMilliseconds / 1000).ceil(),
             ),
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
             ),
           ),
         ],
-      ],
+      ),
     );
   }
+}
 
-  /// retelling 阶段：与精听/跟读的 _PauseCountdownIndicator 一致
-  /// 文字标签 + 120px 短进度条，毫秒级平滑进度
-  Widget _buildRetellingIndicator(ThemeData theme) {
-    final totalMs = state.pauseDuration.inMilliseconds;
-    final remainingMs = state.pauseRemaining.inMilliseconds;
+/// 倒计时控制按钮
+///
+/// 圆形按钮，外围带进度环，内部显示暂停/恢复图标，右侧显示秒数。
+class _CountdownChip extends StatelessWidget {
+  final Duration remaining;
+  final Duration total;
+  final bool isPaused;
+  final VoidCallback onTap;
+
+  const _CountdownChip({
+    required this.remaining,
+    required this.total,
+    required this.isPaused,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final totalMs = total.inMilliseconds;
+    final remainingMs = remaining.inMilliseconds;
     final progress = totalMs > 0 ? 1.0 - (remainingMs / totalMs) : 1.0;
     final seconds = (remainingMs / 1000).ceil();
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          l10n.retellRetellingCountdown(seconds),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${seconds}s',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.s),
-        SizedBox(
-          width: 120,
-          child: LinearProgressIndicator(
-            value: progress.clamp(0.0, 1.0),
-            borderRadius: BorderRadius.circular(2),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: 28,
+            height: 28,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: progress.clamp(0.0, 1.0),
+                  strokeWidth: 2.5,
+                  strokeCap: StrokeCap.round,
+                  backgroundColor: theme.colorScheme.primary.withValues(
+                    alpha: 0.12,
+                  ),
+                  valueColor: AlwaysStoppedAnimation(
+                    theme.colorScheme.primary.withValues(alpha: 0.6),
+                  ),
+                ),
+                Icon(
+                  isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                  size: 16,
+                  color: theme.colorScheme.primary,
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
 /// 底部控制栏
+///
+/// 布局：[上一段] --- [播放/暂停] --- [下一段]
 class _BottomControls extends StatelessWidget {
   final RetellPlayerState state;
   final RetellPlayer player;
@@ -481,67 +531,94 @@ class _BottomControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isFirst = state.currentParagraphIndex <= 0;
-    final isLast = state.currentParagraphIndex >= state.totalParagraphs - 1;
+    final canGoPrev = state.currentParagraphIndex > 0;
+    final canGoNext = state.currentParagraphIndex < state.totalParagraphs - 1;
 
-    // 中间大按钮：listening → play/pause，retelling countdown → replay
+    // 中间大按钮
     final IconData centerIcon;
     final VoidCallback centerOnPressed;
     if (state.phase == RetellPhase.listening) {
-      centerIcon = state.isPlaying ? Icons.pause : Icons.play_arrow;
+      centerIcon = state.isPlaying
+          ? Icons.pause_rounded
+          : Icons.play_arrow_rounded;
       centerOnPressed = state.isPlaying ? player.pause : player.resume;
     } else if (state.isRetellCountdown) {
-      centerIcon = Icons.play_arrow;
+      centerIcon = Icons.play_arrow_rounded;
       centerOnPressed = player.replayDuringCountdown;
     } else {
-      centerIcon = Icons.play_arrow;
+      centerIcon = Icons.play_arrow_rounded;
       centerOnPressed = player.resume;
     }
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // 上一段
-        IconButton(
-          onPressed: isFirst ? null : player.goToPreviousParagraph,
-          icon: const Icon(Icons.skip_previous, size: 32),
-          color: theme.colorScheme.onSurface,
-        ),
-        const SizedBox(width: AppSpacing.l),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _NavButton(
+            icon: Icons.skip_previous_rounded,
+            enabled: canGoPrev,
+            onTap: canGoPrev ? player.goToPreviousParagraph : null,
+          ),
+          const SizedBox(width: 48),
 
-        // 中间大按钮（与跟读页一致的圆形样式）
-        GestureDetector(
-          onTap: centerOnPressed,
-          child: Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Icon(
-              centerIcon,
-              size: 32,
-              color: theme.colorScheme.onPrimary,
+          GestureDetector(
+            onTap: centerOnPressed,
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(
+                centerIcon,
+                size: 28,
+                color: theme.colorScheme.onPrimary,
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: AppSpacing.l),
+          const SizedBox(width: 48),
 
-        // 下一段
-        IconButton(
-          onPressed: isLast ? null : player.goToNextParagraph,
-          icon: const Icon(Icons.skip_next, size: 32),
-          color: theme.colorScheme.onSurface,
+          _NavButton(
+            icon: Icons.skip_next_rounded,
+            enabled: canGoNext,
+            onTap: canGoNext ? player.goToNextParagraph : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 导航按钮（上一段/下一段）
+class _NavButton extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback? onTap;
+
+  const _NavButton({required this.icon, required this.enabled, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedOpacity(
+        opacity: enabled ? 0.6 : 0.15,
+        duration: const Duration(milliseconds: 150),
+        child: Icon(
+          icon,
+          size: 32,
+          color: Theme.of(context).colorScheme.onSurface,
         ),
-      ],
+      ),
     );
   }
 }
