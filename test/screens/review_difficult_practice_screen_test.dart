@@ -335,7 +335,7 @@ void main() {
       expect(find.text('Auto-marked difficult, tap to undo'), findsOneWidget);
     });
 
-    testWidgets('跟读模式显示翻译和分析占位卡片', (tester) async {
+    testWidgets('跟读模式显示翻译和分析区域', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
           playerState: createPlayerState(
@@ -346,14 +346,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('Translation will be available in a future version'),
-        findsOneWidget,
-      );
-      expect(
-        find.text('Analysis will be available in a future version'),
-        findsOneWidget,
-      );
+      // AI 分支将静态 placeholder 替换为 AiContentSection 组件
+      expect(find.text('Translation'), findsOneWidget);
+      expect(find.text('Analysis'), findsOneWidget);
     });
 
     testWidgets('跟读模式不显示偷看和听不懂按钮', (tester) async {

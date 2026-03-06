@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:fluency/main.dart';
 import 'package:fluency/models/audio_item.dart';
@@ -36,6 +37,22 @@ import 'package:fluency/providers/learning_session/retell_player_provider.dart';
 import 'package:fluency/providers/learning_session/review_difficult_practice_provider.dart';
 import 'package:fluency/providers/package_info_provider.dart';
 import 'package:fluency/models/retell_settings.dart';
+import 'package:fluency/database/daos/sentence_ai_cache_dao.dart';
+import 'package:fluency/services/sentence_ai_api_client.dart';
+import 'package:fluency/providers/sentence_ai_provider.dart';
+import 'package:fluency/providers/daily_study_time_provider.dart';
+
+/// 测试用 DailyStudyTime（直接返回 0，不依赖 SharedPreferences）
+class TestDailyStudyTime extends DailyStudyTime {
+  @override
+  Future<int> build() async => 0;
+}
+
+/// Mock SentenceAiCacheDao（集成测试用）
+class _MockSentenceAiCacheDao extends Mock implements SentenceAiCacheDao {}
+
+/// Mock SentenceAiApiClient（集成测试用）
+class _MockSentenceAiApiClient extends Mock implements SentenceAiApiClient {}
 
 // ========== 测试数据工厂 ==========
 
@@ -1504,6 +1521,13 @@ Widget createTestApp() {
       ),
       bookmarkDaoProvider.overrideWithValue(TestBookmarkDao()),
       packageInfoProvider.overrideWithValue(_testPackageInfo),
+      sentenceAiNotifierProvider.overrideWithValue(
+        SentenceAiNotifier(
+          cacheDao: _MockSentenceAiCacheDao(),
+          apiClient: _MockSentenceAiApiClient(),
+        ),
+      ),
+      dailyStudyTimeProvider.overrideWith(() => TestDailyStudyTime()),
     ],
     child: const FluencyApp(),
   );
@@ -1561,6 +1585,13 @@ Widget createTestAppWithAudio({
       ),
       bookmarkDaoProvider.overrideWithValue(TestBookmarkDao()),
       packageInfoProvider.overrideWithValue(_testPackageInfo),
+      sentenceAiNotifierProvider.overrideWithValue(
+        SentenceAiNotifier(
+          cacheDao: _MockSentenceAiCacheDao(),
+          apiClient: _MockSentenceAiApiClient(),
+        ),
+      ),
+      dailyStudyTimeProvider.overrideWith(() => TestDailyStudyTime()),
     ],
     child: _AudioPreloadWrapper(
       audioItem: audioItem,
