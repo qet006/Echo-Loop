@@ -5,4 +5,4 @@
 /// 后端服务器基础 URL
 ///
 /// TODO: 正式部署后替换为生产环境域名
-const apiBaseUrl = 'http://192.168.1.4:3000';
+const apiBaseUrl = 'http://192.168.1.8:3000';
