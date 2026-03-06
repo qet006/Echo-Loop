@@ -605,6 +605,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String estimatedMinutes(int minutes) {
+    return 'Est. $minutes min';
+  }
+
+  @override
+  String get estimatedLessThanOneMinute => 'Est. < 1 min';
+
+  @override
   String get exitBlindListenTitle => 'Exit Listening?';
 
   @override
@@ -1277,5 +1285,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String transcriptionFailedMessage(String message) {
     return 'Error: $message';
+  }
+
+  @override
+  String todayStudyTime(String time) {
+    return 'Today: $time';
+  }
+
+  @override
+  String studyTimeMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String studyTimeHoursMinutes(int hours, int minutes) {
+    return '${hours}h ${minutes}m';
   }
 }

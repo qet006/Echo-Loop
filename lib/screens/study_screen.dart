@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../database/enums.dart';
 import '../l10n/app_localizations.dart';
+import '../providers/daily_study_time_provider.dart';
 import '../providers/study_task_provider.dart';
 import '../providers/time_provider.dart';
 import '../router/app_router.dart';
@@ -31,8 +32,26 @@ class StudyScreen extends ConsumerWidget {
         .where((t) => t.type == StudyTaskType.firstStudy)
         .toList();
 
+    final studyTime = ref.watch(dailyStudyTimeProvider);
+
     return Scaffold(
-      appBar: AppBar(title: Text(_isChinese(context) ? '学习任务' : 'Study Tasks')),
+      appBar: AppBar(
+        title: Text(_isChinese(context) ? '学习任务' : 'Study Tasks'),
+        actions: [
+          if (studyTime case AsyncData(value: final seconds) when seconds > 0)
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.m),
+              child: Chip(
+                avatar: const Icon(Icons.timer_outlined, size: 16),
+                label: Text(
+                  l10n.todayStudyTime(_formatStudyTime(l10n, seconds)),
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+        ],
+      ),
       body: tasks.isEmpty
           ? Center(
               child: Padding(
@@ -223,6 +242,17 @@ String _stageName(AppLocalizations l10n, LearningStage stage) {
     LearningStage.review28 => l10n.reviewRound28,
     LearningStage.completed => _isChineseFromL10n(l10n) ? '已完成' : 'Completed',
   };
+}
+
+/// 格式化学习时长显示
+String _formatStudyTime(AppLocalizations l10n, int seconds) {
+  final totalMinutes = (seconds / 60).ceil();
+  if (totalMinutes < 60) {
+    return l10n.studyTimeMinutes(totalMinutes < 1 ? 1 : totalMinutes);
+  }
+  final hours = totalMinutes ~/ 60;
+  final minutes = totalMinutes % 60;
+  return l10n.studyTimeHoursMinutes(hours, minutes);
 }
 
 bool _isChinese(BuildContext context) {

@@ -1220,6 +1220,18 @@ abstract class AppLocalizations {
   /// **'Duration: {duration}'**
   String audioDuration(String duration);
 
+  /// No description provided for @estimatedMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Est. {minutes} min'**
+  String estimatedMinutes(int minutes);
+
+  /// No description provided for @estimatedLessThanOneMinute.
+  ///
+  /// In en, this message translates to:
+  /// **'Est. < 1 min'**
+  String get estimatedLessThanOneMinute;
+
   /// No description provided for @exitBlindListenTitle.
   ///
   /// In en, this message translates to:
@@ -2335,6 +2347,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Error: {message}'**
   String transcriptionFailedMessage(String message);
+
+  /// Today's study time label
+  ///
+  /// In en, this message translates to:
+  /// **'Today: {time}'**
+  String todayStudyTime(String time);
+
+  /// Study time in minutes
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String studyTimeMinutes(int minutes);
+
+  /// Study time in hours and minutes
+  ///
+  /// In en, this message translates to:
+  /// **'{hours}h {minutes}m'**
+  String studyTimeHoursMinutes(int hours, int minutes);
 }
 
 class _AppLocalizationsDelegate

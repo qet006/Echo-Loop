@@ -279,6 +279,13 @@
       "duration": { "type": "String" }
     }
   },
+  "estimatedMinutes": "Est. {minutes} min",
+  "@estimatedMinutes": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "estimatedLessThanOneMinute": "Est. < 1 min",
   "exitBlindListenTitle": "Exit Listening?",
   "exitBlindListenMessage": "Audio is still playing. Are you sure you want to exit?",
   "confirmExit": "Exit",
@@ -697,6 +704,29 @@
   "@transcriptionFailedMessage": {
     "placeholders": {
       "message": { "type": "String" }
+    }
+  },
+
+  "todayStudyTime": "Today: {time}",
+  "@todayStudyTime": {
+    "description": "Today's study time label",
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "studyTimeMinutes": "{minutes} min",
+  "@studyTimeMinutes": {
+    "description": "Study time in minutes",
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "studyTimeHoursMinutes": "{hours}h {minutes}m",
+  "@studyTimeHoursMinutes": {
+    "description": "Study time in hours and minutes",
+    "placeholders": {
+      "hours": { "type": "int" },
+      "minutes": { "type": "int" }
     }
   }
 }

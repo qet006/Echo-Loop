@@ -10,6 +10,8 @@ import 'package:just_audio/just_audio.dart' as ja;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../models/playback_settings.dart';
 import '../../models/sentence.dart';
+import '../../services/study_time_service.dart';
+import '../daily_study_time_provider.dart';
 import '../audio_engine/audio_engine_provider.dart';
 import '../learning_progress_provider.dart';
 import '../listening_practice/listening_practice_provider.dart';
@@ -121,12 +123,33 @@ class LearningSessionState {
 class LearningSession extends _$LearningSession {
   StreamSubscription<ja.PlayerState>? _playerStateSub;
 
+  /// 学习计时器，进入学习模式时启动，退出时停止
+  final Stopwatch _studyStopwatch = Stopwatch();
+
+  /// 学习时长存储服务
+  final StudyTimeService _studyTimeService = StudyTimeService();
+
   @override
   LearningSessionState build() {
     ref.onDispose(() {
       _playerStateSub?.cancel();
+      _saveStudyTime();
     });
     return const LearningSessionState();
+  }
+
+  /// 停止计时并保存已记录的学习时长
+  Future<void> _saveStudyTime() async {
+    if (!_studyStopwatch.isRunning &&
+        _studyStopwatch.elapsed == Duration.zero) {
+      return;
+    }
+    _studyStopwatch.stop();
+    final seconds = _studyStopwatch.elapsed.inSeconds;
+    _studyStopwatch.reset();
+    if (seconds > 0) {
+      await _studyTimeService.addStudyTime(seconds);
+    }
   }
 
   /// 进入全文盲听模式
@@ -139,6 +162,7 @@ class LearningSession extends _$LearningSession {
     String audioItemId, {
     bool isFreePlay = false,
   }) async {
+    _studyStopwatch.start();
     final practice = ref.read(listeningPracticeProvider.notifier);
     final currentSettings = ref.read(listeningPracticeProvider).settings;
 
@@ -194,6 +218,7 @@ class LearningSession extends _$LearningSession {
     List<Sentence> sentences, {
     bool isFreePlay = false,
   }) async {
+    _studyStopwatch.start();
     final practice = ref.read(listeningPracticeProvider.notifier);
     final currentSettings = ref.read(listeningPracticeProvider).settings;
 
@@ -232,6 +257,7 @@ class LearningSession extends _$LearningSession {
     List<Sentence> allSentences, {
     bool isFreePlay = false,
   }) async {
+    _studyStopwatch.start();
     final practice = ref.read(listeningPracticeProvider.notifier);
     final currentSettings = ref.read(listeningPracticeProvider).settings;
 
@@ -285,6 +311,7 @@ class LearningSession extends _$LearningSession {
     Map<int, Set<int>> keywordsMap, {
     bool isFreePlay = false,
   }) async {
+    _studyStopwatch.start();
     final practice = ref.read(listeningPracticeProvider.notifier);
     final currentSettings = ref.read(listeningPracticeProvider).settings;
 
@@ -325,6 +352,7 @@ class LearningSession extends _$LearningSession {
     List<Sentence> allSentences, {
     bool isFreePlay = false,
   }) async {
+    _studyStopwatch.start();
     final practice = ref.read(listeningPracticeProvider.notifier);
     final currentSettings = ref.read(listeningPracticeProvider).settings;
 
@@ -365,6 +393,10 @@ class LearningSession extends _$LearningSession {
   ///
   /// 根据当前学习模式分支处理：停止播放、释放资源、恢复 LP 监听。
   Future<void> exitLearningMode() async {
+    await _saveStudyTime();
+    // 通知 UI 刷新今日学习时长
+    ref.read(dailyStudyTimeProvider.notifier).refresh();
+
     final mode = state.learningMode;
 
     _playerStateSub?.cancel();

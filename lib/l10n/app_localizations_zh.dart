@@ -600,6 +600,14 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String estimatedMinutes(int minutes) {
+    return '预计 $minutes 分钟';
+  }
+
+  @override
+  String get estimatedLessThanOneMinute => '预计不到 1 分钟';
+
+  @override
   String get exitBlindListenTitle => '退出盲听？';
 
   @override
@@ -1241,5 +1249,20 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String transcriptionFailedMessage(String message) {
     return '错误：$message';
+  }
+
+  @override
+  String todayStudyTime(String time) {
+    return '今日：$time';
+  }
+
+  @override
+  String studyTimeMinutes(int minutes) {
+    return '$minutes 分钟';
+  }
+
+  @override
+  String studyTimeHoursMinutes(int hours, int minutes) {
+    return '$hours小时$minutes分钟';
   }
 }

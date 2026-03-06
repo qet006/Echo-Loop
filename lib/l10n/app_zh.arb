@@ -187,6 +187,8 @@
   "countdownNextPlay": "即将开始下一遍",
   "skipCountdown": "跳过",
   "audioDuration": "时长：{duration}",
+  "estimatedMinutes": "预计 {minutes} 分钟",
+  "estimatedLessThanOneMinute": "预计不到 1 分钟",
   "exitBlindListenTitle": "退出盲听？",
   "exitBlindListenMessage": "音频正在播放中，确定要退出吗？",
   "confirmExit": "退出",
@@ -556,5 +558,9 @@
     "placeholders": {
       "message": { "type": "String" }
     }
-  }
+  },
+
+  "todayStudyTime": "今日：{time}",
+  "studyTimeMinutes": "{minutes} 分钟",
+  "studyTimeHoursMinutes": "{hours}小时{minutes}分钟"
 }
