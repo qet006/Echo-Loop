@@ -89,6 +89,26 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
 
       // 始终调用 loadAudio：同一音频时只重新读取字幕，不重新加载音频文件
       ref.read(listeningPracticeProvider.notifier).loadAudio(audioItem);
+
+      // 监听字幕变化（上传/AI转录完成后重新加载字幕）
+      ref.listenManual(
+        audioLibraryProvider.select(
+          (s) => s.audioItems
+              .where((i) => i.id == widget.audioItemId)
+              .firstOrNull
+              ?.transcriptPath,
+        ),
+        (prev, next) {
+          if (prev != next && next != null) {
+            final updated = ref
+                .read(audioLibraryProvider.notifier)
+                .getItemById(widget.audioItemId);
+            if (updated != null) {
+              ref.read(listeningPracticeProvider.notifier).loadAudio(updated);
+            }
+          }
+        },
+      );
     });
   }
 
@@ -1750,8 +1770,7 @@ class _NoTranscriptBanner extends StatelessWidget {
               onPressed: () {
                 showModalBottomSheet(
                   context: context,
-                  builder: (_) =>
-                      ManageSubtitlesSheet(audioItem: audioItem),
+                  builder: (_) => ManageSubtitlesSheet(audioItem: audioItem),
                 );
               },
               child: Text(l10n.addSubtitle),
