@@ -243,6 +243,28 @@ class _AudioBookmarkGroup extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 4),
+            // 练习该音频收藏句按钮
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: IconButton(
+                icon: const Icon(Icons.headphones, size: 18),
+                color: theme.colorScheme.primary,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: l10n.bookmarkReviewStartCount(bookmarks.length),
+                onPressed: () {
+                  final provider = ref.read(bookmarkReviewProvider.notifier);
+                  final audioItemDao = ref.read(audioItemDaoProvider);
+                  provider.initialize(
+                    bookmarks,
+                    getAudioItemById: (id) => audioItemDao.getById(id),
+                  );
+                  context.push(AppRoutes.bookmarkReview);
+                },
+              ),
+            ),
+            const SizedBox(width: 2),
             const Icon(Icons.expand_more, size: 20),
           ],
         ),
