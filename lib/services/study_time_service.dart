@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Key 格式：`study_time_YYYY-MM-DD`，value 为当日累计秒数。
 class StudyTimeService {
   static const String _keyPrefix = 'study_time_';
+  static const String _inputWordsPrefix = 'input_words_';
+  static const String _outputWordsPrefix = 'output_words_';
 
   /// 获取指定日期的学习时长（秒）
   Future<int> getStudyTime(DateTime date) async {
@@ -79,6 +81,61 @@ class StudyTimeService {
       total += prefs.getInt(_keyFor(date)) ?? 0;
     }
     return total;
+  }
+
+  // ========== 输入词数 ==========
+
+  /// 获取指定日期的输入词数
+  Future<int> getInputWords(DateTime date) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_wordKeyFor(_inputWordsPrefix, date)) ?? 0;
+  }
+
+  /// 获取今日输入词数
+  Future<int> getTodayInputWords() => getInputWords(DateTime.now());
+
+  /// 累加输入词数到指定日期
+  ///
+  /// [count] 必须 > 0，否则忽略。
+  Future<void> addInputWords(int count, {DateTime? date}) async {
+    if (count <= 0) return;
+    final targetDate = date ?? DateTime.now();
+    final prefs = await SharedPreferences.getInstance();
+    final key = _wordKeyFor(_inputWordsPrefix, targetDate);
+    final current = prefs.getInt(key) ?? 0;
+    await prefs.setInt(key, current + count);
+  }
+
+  // ========== 输出词数 ==========
+
+  /// 获取指定日期的输出词数
+  Future<int> getOutputWords(DateTime date) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_wordKeyFor(_outputWordsPrefix, date)) ?? 0;
+  }
+
+  /// 获取今日输出词数
+  Future<int> getTodayOutputWords() => getOutputWords(DateTime.now());
+
+  /// 累加输出词数到指定日期
+  ///
+  /// [count] 必须 > 0，否则忽略。
+  Future<void> addOutputWords(int count, {DateTime? date}) async {
+    if (count <= 0) return;
+    final targetDate = date ?? DateTime.now();
+    final prefs = await SharedPreferences.getInstance();
+    final key = _wordKeyFor(_outputWordsPrefix, targetDate);
+    final current = prefs.getInt(key) ?? 0;
+    await prefs.setInt(key, current + count);
+  }
+
+  /// 生成词数存储 key
+  String _wordKeyFor(String prefix, DateTime date) {
+    final d = _dateOnly(date);
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '$prefix$y-$m-$day';
   }
 
   /// 生成日期对应的存储 key

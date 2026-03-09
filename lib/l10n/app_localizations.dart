@@ -2696,6 +2696,18 @@ abstract class AppLocalizations {
   /// **'Shadow reading repeats'**
   String get difficultPracticeShadowReadingRepeat;
 
+  /// No description provided for @inputWordsShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Input'**
+  String get inputWordsShort;
+
+  /// No description provided for @outputWordsShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Output'**
+  String get outputWordsShort;
+
   /// No description provided for @bookmarkReviewProgress.
   ///
   /// In en, this message translates to:

@@ -845,6 +845,9 @@
   "difficultPracticeBlindListenRepeat": "Blind listen repeats",
   "difficultPracticeShadowReadingRepeat": "Shadow reading repeats",
 
+  "inputWordsShort": "Input",
+  "outputWordsShort": "Output",
+
   "bookmarkReviewProgress": "{current}/{total} sentences",
   "@bookmarkReviewProgress": {
     "placeholders": {

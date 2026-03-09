@@ -1468,6 +1468,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get difficultPracticeShadowReadingRepeat => '跟读循环次数';
 
   @override
+  String get inputWordsShort => '输入';
+
+  @override
+  String get outputWordsShort => '输出';
+
+  @override
   String bookmarkReviewProgress(int current, int total) {
     return '$current/$total 句';
   }

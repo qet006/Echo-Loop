@@ -622,5 +622,8 @@
   "difficultPracticeBlindListenRepeat": "盲听循环次数",
   "difficultPracticeShadowReadingRepeat": "跟读循环次数",
 
+  "inputWordsShort": "输入",
+  "outputWordsShort": "输出",
+
   "bookmarkReviewProgress": "{current}/{total} 句"
 }

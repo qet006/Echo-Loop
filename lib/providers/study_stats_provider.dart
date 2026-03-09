@@ -17,11 +17,19 @@ class StudyStats {
   /// 过去 7 天每天学习时长（秒），索引 0 = 6 天前，索引 6 = 今天
   final List<int> dailySeconds;
 
+  /// 今日输入词数（听了多少词）
+  final int todayInputWords;
+
+  /// 今日输出词数（跟读/复述了多少词）
+  final int todayOutputWords;
+
   const StudyStats({
     this.streak = 0,
     this.todaySeconds = 0,
     this.weekTotalSeconds = 0,
     this.dailySeconds = const [0, 0, 0, 0, 0, 0, 0],
+    this.todayInputWords = 0,
+    this.todayOutputWords = 0,
   });
 }
 
@@ -42,12 +50,16 @@ class StudyStatsNotifier extends _$StudyStatsNotifier {
       service.getTodayStudyTime(),
       service.getWeekTotalStudyTime(),
       service.getWeeklyStudyTimes(),
+      service.getTodayInputWords(),
+      service.getTodayOutputWords(),
     ]);
     return StudyStats(
       streak: results[0] as int,
       todaySeconds: results[1] as int,
       weekTotalSeconds: results[2] as int,
       dailySeconds: results[3] as List<int>,
+      todayInputWords: results[4] as int,
+      todayOutputWords: results[5] as int,
     );
   }
 

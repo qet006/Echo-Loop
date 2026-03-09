@@ -1506,6 +1506,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get difficultPracticeShadowReadingRepeat => 'Shadow reading repeats';
 
   @override
+  String get inputWordsShort => 'Input';
+
+  @override
+  String get outputWordsShort => 'Output';
+
+  @override
   String bookmarkReviewProgress(int current, int total) {
     return '$current/$total sentences';
   }
