@@ -135,6 +135,14 @@
 
   **完成时间**: 2026-03-09
 
+## 已完成：Flashcard 测试覆盖
+- [x] 单元测试（FlashcardState / FlashcardWordItem / 倒计时算法 / 排序 / 智能分数 / 例句额外秒数，28 个）
+- [x] 组件测试（FlashcardScreen 基本渲染 / 翻转交互 / 完成视图 / 暂停状态 / 中文本地化，9 个）
+- [x] 集成测试（导航 + 卡片显示 / 翻转 / 前后切换 / 完成流程 / 暂停恢复 / 退出清理，10 个）
+- [x] TestFlashcardNotifier 集成测试替身（test_notifiers.dart）
+
+  **完成时间**: 2026-03-09
+
 ## 已完成：Flashcard UI 优化
 - [x] 移除底部多余翻转按钮，点击卡片即翻转
 - [x] 关联例句支持播放原声（复用 AudioEngine，带播放/停止状态切换）
