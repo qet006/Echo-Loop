@@ -194,4 +194,81 @@ void main() {
       expect(total, 150);
     });
   });
+
+  group('StudyTimeService - inputWords', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('首次读取返回 0', () async {
+      final service = StudyTimeService();
+      expect(await service.getTodayInputWords(), 0);
+    });
+
+    test('addInputWords 累加', () async {
+      final service = StudyTimeService();
+      await service.addInputWords(50);
+      expect(await service.getTodayInputWords(), 50);
+
+      await service.addInputWords(30);
+      expect(await service.getTodayInputWords(), 80);
+    });
+
+    test('count <= 0 时忽略', () async {
+      final service = StudyTimeService();
+      await service.addInputWords(100);
+      await service.addInputWords(0);
+      await service.addInputWords(-5);
+      expect(await service.getTodayInputWords(), 100);
+    });
+
+    test('自定义日期隔离', () async {
+      final service = StudyTimeService();
+      final day1 = DateTime(2026, 3, 5);
+      final day2 = DateTime(2026, 3, 6);
+
+      await service.addInputWords(100, date: day1);
+      await service.addInputWords(200, date: day2);
+
+      expect(await service.getInputWords(day1), 100);
+      expect(await service.getInputWords(day2), 200);
+    });
+  });
+
+  group('StudyTimeService - outputWords', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('首次读取返回 0', () async {
+      final service = StudyTimeService();
+      expect(await service.getTodayOutputWords(), 0);
+    });
+
+    test('addOutputWords 累加', () async {
+      final service = StudyTimeService();
+      await service.addOutputWords(40);
+      expect(await service.getTodayOutputWords(), 40);
+
+      await service.addOutputWords(60);
+      expect(await service.getTodayOutputWords(), 100);
+    });
+
+    test('count <= 0 时忽略', () async {
+      final service = StudyTimeService();
+      await service.addOutputWords(50);
+      await service.addOutputWords(0);
+      await service.addOutputWords(-1);
+      expect(await service.getTodayOutputWords(), 50);
+    });
+
+    test('输入与输出互不干扰', () async {
+      final service = StudyTimeService();
+      await service.addInputWords(100);
+      await service.addOutputWords(50);
+
+      expect(await service.getTodayInputWords(), 100);
+      expect(await service.getTodayOutputWords(), 50);
+    });
+  });
 }
