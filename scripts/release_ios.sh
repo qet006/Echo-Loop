@@ -25,6 +25,7 @@ Environment overrides:
   IOS_TEAM_ID
   IOS_BUILD_NAME
   IOS_BUILD_NUMBER
+  API_BASE_URL
   APP_STORE_API_KEY_ID
   APP_STORE_API_ISSUER_ID
   APP_STORE_API_KEY_PATH
@@ -38,6 +39,16 @@ log() {
 fail() {
   echo "[ios-release] ERROR: $*" >&2
   exit 1
+}
+
+ensure_apple_toolchain_path() {
+  # Xcode export 会调用带 Apple 扩展参数的 /usr/bin/rsync。
+  # 若 PATH 前面命中了 Homebrew rsync，会在打包 IPA 时触发不兼容错误。
+  export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+}
+
+encode_dart_define() {
+  printf '%s' "$1" | base64 | tr -d '\n'
 }
 
 require_command() {
@@ -127,6 +138,7 @@ require_command xcrun
 require_command plutil
 require_command codesign
 require_command security
+ensure_apple_toolchain_path()
 
 if [[ -x "scripts/preflight.sh" ]]; then
   scripts/preflight.sh
@@ -136,9 +148,11 @@ WORKSPACE="${IOS_WORKSPACE:-ios/Runner.xcworkspace}"
 SCHEME="${IOS_SCHEME:-Runner}"
 CONFIGURATION="${IOS_CONFIGURATION:-Release}"
 TEAM_ID="${IOS_TEAM_ID:-S8S968QAV3}"
+API_BASE_URL="${API_BASE_URL:-https://www.echo-loop.top}"
 API_KEY_ID="${APP_STORE_API_KEY_ID:-5GB5KL75VZ}"
 API_ISSUER_ID="${APP_STORE_API_ISSUER_ID:-3ec439fe-b66c-4034-b8c2-16e133fc4d6b}"
 API_KEY_PATH="${APP_STORE_API_KEY_PATH:-$ROOT_DIR/ios/AuthKey_${API_KEY_ID}.p8}"
+DART_DEFINES_VALUE="$(encode_dart_define "API_BASE_URL=${API_BASE_URL}")"
 
 [[ -d "$WORKSPACE" ]] || fail "Workspace not found: $WORKSPACE"
 [[ -f "$API_KEY_PATH" ]] || fail "API key file not found: $API_KEY_PATH"
@@ -169,6 +183,7 @@ fi
 [[ -n "$BUILD_NUMBER" ]] || fail "Unable to determine build number"
 log "Using build name: $BUILD_NAME"
 log "Using build number: $BUILD_NUMBER"
+log "Using API base URL: $API_BASE_URL"
 
 log "Checking available code signing identities"
 security find-identity -v -p codesigning
@@ -195,7 +210,7 @@ cat > "$EXPORT_OPTIONS_PATH" <<EOF
   <key>manageAppVersionAndBuildNumber</key>
   <false/>
   <key>method</key>
-  <string>app-store</string>
+  <string>app-store-connect</string>
   <key>signingStyle</key>
   <string>automatic</string>
   <key>stripSwiftSymbols</key>
@@ -221,6 +236,7 @@ xcodebuild \
   -authenticationKeyPath "$API_KEY_PATH" \
   -authenticationKeyID "$API_KEY_ID" \
   -authenticationKeyIssuerID "$API_ISSUER_ID" \
+  DART_DEFINES="$DART_DEFINES_VALUE" \
   FLUTTER_BUILD_NAME="$BUILD_NAME" \
   FLUTTER_BUILD_NUMBER="$BUILD_NUMBER" \
   archive
@@ -236,6 +252,7 @@ xcodebuild \
   -authenticationKeyPath "$API_KEY_PATH" \
   -authenticationKeyID "$API_KEY_ID" \
   -authenticationKeyIssuerID "$API_ISSUER_ID" \
+  DART_DEFINES="$DART_DEFINES_VALUE" \
   FLUTTER_BUILD_NAME="$BUILD_NAME" \
   FLUTTER_BUILD_NUMBER="$BUILD_NUMBER"
 export_status=$?
