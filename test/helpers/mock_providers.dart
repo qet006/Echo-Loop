@@ -503,6 +503,11 @@ class TestLearningProgressNotifier extends LearningProgressNotifier {
   }
 
   @override
+  Future<LearningProgress?> getLatestByAudioId(String audioItemId) async {
+    return state.progressMap[audioItemId];
+  }
+
+  @override
   Future<void> setDifficulty(
     String audioItemId,
     DifficultyLevel difficulty,
@@ -743,6 +748,10 @@ class TestIntensiveListenPlayer extends IntensiveListenPlayer {
     state = state.copyWith(
       isAnnotationMode: true,
       isPlaying: false,
+      isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+      pauseRemaining: Duration.zero,
+      pauseDuration: Duration.zero,
       difficultSentences: newDifficult,
       isCurrentSentenceAutoMarked: !wasAlreadyDifficult,
     );
@@ -751,9 +760,11 @@ class TestIntensiveListenPlayer extends IntensiveListenPlayer {
   @override
   Future<void> exitAnnotationMode() async {
     state = state.copyWith(
-      isAnnotationMode: false,
-      isAnnotationReplay: false,
+      isAnnotationMode: true,
+      isAnnotationReplay: true,
       isPlaying: true,
+      annotationReplayRemaining: const Duration(seconds: 3),
+      annotationReplayDuration: const Duration(seconds: 3),
       isCurrentSentenceAutoMarked: false,
     );
   }
@@ -763,6 +774,29 @@ class TestIntensiveListenPlayer extends IntensiveListenPlayer {
     if (!state.isAnnotationMode) return;
     // 测试中模拟重播：设置 isPlaying 然后立即停止
     state = state.copyWith(isPlaying: true);
+  }
+
+  @override
+  Future<void> replayDuringCountdown() async {
+    if (state.isAnnotationMode) {
+      state = state.copyWith(
+        isPlaying: true,
+        isPauseBetweenPlays: false,
+        isPauseBetweenSentences: false,
+        isAnnotationReplay: true,
+        annotationReplayRemaining: const Duration(seconds: 3),
+        annotationReplayDuration: const Duration(seconds: 3),
+      );
+      return;
+    }
+
+    state = state.copyWith(
+      isPlaying: true,
+      isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+      annotationReplayRemaining: Duration.zero,
+      annotationReplayDuration: Duration.zero,
+    );
   }
 
   @override
@@ -1209,9 +1243,9 @@ class TestRetellPlayer extends RetellPlayer {
   @override
   List<Sentence> get currentParagraphSentences =>
       _testParagraphs.isNotEmpty &&
-              state.currentParagraphIndex < _testParagraphs.length
-          ? _testParagraphs[state.currentParagraphIndex]
-          : [];
+          state.currentParagraphIndex < _testParagraphs.length
+      ? _testParagraphs[state.currentParagraphIndex]
+      : [];
 
   @override
   List<List<Sentence>> get paragraphs => List.unmodifiable(_testParagraphs);

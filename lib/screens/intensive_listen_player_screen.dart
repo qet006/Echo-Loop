@@ -1,7 +1,6 @@
 /// 精听播放器页面
 ///
-/// 逐句精听界面，支持普通模式（文字遮盖）、标注模式（揭示文本）、
-/// 标注重播模式（带字幕重播）。
+/// 逐句精听界面，支持普通模式（文字遮盖）和“听不懂”后的详情模式。
 ///
 /// 完成处理：所有句子播完 → 完成对话框 → completeCurrentSubStage → 退出
 /// 退出处理：PopScope → 保存断点 → exitLearningMode → pop
@@ -470,6 +469,24 @@ class _IntensiveListenPlayerScreenState
       }
     });
 
+    ref.listen<IntensiveListenState>(intensiveListenPlayerProvider, (
+      prev,
+      next,
+    ) {
+      final session = ref.read(learningSessionProvider);
+      if (session.isFreePlay) return;
+      final previousIndex = prev?.currentSentenceIndex;
+      if (previousIndex == null || previousIndex == next.currentSentenceIndex) {
+        return;
+      }
+      ref
+          .read(learningProgressNotifierProvider.notifier)
+          .saveIntensiveListenSentenceIndex(
+            widget.audioItemId,
+            next.currentSentenceIndex,
+          );
+    });
+
     final currentSentence = player.currentSentence;
 
     // 句子时长（如 "3.5s"）和时间戳（如 "00:32.1 - 00:35.6"）分开传递，
@@ -490,12 +507,14 @@ class _IntensiveListenPlayerScreenState
 
     return LearningHotkeyScope(
       onPlayPause: () {
-        if (playerState.isAnnotationMode) {
-          player.replayInAnnotationMode();
+        if (playerState.isPlaying) {
+          player.pause();
+        } else if (playerState.isAnnotationReplay) {
+          player.resume();
         } else if (playerState.isPauseBetweenPlays) {
           player.replayDuringCountdown();
-        } else if (playerState.isPlaying) {
-          player.pause();
+        } else if (playerState.isAnnotationMode) {
+          player.replayInAnnotationMode();
         } else {
           player.resume();
         }
@@ -540,23 +559,32 @@ class _IntensiveListenPlayerScreenState
               Expanded(
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 300),
-                  child: playerState.isAnnotationReplay
-                      ? _AnnotationReplayView(
-                          key: const ValueKey('replay'),
-                          text: currentSentence?.text ?? '',
-                          l10n: l10n,
-                        )
-                      : playerState.isAnnotationMode
+                  child:
+                      playerState.isAnnotationMode ||
+                          playerState.isAnnotationReplay
                       ? _AnnotationModeView(
-                          key: const ValueKey('annotation'),
+                          key: const ValueKey('details'),
                           text: currentSentence?.text ?? '',
                           isDifficult: playerState.difficultSentences.contains(
                             playerState.currentSentenceIndex,
                           ),
                           isAutoMarked: playerState.isCurrentSentenceAutoMarked,
+                          isReplayActive: playerState.isAnnotationReplay,
+                          isPauseBetweenSentences:
+                              playerState.isPauseBetweenSentences,
+                          pauseRemaining: playerState.pauseRemaining,
+                          pauseDuration: playerState.pauseDuration,
+                          isCountdownPaused: playerState.isCountdownPaused,
                           l10n: l10n,
-                          onContinue: () => player.exitAnnotationMode(),
+                          onContinue:
+                              playerState.isAnnotationReplay ||
+                                  playerState.isPauseBetweenSentences
+                              ? null
+                              : () => player.exitAnnotationMode(),
                           onToggleDifficult: _toggleAndSaveDifficult,
+                          onPauseCountdown: () => playerState.isCountdownPaused
+                              ? player.resumeCountdown()
+                              : player.pauseCountdown(),
                           aiNotifier: ref.read(sentenceAiNotifierProvider),
                           audioItemId: widget.audioItemId,
                           sentenceIndex: playerState.currentSentenceIndex,
@@ -589,12 +617,14 @@ class _IntensiveListenPlayerScreenState
                 onPrevious: () => player.goToPrevious(),
                 onNext: () => player.goToNext(),
                 onPlayPause: () {
-                  if (playerState.isAnnotationMode) {
-                    player.replayInAnnotationMode();
+                  if (playerState.isPlaying) {
+                    player.pause();
+                  } else if (playerState.isAnnotationReplay) {
+                    player.resume();
                   } else if (playerState.isPauseBetweenPlays) {
                     player.replayDuringCountdown();
-                  } else if (playerState.isPlaying) {
-                    player.pause();
+                  } else if (playerState.isAnnotationMode) {
+                    player.replayInAnnotationMode();
                   } else {
                     player.resume();
                   }
@@ -923,9 +953,25 @@ class _AnnotationModeView extends StatelessWidget {
   /// 是否展示“自动标记为难句”文案
   final bool isAutoMarked;
 
+  /// 是否处于当前页内的详情重播状态
+  final bool isReplayActive;
+
+  /// 是否处于句间倒计时中
+  final bool isPauseBetweenSentences;
+
+  /// 句间停顿剩余时间
+  final Duration pauseRemaining;
+
+  /// 句间停顿总时长
+  final Duration pauseDuration;
+
+  /// 倒计时是否暂停
+  final bool isCountdownPaused;
+
   final AppLocalizations l10n;
-  final VoidCallback onContinue;
+  final VoidCallback? onContinue;
   final VoidCallback onToggleDifficult;
+  final VoidCallback onPauseCountdown;
 
   /// AI 翻译/解析服务
   final SentenceAiNotifier? aiNotifier;
@@ -947,9 +993,15 @@ class _AnnotationModeView extends StatelessWidget {
     required this.text,
     required this.isDifficult,
     required this.isAutoMarked,
+    required this.isReplayActive,
+    required this.isPauseBetweenSentences,
+    required this.pauseRemaining,
+    required this.pauseDuration,
+    required this.isCountdownPaused,
     required this.l10n,
     required this.onContinue,
     required this.onToggleDifficult,
+    required this.onPauseCountdown,
     this.aiNotifier,
     this.audioItemId,
     this.sentenceIndex,
@@ -965,7 +1017,6 @@ class _AnnotationModeView extends StatelessWidget {
     final cachedAnalysisText = cachedAnalysis != null
         ? '${cachedAnalysis.grammar}\n${cachedAnalysis.vocabulary}\n${cachedAnalysis.usage}'
         : null;
-
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.l),
       child: Column(
@@ -1000,59 +1051,30 @@ class _AnnotationModeView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.m),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: onContinue,
-              child: Text(l10n.intensiveListenContinue),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 标注重播模式视图（带字幕重播中）
-class _AnnotationReplayView extends StatelessWidget {
-  final String text;
-  final AppLocalizations l10n;
-
-  const _AnnotationReplayView({
-    super.key,
-    required this.text,
-    required this.l10n,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.l),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 显示句子文本
-            Text(
-              text,
-              style: theme.textTheme.titleMedium?.copyWith(height: 1.6),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.l),
-
-            // 播放中指示器
-            CircularProgressIndicator(strokeWidth: 2),
-            const SizedBox(height: AppSpacing.s),
-            Text(
-              l10n.intensiveListenReplayingWithSubtitle,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+          if (!isReplayActive && !isPauseBetweenSentences)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: onContinue,
+                child: Text(l10n.intensiveListenContinue),
               ),
             ),
-          ],
-        ),
+          if (isReplayActive)
+            Text(
+              l10n.intensiveListenReplayingWithSubtitle,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          if (isPauseBetweenSentences)
+            _CountdownChip(
+              remaining: pauseRemaining,
+              total: pauseDuration,
+              isPaused: isCountdownPaused,
+              onTap: onPauseCountdown,
+            ),
+        ],
       ),
     );
   }
@@ -1113,13 +1135,8 @@ class _PlaybackControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    final isPlayDisabled = playerState.isAnnotationReplay;
-    final isNavDisabled = playerState.isAnnotationReplay;
-
-    final canGoPrev = !isNavDisabled && playerState.currentSentenceIndex > 0;
+    final canGoPrev = playerState.currentSentenceIndex > 0;
     final canGoNext =
-        !isNavDisabled &&
         playerState.currentSentenceIndex < playerState.totalSentences - 1;
 
     return Padding(
@@ -1141,35 +1158,27 @@ class _PlaybackControls extends StatelessWidget {
 
           // 播放/暂停
           GestureDetector(
-            onTap: isPlayDisabled ? null : onPlayPause,
+            onTap: onPlayPause,
             child: Container(
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: isPlayDisabled
-                    ? theme.colorScheme.surfaceContainerHighest
-                    : theme.colorScheme.primary,
+                color: theme.colorScheme.primary,
                 shape: BoxShape.circle,
-                boxShadow: isPlayDisabled
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: theme.colorScheme.primary.withValues(
-                            alpha: 0.15,
-                          ),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Icon(
                 playerState.isPlaying
                     ? Icons.pause_rounded
                     : Icons.play_arrow_rounded,
                 size: 28,
-                color: isPlayDisabled
-                    ? theme.colorScheme.onSurfaceVariant
-                    : theme.colorScheme.onPrimary,
+                color: theme.colorScheme.onPrimary,
               ),
             ),
           ),

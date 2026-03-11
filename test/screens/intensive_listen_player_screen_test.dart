@@ -21,6 +21,7 @@ import 'package:fluency/database/daos/sentence_ai_cache_dao.dart';
 import 'package:fluency/database/providers.dart';
 import 'package:fluency/services/sentence_ai_api_client.dart';
 import 'package:fluency/theme/app_theme.dart';
+import 'package:fluency/widgets/intensive_listen/sentence_annotation_card.dart';
 
 import '../helpers/mock_providers.dart';
 
@@ -58,6 +59,42 @@ class _AutoCompleteIntensiveListenPlayer extends TestIntensiveListenPlayer {
   }
 }
 
+class _RecordingIntensiveListenPlayer extends TestIntensiveListenPlayer {
+  _RecordingIntensiveListenPlayer(super.initialState, super.testSentences);
+
+  int pauseCalls = 0;
+  int resumeCalls = 0;
+  int replayInDetailsCalls = 0;
+  int replayDuringCountdownCalls = 0;
+
+  @override
+  Future<void> startPlaying() async {}
+
+  @override
+  Future<void> pause() async {
+    pauseCalls += 1;
+    await super.pause();
+  }
+
+  @override
+  Future<void> resume() async {
+    resumeCalls += 1;
+    await super.resume();
+  }
+
+  @override
+  Future<void> replayInAnnotationMode() async {
+    replayInDetailsCalls += 1;
+    await super.replayInAnnotationMode();
+  }
+
+  @override
+  Future<void> replayDuringCountdown() async {
+    replayDuringCountdownCalls += 1;
+    await super.replayDuringCountdown();
+  }
+}
+
 void main() {
   /// 创建测试用的精听状态
   IntensiveListenState createPlayerState({
@@ -73,6 +110,8 @@ void main() {
     bool isPauseBetweenSentences = false,
     Duration pauseRemaining = Duration.zero,
     Duration pauseDuration = Duration.zero,
+    Duration annotationReplayRemaining = Duration.zero,
+    Duration annotationReplayDuration = Duration.zero,
     bool isCompleted = false,
     Set<int> difficultSentences = const {},
     bool isCurrentSentenceAutoMarked = false,
@@ -90,6 +129,8 @@ void main() {
       isPauseBetweenSentences: isPauseBetweenSentences,
       pauseRemaining: pauseRemaining,
       pauseDuration: pauseDuration,
+      annotationReplayRemaining: annotationReplayRemaining,
+      annotationReplayDuration: annotationReplayDuration,
       isCompleted: isCompleted,
       difficultSentences: difficultSentences,
       isCurrentSentenceAutoMarked: isCurrentSentenceAutoMarked,
@@ -250,7 +291,7 @@ void main() {
       expect(find.text('Play 2/3'), findsOneWidget);
     });
 
-    testWidgets('标注模式显示继续按钮', (tester) async {
+    testWidgets('详情模式显示继续按钮', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
           playerState: createPlayerState(
@@ -264,21 +305,66 @@ void main() {
       expect(find.text('Continue'), findsOneWidget);
     });
 
-    testWidgets('标注重播模式显示重播指示器', (tester) async {
+    testWidgets('从普通倒计时点击听不懂进入详情页时只显示继续按钮', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
           playerState: createPlayerState(
-            isAnnotationReplay: true,
-            isPlaying: true,
+            isPlaying: false,
+            isPauseBetweenPlays: true,
+            isPauseBetweenSentences: false,
+            pauseRemaining: const Duration(seconds: 3),
+            pauseDuration: const Duration(seconds: 3),
           ),
         ),
       );
-      // CircularProgressIndicator 持续动画，不能用 pumpAndSettle
-      await tester.pump();
-      await tester.pump();
+      await tester.pumpAndSettle();
 
+      await tester.tap(find.text("Can't understand"));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SentenceAnnotationCard), findsOneWidget);
+      expect(find.text('Continue'), findsOneWidget);
+      expect(find.text('3s'), findsNothing);
+      expect(find.text('Replaying with subtitles...'), findsNothing);
+    });
+
+    testWidgets('详情重播时保留详情页并显示重播提示', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            isAnnotationMode: true,
+            isAnnotationReplay: true,
+            isPlaying: true,
+            annotationReplayRemaining: const Duration(seconds: 3),
+            annotationReplayDuration: const Duration(seconds: 5),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SentenceAnnotationCard), findsOneWidget);
+      expect(find.text('Continue'), findsNothing);
       expect(find.text('Replaying with subtitles...'), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+
+    testWidgets('详情页重播后显示正常样式倒计时', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            isAnnotationMode: true,
+            isPauseBetweenPlays: true,
+            isPauseBetweenSentences: true,
+            isPlaying: false,
+            pauseRemaining: const Duration(seconds: 3),
+            pauseDuration: const Duration(seconds: 3),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SentenceAnnotationCard), findsOneWidget);
+      expect(find.text('3s'), findsOneWidget);
+      expect(find.text('Continue'), findsNothing);
     });
 
     testWidgets('显示播放/暂停和上下句按钮', (tester) async {
@@ -693,10 +779,154 @@ void main() {
       expect(nextOpacity.opacity, 0.6);
     });
 
+    testWidgets('详情页重播中导航按钮仍可用', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            currentSentenceIndex: 2,
+            totalSentences: 5,
+            isAnnotationMode: true,
+            isAnnotationReplay: true,
+            isPlaying: true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final prevIcon = find.byIcon(Icons.skip_previous_rounded);
+      final nextIcon = find.byIcon(Icons.skip_next_rounded);
+      final prevOpacity = tester.widget<AnimatedOpacity>(
+        find
+            .ancestor(of: prevIcon, matching: find.byType(AnimatedOpacity))
+            .first,
+      );
+      final nextOpacity = tester.widget<AnimatedOpacity>(
+        find
+            .ancestor(of: nextIcon, matching: find.byType(AnimatedOpacity))
+            .first,
+      );
+
+      expect(prevOpacity.opacity, 0.6);
+      expect(nextOpacity.opacity, 0.6);
+    });
+
+    testWidgets('详情页倒计时中导航按钮仍可用', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            currentSentenceIndex: 2,
+            totalSentences: 5,
+            isAnnotationMode: true,
+            isPauseBetweenPlays: true,
+            isPauseBetweenSentences: true,
+            isPlaying: false,
+            pauseRemaining: const Duration(seconds: 3),
+            pauseDuration: const Duration(seconds: 3),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final prevIcon = find.byIcon(Icons.skip_previous_rounded);
+      final nextIcon = find.byIcon(Icons.skip_next_rounded);
+      final prevOpacity = tester.widget<AnimatedOpacity>(
+        find
+            .ancestor(of: prevIcon, matching: find.byType(AnimatedOpacity))
+            .first,
+      );
+      final nextOpacity = tester.widget<AnimatedOpacity>(
+        find
+            .ancestor(of: nextIcon, matching: find.byType(AnimatedOpacity))
+            .first,
+      );
+
+      expect(prevOpacity.opacity, 0.6);
+      expect(nextOpacity.opacity, 0.6);
+    });
+
+    testWidgets('详情页重播中点击播放按钮先暂停，不触发详情页内重播', (tester) async {
+      late _RecordingIntensiveListenPlayer player;
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            isAnnotationMode: true,
+            isAnnotationReplay: true,
+            isPlaying: true,
+          ),
+          playerFactory: (state, sentences) {
+            player = _RecordingIntensiveListenPlayer(state, sentences);
+            return player;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.pause_rounded));
+      await tester.pumpAndSettle();
+
+      expect(player.pauseCalls, 1);
+      expect(player.resumeCalls, 0);
+      expect(player.replayInDetailsCalls, 0);
+    });
+
+    testWidgets('详情页重播暂停后点击播放会从当前句重新开始', (tester) async {
+      late _RecordingIntensiveListenPlayer player;
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            isAnnotationMode: true,
+            isAnnotationReplay: true,
+            isPlaying: false,
+          ),
+          playerFactory: (state, sentences) {
+            player = _RecordingIntensiveListenPlayer(state, sentences);
+            return player;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+      await tester.pumpAndSettle();
+
+      expect(player.resumeCalls, 1);
+      expect(player.replayInDetailsCalls, 0);
+    });
+
+    testWidgets('详情页倒计时中点击播放按钮会回到带字幕重播态', (tester) async {
+      late _RecordingIntensiveListenPlayer player;
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            isAnnotationMode: true,
+            isPlaying: false,
+            isPauseBetweenPlays: true,
+            isPauseBetweenSentences: true,
+            pauseRemaining: const Duration(seconds: 3),
+            pauseDuration: const Duration(seconds: 3),
+          ),
+          playerFactory: (state, sentences) {
+            player = _RecordingIntensiveListenPlayer(state, sentences);
+            return player;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+      await tester.pumpAndSettle();
+
+      expect(player.replayDuringCountdownCalls, 1);
+      expect(player.replayInDetailsCalls, 0);
+      expect(player.resumeCalls, 0);
+      expect(find.text('Replaying with subtitles...'), findsOneWidget);
+      expect(find.text('Continue'), findsNothing);
+    });
+
     testWidgets('偷看按钮点击切换 isTextRevealed（非按住）', (tester) async {
-      await tester.pumpWidget(createTestWidget(
-        playerState: createPlayerState(isTextRevealed: false),
-      ));
+      await tester.pumpWidget(
+        createTestWidget(playerState: createPlayerState(isTextRevealed: false)),
+      );
       await tester.pumpAndSettle();
 
       // 找到偷看按钮并点击
@@ -711,9 +941,9 @@ void main() {
     });
 
     testWidgets('偷看按钮再次点击取消显示', (tester) async {
-      await tester.pumpWidget(createTestWidget(
-        playerState: createPlayerState(isTextRevealed: true),
-      ));
+      await tester.pumpWidget(
+        createTestWidget(playerState: createPlayerState(isTextRevealed: true)),
+      );
       await tester.pumpAndSettle();
 
       // 已显示状态，图标为 visibility_off

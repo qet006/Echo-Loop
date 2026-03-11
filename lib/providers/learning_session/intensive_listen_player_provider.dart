@@ -3,8 +3,8 @@
 /// 逐句精听播放器，与 BlindListenPlayer 同层级，直接操作 AudioEngine。
 /// 核心功能：
 /// - 逐句播放（可配置遍数，遍间停顿）
-/// - 标注模式（听不懂 → 暂停 → 揭示文本 → 标记难句）
-/// - 标注模式退出时带字幕重播一遍再推进
+/// - 看不懂详情模式（听不懂 → 暂停 → 揭示文本 → 标记难句）
+/// - 详情模式退出时在当前页带字幕重播一遍再推进
 /// - 偷看字幕（不暂停、不标记、切句时重置）
 /// - 手动上一句/下一句
 /// - 三种停顿模式（智能/固定/倍数）
@@ -76,10 +76,16 @@ class IntensiveListenState {
   /// 停顿总时长
   final Duration pauseDuration;
 
-  /// 是否处于标注模式（听不懂）
+  /// 当前句详情重播剩余时间
+  final Duration annotationReplayRemaining;
+
+  /// 当前句详情重播总时长
+  final Duration annotationReplayDuration;
+
+  /// 是否处于“听不懂”后的详情模式
   final bool isAnnotationMode;
 
-  /// 是否处于标注模式重播（带字幕重播一遍）
+  /// 是否处于当前页内的详情重播状态（带字幕重播一遍）
   final bool isAnnotationReplay;
 
   /// 是否已完成所有句子
@@ -114,6 +120,8 @@ class IntensiveListenState {
     this.isPauseBetweenSentences = false,
     this.pauseRemaining = Duration.zero,
     this.pauseDuration = Duration.zero,
+    this.annotationReplayRemaining = Duration.zero,
+    this.annotationReplayDuration = Duration.zero,
     this.isAnnotationMode = false,
     this.isAnnotationReplay = false,
     this.isCompleted = false,
@@ -134,6 +142,8 @@ class IntensiveListenState {
     bool? isPauseBetweenSentences,
     Duration? pauseRemaining,
     Duration? pauseDuration,
+    Duration? annotationReplayRemaining,
+    Duration? annotationReplayDuration,
     bool? isAnnotationMode,
     bool? isAnnotationReplay,
     bool? isCompleted,
@@ -154,6 +164,10 @@ class IntensiveListenState {
           isPauseBetweenSentences ?? this.isPauseBetweenSentences,
       pauseRemaining: pauseRemaining ?? this.pauseRemaining,
       pauseDuration: pauseDuration ?? this.pauseDuration,
+      annotationReplayRemaining:
+          annotationReplayRemaining ?? this.annotationReplayRemaining,
+      annotationReplayDuration:
+          annotationReplayDuration ?? this.annotationReplayDuration,
       isAnnotationMode: isAnnotationMode ?? this.isAnnotationMode,
       isAnnotationReplay: isAnnotationReplay ?? this.isAnnotationReplay,
       isCompleted: isCompleted ?? this.isCompleted,
@@ -248,6 +262,10 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
 
   /// 恢复播放（从当前句子重新开始播放循环）
   Future<void> resume() async {
+    if (state.isAnnotationReplay) {
+      await _startInlineAnnotationReplay();
+      return;
+    }
     await _startSentence();
   }
 
@@ -264,6 +282,9 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       isAnnotationReplay: false,
       isTextRevealed: false,
       isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+      annotationReplayRemaining: Duration.zero,
+      annotationReplayDuration: Duration.zero,
       isCurrentSentenceAutoMarked: false,
       isCountdownPaused: false,
       isCountdownFastForward: false,
@@ -285,6 +306,9 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       isAnnotationReplay: false,
       isTextRevealed: false,
       isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+      annotationReplayRemaining: Duration.zero,
+      annotationReplayDuration: Duration.zero,
       isCurrentSentenceAutoMarked: false,
       isCountdownPaused: false,
       isCountdownFastForward: false,
@@ -293,7 +317,7 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     await _startSentence();
   }
 
-  /// 进入标注模式（听不懂）
+  /// 进入详情模式（听不懂）
   ///
   /// 暂停音频 → 揭示文本 → 标记为难句
   void enterAnnotationMode() {
@@ -315,7 +339,12 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       isAnnotationMode: true,
       isPlaying: false,
       isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
       isTextRevealed: false,
+      pauseRemaining: Duration.zero,
+      pauseDuration: Duration.zero,
+      annotationReplayRemaining: Duration.zero,
+      annotationReplayDuration: Duration.zero,
       difficultSentences: newDifficult,
       isCurrentSentenceAutoMarked: !wasAlreadyDifficult,
       isCountdownPaused: false,
@@ -323,22 +352,33 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     );
   }
 
-  /// 退出标注模式（点击"继续"）
+  /// 退出详情模式（点击“继续”）
   ///
-  /// 带字幕重播当前句一遍 → 播完自动推进到下一句
+  /// 保持当前页可见，带字幕重播当前句一遍，播完后按正常流程倒计时推进。
   Future<void> exitAnnotationMode() async {
-    state = state.copyWith(
-      isAnnotationMode: false,
-      isAnnotationReplay: true,
-      isPlaying: true,
-      isCurrentSentenceAutoMarked: false,
-    );
+    await _startInlineAnnotationReplay();
+  }
 
+  /// 在当前页内启动详情重播
+  Future<void> _startInlineAnnotationReplay() async {
     final sentence = currentSentence;
     if (sentence == null || sentence.duration <= Duration.zero) {
       await _finishAnnotationReplay();
       return;
     }
+
+    state = state.copyWith(
+      isAnnotationMode: true,
+      isAnnotationReplay: true,
+      isPlaying: true,
+      isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+      isCurrentSentenceAutoMarked: false,
+      annotationReplayRemaining: sentence.duration,
+      annotationReplayDuration: sentence.duration,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+    );
 
     final engine = ref.read(audioEngineProvider.notifier);
     _currentSessionId = engine.newSession();
@@ -428,9 +468,18 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     state = state.copyWith(
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
+      annotationReplayRemaining: Duration.zero,
+      annotationReplayDuration: Duration.zero,
       isCountdownPaused: false,
       isCountdownFastForward: false,
     );
+
+    /// 详情页里的倒计时重播，需要回到“带字幕重播中”而不是普通模式。
+    if (state.isAnnotationMode) {
+      await _startInlineAnnotationReplay();
+      return;
+    }
+
     await _startSentence();
   }
 
@@ -485,6 +534,9 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       isPlaying: true,
       currentPlayCount: 1,
       isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+      annotationReplayRemaining: Duration.zero,
+      annotationReplayDuration: Duration.zero,
       isCountdownPaused: false,
       isCountdownFastForward: false,
     );
@@ -571,6 +623,8 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       isPlaying: false,
       isPauseBetweenPlays: true,
       isPauseBetweenSentences: true,
+      annotationReplayRemaining: Duration.zero,
+      annotationReplayDuration: Duration.zero,
       isCountdownPaused: false,
       isCountdownFastForward: false,
       pauseDuration: pauseDur,
@@ -589,6 +643,7 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       state = state.copyWith(
         isCompleted: true,
         isPlaying: false,
+        isAnnotationMode: false,
         isPauseBetweenPlays: false,
         isPauseBetweenSentences: false,
         isCountdownPaused: false,
@@ -605,12 +660,14 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
         isPauseBetweenSentences: false,
         isAnnotationMode: false,
         isAnnotationReplay: false,
+        annotationReplayRemaining: Duration.zero,
+        annotationReplayDuration: Duration.zero,
         isCurrentSentenceAutoMarked: false,
         isCountdownPaused: false,
         isCountdownFastForward: false,
       );
 
-      _startSentence();
+      await _startSentence();
     }
   }
 
@@ -627,6 +684,8 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       isAnnotationMode: false,
       isAnnotationReplay: false,
       isTextRevealed: false,
+      annotationReplayRemaining: Duration.zero,
+      annotationReplayDuration: Duration.zero,
       isCurrentSentenceAutoMarked: false,
       isCountdownPaused: false,
       isCountdownFastForward: false,
@@ -634,9 +693,16 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     await startPlaying();
   }
 
-  /// 标注重播完成后推进（停顿由 _autoAdvance 统一处理）
+  /// 当前页内的详情重播完成后推进
   Future<void> _finishAnnotationReplay() async {
-    state = state.copyWith(isAnnotationReplay: false, isPlaying: false);
+    state = state.copyWith(
+      isAnnotationReplay: false,
+      isPlaying: false,
+      annotationReplayRemaining: Duration.zero,
+      annotationReplayDuration: Duration.zero,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+    );
     await _autoAdvance();
   }
 

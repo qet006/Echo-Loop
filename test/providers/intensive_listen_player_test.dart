@@ -1,13 +1,40 @@
 // 精听播放器状态测试
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fluency/models/intensive_listen_settings.dart';
+import 'package:fluency/models/sentence.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
 import 'package:fluency/providers/learning_session/intensive_listen_player_provider.dart';
 import '../helpers/mock_providers.dart';
 
+class _ReplayTestAudioEngine extends TestAudioEngine {
+  int _sessionId = 0;
+
+  @override
+  int newSession() {
+    _sessionId += 1;
+    return _sessionId;
+  }
+
+  @override
+  bool isActiveSession(int id) => id == _sessionId;
+
+  @override
+  Future<void> playClipOnce(Sentence sentence, int sessionId) async {
+    if (!isActiveSession(sessionId)) return;
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   group('IntensiveListenState', () {
     test('默认初始状态', () {
       const state = IntensiveListenState();
@@ -262,6 +289,79 @@ void main() {
 
       final state = container.read(intensiveListenPlayerProvider);
       expect(state.difficultSentences, {0, 1, 2});
+    });
+  });
+
+  group('看不懂详情页继续后的当前页重播', () {
+    late ProviderContainer container;
+    late IntensiveListenPlayer notifier;
+
+    final sentences = [
+      Sentence(
+        index: 0,
+        text: 'First short sentence.',
+        startTime: Duration.zero,
+        endTime: const Duration(milliseconds: 120),
+      ),
+      Sentence(
+        index: 1,
+        text: 'Second short sentence.',
+        startTime: const Duration(milliseconds: 200),
+        endTime: const Duration(milliseconds: 320),
+      ),
+    ];
+
+    setUp(() async {
+      container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => _ReplayTestAudioEngine()),
+        ],
+      );
+      notifier = container.read(intensiveListenPlayerProvider.notifier);
+      await notifier.initialize(sentences);
+    });
+
+    tearDown(() => container.dispose());
+
+    test('点击继续后先重播，再进入句间倒计时，最后推进到下一句', () async {
+      notifier.enterAnnotationMode();
+
+      final future = notifier.exitAnnotationMode();
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      final replaying = container.read(intensiveListenPlayerProvider);
+      expect(replaying.isAnnotationReplay, true);
+      expect(replaying.isPlaying, true);
+      expect(
+        replaying.annotationReplayDuration,
+        const Duration(milliseconds: 120),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+
+      final pausing = container.read(intensiveListenPlayerProvider);
+      expect(pausing.isAnnotationReplay, false);
+      expect(pausing.isAnnotationMode, true);
+      expect(pausing.isPauseBetweenSentences, true);
+
+      await future;
+      final advanced = container.read(intensiveListenPlayerProvider);
+      expect(advanced.currentSentenceIndex, 1);
+      expect(advanced.isAnnotationReplay, false);
+      expect(advanced.isAnnotationMode, false);
+      expect(advanced.isPauseBetweenSentences, false);
+    });
+
+    test('最后一句点击继续后，重播和倒计时结束后标记完成', () async {
+      await notifier.goToNext();
+      notifier.enterAnnotationMode();
+
+      await notifier.exitAnnotationMode();
+
+      final completed = container.read(intensiveListenPlayerProvider);
+      expect(completed.isCompleted, true);
+      expect(completed.isAnnotationReplay, false);
+      expect(completed.isPauseBetweenSentences, false);
     });
   });
 
