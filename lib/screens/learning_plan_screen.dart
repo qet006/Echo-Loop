@@ -209,11 +209,10 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
     await ref
         .read(learningSessionProvider.notifier)
         .enterBlindListenMode(widget.audioItemId);
-    if (mounted) {
-      context.push(
-        AppRoutes.blindListenPlayer(widget.collectionId, widget.audioItemId),
-      );
-    }
+    if (!context.mounted) return;
+    context.push(
+      AppRoutes.blindListenPlayer(widget.collectionId, widget.audioItemId),
+    );
   }
 
   /// 复习难句补练：进入 ReviewDifficultPracticeScreen
@@ -240,14 +239,13 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
           widget.audioItemId,
           lpState.sentences,
         );
-    if (mounted) {
-      context.push(
-        AppRoutes.reviewDifficultPractice(
-          widget.collectionId,
-          widget.audioItemId,
-        ),
-      );
-    }
+    if (!context.mounted) return;
+    context.push(
+      AppRoutes.reviewDifficultPractice(
+        widget.collectionId,
+        widget.audioItemId,
+      ),
+    );
   }
 
   /// 复习复述：复用 RetellPlayerScreen
@@ -283,11 +281,10 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         [lpState.sentences],
         keywordsMap,
       );
-      if (mounted) {
-        context.push(
-          AppRoutes.retellPlayer(widget.collectionId, widget.audioItemId),
-        );
-      }
+      if (!context.mounted) return;
+      context.push(
+        AppRoutes.retellPlayer(widget.collectionId, widget.audioItemId),
+      );
       return;
     }
 
@@ -312,11 +309,10 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         await ref
             .read(learningSessionProvider.notifier)
             .enterRetellMode(widget.audioItemId, paragraphs, keywordsMap);
-        if (mounted) {
-          context.push(
-            AppRoutes.retellPlayer(widget.collectionId, widget.audioItemId),
-          );
-        }
+        if (!context.mounted) return;
+        context.push(
+          AppRoutes.retellPlayer(widget.collectionId, widget.audioItemId),
+        );
       },
     );
   }
@@ -338,14 +334,13 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         await ref
             .read(learningSessionProvider.notifier)
             .enterBlindListenMode(widget.audioItemId);
-        if (mounted) {
-          context.push(
-            AppRoutes.blindListenPlayer(
-              widget.collectionId,
-              widget.audioItemId,
-            ),
-          );
-        }
+        if (!context.mounted) return;
+        context.push(
+          AppRoutes.blindListenPlayer(
+            widget.collectionId,
+            widget.audioItemId,
+          ),
+        );
       },
     );
   }
@@ -388,24 +383,22 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         await ref
             .read(learningSessionProvider.notifier)
             .enterIntensiveListenMode(widget.audioItemId, lpState.sentences);
-        if (mounted) {
-          context.push(
-            AppRoutes.intensiveListenPlayer(
-              widget.collectionId,
-              widget.audioItemId,
-            ),
-          );
-        }
+        if (!context.mounted) return;
+        context.push(
+          AppRoutes.intensiveListenPlayer(
+            widget.collectionId,
+            widget.audioItemId,
+          ),
+        );
       },
     );
   }
 
   /// 进入难句跟读
-  void _startListenAndRepeat(BuildContext context) {
+  Future<void> _startListenAndRepeat(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
     final lpState = ref.read(listeningPracticeProvider);
 
-    // 无字幕则提示
     if (lpState.sentences.isEmpty) {
       showDialog(
         context: context,
@@ -423,60 +416,55 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       return;
     }
 
-    // 读取难句书签数量
     final bookmarkDao = ref.read(bookmarkDaoProvider);
-    BookmarkManager.loadBookmarks(widget.audioItemId, dao: bookmarkDao).then((
-      difficultIndices,
-    ) {
-      if (!mounted) return;
+    final difficultIndices = await BookmarkManager.loadBookmarks(
+      widget.audioItemId,
+      dao: bookmarkDao,
+    );
+    if (!context.mounted) return;
 
-      if (difficultIndices.isEmpty) {
-        // 无难句 → 跳过跟读，显示提示
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.listenAndRepeatNoDifficultSentences)),
+    if (difficultIndices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.listenAndRepeatNoDifficultSentences)),
+      );
+      return;
+    }
+
+    final progress = ref
+        .read(learningProgressNotifierProvider)
+        .progressMap[widget.audioItemId];
+    final playCount = targetPlayCountForDifficulty(
+      progress?.difficulty.index ?? 2,
+    );
+
+    final difficultDuration = difficultIndices.fold<Duration>(
+      Duration.zero,
+      (sum, idx) =>
+          sum +
+          (idx < lpState.sentences.length
+              ? lpState.sentences[idx].duration
+              : Duration.zero),
+    );
+    final repeatEstimate = difficultDuration * playCount * 2;
+
+    showListenAndRepeatBriefingSheet(
+      context: context,
+      difficultCount: difficultIndices.length,
+      playCount: playCount,
+      estimatedDuration: repeatEstimate,
+      onStartPractice: () async {
+        await ref
+            .read(learningSessionProvider.notifier)
+            .enterListenAndRepeatMode(widget.audioItemId, lpState.sentences);
+        if (!context.mounted) return;
+        context.push(
+          AppRoutes.listenAndRepeatPlayer(
+            widget.collectionId,
+            widget.audioItemId,
+          ),
         );
-        return;
-      }
-
-      // 计算预估遍数（取第一个难句的难度作为预览）
-      final progress = ref
-          .read(learningProgressNotifierProvider)
-          .progressMap[widget.audioItemId];
-      final playCount = targetPlayCountForDifficulty(
-        progress?.difficulty.index ?? 2,
-      );
-
-      // 预估时长：难句总时长 × 遍数 × 2（播放 + 跟读留白）
-      final difficultDuration = difficultIndices.fold<Duration>(
-        Duration.zero,
-        (sum, idx) =>
-            sum +
-            (idx < lpState.sentences.length
-                ? lpState.sentences[idx].duration
-                : Duration.zero),
-      );
-      final repeatEstimate = difficultDuration * playCount * 2;
-
-      showListenAndRepeatBriefingSheet(
-        context: context,
-        difficultCount: difficultIndices.length,
-        playCount: playCount,
-        estimatedDuration: repeatEstimate,
-        onStartPractice: () async {
-          await ref
-              .read(learningSessionProvider.notifier)
-              .enterListenAndRepeatMode(widget.audioItemId, lpState.sentences);
-          if (mounted) {
-            context.push(
-              AppRoutes.listenAndRepeatPlayer(
-                widget.collectionId,
-                widget.audioItemId,
-              ),
-            );
-          }
-        },
-      );
-    });
+      },
+    );
   }
 
   /// 进入段级复述
@@ -519,11 +507,10 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         await ref
             .read(learningSessionProvider.notifier)
             .enterRetellMode(widget.audioItemId, paragraphs, keywordsMap);
-        if (mounted) {
-          context.push(
-            AppRoutes.retellPlayer(widget.collectionId, widget.audioItemId),
-          );
-        }
+        if (!context.mounted) return;
+        context.push(
+          AppRoutes.retellPlayer(widget.collectionId, widget.audioItemId),
+        );
       },
     );
   }

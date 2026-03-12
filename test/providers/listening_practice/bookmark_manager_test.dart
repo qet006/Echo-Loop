@@ -138,12 +138,13 @@ void main() {
           createSentence(1, 'Hello'),
           createSentence(2, ',Hello.'),
         ];
-        final (_, indicesToRemove, __) = BookmarkManager.toggleBookmark(
+        final result = BookmarkManager.toggleBookmark(
           0,
           sentences,
           {0, 1, 2},
           false,
         );
+        final indicesToRemove = result.$2;
 
         // 标准化后 'Hello!', 'Hello', ',Hello.' 都是 'hello'
         expect(indicesToRemove, {0, 1, 2});
@@ -156,12 +157,13 @@ void main() {
           createSentence(2, 'C'),
         ];
         // 书签模式下，移除索引 0，下一个应该是索引 1
-        final (_, __, nextIndex) = BookmarkManager.toggleBookmark(
+        final result = BookmarkManager.toggleBookmark(
           0,
           sentences,
           {0, 1, 2},
           true,
         );
+        final nextIndex = result.$3;
 
         expect(nextIndex, isNotNull);
         expect(nextIndex, 1);
@@ -169,24 +171,26 @@ void main() {
 
       test('非书签模式 nextIndex 为 null', () {
         final sentences = [createSentence(0, 'A'), createSentence(1, 'B')];
-        final (_, __, nextIndex) = BookmarkManager.toggleBookmark(
+        final result = BookmarkManager.toggleBookmark(
           0,
           sentences,
           {0, 1},
           false,
         );
+        final nextIndex = result.$3;
 
         expect(nextIndex, isNull);
       });
 
       test('书签模式移除最后一个书签时 nextIndex 为 null', () {
         final sentences = [createSentence(0, 'A')];
-        final (_, __, nextIndex) = BookmarkManager.toggleBookmark(
+        final result = BookmarkManager.toggleBookmark(
           0,
           sentences,
           {0},
           true,
         );
+        final nextIndex = result.$3;
 
         expect(nextIndex, isNull);
       });

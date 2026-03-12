@@ -1,7 +1,6 @@
-/// SentencePlaybackEngine 单元测试
-///
-/// 测试纯函数 listenAndRepeatPauseCalculator / targetPlayCountForDifficulty，
-/// 以及 SentencePlaybackEngine 的 cleanup 和 invalidateSession 生命周期行为。
+// SentencePlaybackEngine 单元测试。
+// 测试纯函数 listenAndRepeatPauseCalculator / targetPlayCountForDifficulty，
+// 以及 SentencePlaybackEngine 的 cleanup 和 invalidateSession 生命周期行为。
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fluency/providers/learning_session/sentence_playback_engine.dart';
 

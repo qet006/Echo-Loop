@@ -3,6 +3,7 @@
 // 封装与后端的所有 HTTP API 通信，用于 AI 转录流程。
 // 基于 Dio，支持 CancelToken、上传进度回调和错误处理。
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' show Ref;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:universal_io/io.dart';
 import '../config/api_config.dart';
@@ -250,7 +251,7 @@ class TranscriptionApiClient {
 
 /// 转录 API 客户端单例 Provider
 @Riverpod(keepAlive: true)
-TranscriptionApiClient transcriptionApiClient(TranscriptionApiClientRef ref) {
+TranscriptionApiClient transcriptionApiClient(Ref ref) {
   final client = TranscriptionApiClient(baseUrl: apiBaseUrl);
   ref.onDispose(client.dispose);
   return client;

@@ -4,6 +4,7 @@
 // 管理各音频的 AI 转录任务生命周期：
 // 上传 → 转录 → 完成（或失败）。
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' show Ref;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:universal_io/io.dart';
@@ -44,7 +45,7 @@ class TranscriptionFileOps {
 
 /// 文件操作 Provider（测试时可覆盖）
 @Riverpod(keepAlive: true)
-TranscriptionFileOps transcriptionFileOps(TranscriptionFileOpsRef ref) =>
+TranscriptionFileOps transcriptionFileOps(Ref ref) =>
     const TranscriptionFileOps();
 
 // ─── 转录任务状态 ──────────────────────────────────────────
@@ -95,7 +96,7 @@ class TranscriptionFailed extends TranscriptionTaskState {
 /// 转录任务管理器
 ///
 /// keepAlive: 弹窗关闭后任务仍在后台运行。
-/// state: Map<String, TranscriptionTaskState>  (audioId → state)
+/// state: `Map<String, TranscriptionTaskState>`（audioId -> state）
 @Riverpod(keepAlive: true)
 class TranscriptionTaskManager extends _$TranscriptionTaskManager {
   /// 各任务的 CancelToken

@@ -88,12 +88,11 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
         if (next is TranscriptionCompleted) {
           // 短暂显示完成状态后关闭
           Future.delayed(const Duration(milliseconds: 800), () {
-            if (mounted) {
-              ref
-                  .read(transcriptionTaskManagerProvider.notifier)
-                  .clearState(audioItem.id);
-              Navigator.pop(context);
-            }
+            if (!mounted || !context.mounted) return;
+            ref
+                .read(transcriptionTaskManagerProvider.notifier)
+                .clearState(audioItem.id);
+            Navigator.pop(context);
           });
         }
       },
@@ -569,8 +568,9 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
 
     // 已有字幕时弹出覆盖确认
     if (audioItem.hasTranscript) {
+      if (!mounted) return;
       final confirmed = await showDialog<bool>(
-        context: context,
+        context: this.context,
         builder: (ctx) => AlertDialog(
           title: Text(l10n.overwriteExistingSubtitle),
           content: Text(l10n.overwriteExistingSubtitleMessage),
@@ -586,6 +586,7 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
           ],
         ),
       );
+      if (!mounted) return;
       if (confirmed != true) return;
     }
 
@@ -643,17 +644,17 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
     // 检查文件大小限制
     final fullPath = await audioItem.getFullAudioPath();
     final fileSize = await File(fullPath).length();
+    if (!context.mounted) return;
     if (fileSize > _maxFileSize) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.transcriptionErrorFileTooLarge(50))),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.transcriptionErrorFileTooLarge(50))),
+      );
       return;
     }
 
     // 已有字幕时弹出覆盖确认
     if (audioItem.hasTranscript) {
+      if (!context.mounted) return;
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(

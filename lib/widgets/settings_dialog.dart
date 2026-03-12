@@ -113,7 +113,7 @@ class SettingsDialog extends ConsumerWidget {
               SizedBox(
                 width: 140,
                 child: DropdownButtonFormField<int>(
-                  value: playerState.settings.loopCount,
+                  initialValue: playerState.settings.loopCount,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
                     contentPadding: EdgeInsets.symmetric(
@@ -149,7 +149,7 @@ class SettingsDialog extends ConsumerWidget {
               SizedBox(
                 width: 140,
                 child: DropdownButtonFormField<int>(
-                  value: playerState.settings.pauseInterval.inSeconds,
+                  initialValue: playerState.settings.pauseInterval.inSeconds,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
                     contentPadding: EdgeInsets.symmetric(
@@ -219,7 +219,7 @@ class SettingsDialog extends ConsumerWidget {
               SizedBox(
                 width: 140,
                 child: DropdownButtonFormField<int>(
-                  value: playerState.settings.loopAudio,
+                  initialValue: playerState.settings.loopAudio,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
                     contentPadding: EdgeInsets.symmetric(

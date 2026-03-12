@@ -229,7 +229,7 @@ class _AiContentSectionState extends State<AiContentSection> {
 
 /// Shimmer 骨架屏占位
 class _ShimmerPlaceholder extends StatefulWidget {
-  const _ShimmerPlaceholder({super.key});
+  const _ShimmerPlaceholder();
 
   @override
   State<_ShimmerPlaceholder> createState() => _ShimmerPlaceholderState();

@@ -412,7 +412,8 @@ class _BlindListenPlayerScreenState
           }
 
           await ref.read(learningSessionProvider.notifier).exitLearningMode();
-          if (mounted) context.pop();
+          if (!context.mounted) return;
+          context.pop();
         },
         child: Scaffold(
           appBar: AppBar(

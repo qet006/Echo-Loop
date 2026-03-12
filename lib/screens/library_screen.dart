@@ -102,25 +102,27 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         IconButton(
           icon: const Icon(Icons.add),
           tooltip: l10n.addAudio,
-          onPressed: () async {
-            final result = await showDialog<AudioItem>(
-              context: context,
-              builder: (context) => const AddAudioDialog(),
-            );
-            if (result != null && context.mounted) {
-              final l = AppLocalizations.of(context)!;
-              final wantSubtitle = await _showSubtitlePrompt(context, l);
-              if (wantSubtitle && context.mounted) {
-                showModalBottomSheet(
-                  context: context,
-                  builder: (_) => ManageSubtitlesSheet(audioItem: result),
-                );
-              }
-            }
-          },
+          onPressed: _handleAddAudio,
         ),
       ];
     }
+  }
+
+  Future<void> _handleAddAudio() async {
+    final result = await showDialog<AudioItem>(
+      context: context,
+      builder: (dialogContext) => const AddAudioDialog(),
+    );
+    if (result == null || !mounted) return;
+
+    final l10n = AppLocalizations.of(context)!;
+    final wantSubtitle = await _showSubtitlePrompt(context, l10n);
+    if (!mounted || !wantSubtitle) return;
+
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => ManageSubtitlesSheet(audioItem: result),
+    );
   }
 }
 

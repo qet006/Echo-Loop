@@ -5,6 +5,7 @@
 library;
 
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' show Ref;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../config/api_config.dart';
@@ -72,7 +73,7 @@ class SentenceAiApiClient {
 
 /// AI API 客户端单例 Provider
 @Riverpod(keepAlive: true)
-SentenceAiApiClient sentenceAiApiClient(SentenceAiApiClientRef ref) {
+SentenceAiApiClient sentenceAiApiClient(Ref ref) {
   final client = SentenceAiApiClient(baseUrl: apiBaseUrl);
   ref.onDispose(client.dispose);
   return client;

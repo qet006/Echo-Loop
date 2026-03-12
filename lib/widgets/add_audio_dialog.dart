@@ -99,7 +99,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     final collections =
         ref.watch(collectionListProvider).rawCollections;
     return DropdownButtonFormField<String?>(
-      value: _selectedCollectionId,
+      initialValue: _selectedCollectionId,
       decoration: InputDecoration(
         labelText: l10n.selectCollection,
         isDense: true,

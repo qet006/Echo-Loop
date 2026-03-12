@@ -1,7 +1,5 @@
-/// 书签持久化测试
-///
-/// 验证精听模式中标记难句后，书签能正确持久化到数据库，
-/// 且下次进入时能正确恢复。
+// 书签持久化测试。
+// 验证精听模式中标记难句后，书签能正确持久化到数据库，且下次进入时能正确恢复。
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';

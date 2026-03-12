@@ -231,6 +231,7 @@ void main() {
       when(
         () => mockApi.submitTranscription(
           sha256: any(named: 'sha256'),
+          fileName: any(named: 'fileName'),
           objectName: any(named: 'objectName'),
           publicUrl: any(named: 'publicUrl'),
           mimeType: any(named: 'mimeType'),
@@ -329,6 +330,7 @@ void main() {
       when(
         () => mockApi.submitTranscription(
           sha256: any(named: 'sha256'),
+          fileName: any(named: 'fileName'),
           objectName: any(named: 'objectName'),
           publicUrl: any(named: 'publicUrl'),
           mimeType: any(named: 'mimeType'),
@@ -416,6 +418,7 @@ void main() {
       when(
         () => mockApi.submitTranscription(
           sha256: any(named: 'sha256'),
+          fileName: any(named: 'fileName'),
           objectName: any(named: 'objectName'),
           publicUrl: any(named: 'publicUrl'),
           mimeType: any(named: 'mimeType'),
@@ -542,6 +545,7 @@ void main() {
       when(
         () => mockApi.submitTranscription(
           sha256: any(named: 'sha256'),
+          fileName: any(named: 'fileName'),
           objectName: any(named: 'objectName'),
           publicUrl: any(named: 'publicUrl'),
           mimeType: any(named: 'mimeType'),

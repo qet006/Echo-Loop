@@ -1,7 +1,6 @@
-/// BookmarkReview 单元测试
-///
-/// 测试 BookmarkSentence 数据类和 ReviewDifficultPracticeState 在收藏复习场景下的行为。
-/// Provider 的播放逻辑依赖 AudioEngine，集成测试在 integration_test 中覆盖。
+// BookmarkReview 单元测试。
+// 测试 BookmarkSentence 数据类和 ReviewDifficultPracticeState 在收藏复习场景下的行为。
+// Provider 的播放逻辑依赖 AudioEngine，集成测试在 integration_test 中覆盖。
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fluency/models/bookmark_sentence.dart';
 import 'package:fluency/models/sentence.dart';
