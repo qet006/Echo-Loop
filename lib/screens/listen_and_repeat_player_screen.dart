@@ -72,6 +72,7 @@ class _ListenAndRepeatPlayerScreenState
 
     final session = ref.read(learningSessionProvider);
     if (session.isFreePlay) {
+      await _saveSentenceProgress();
       await ref.read(learningSessionProvider.notifier).exitLearningMode();
       if (mounted) context.pop();
       return;
@@ -255,6 +256,9 @@ class _ListenAndRepeatPlayerScreenState
           .incrementShadowingPassCount(widget.audioItemId);
 
       if (result == true) {
+        await ref
+            .read(learningProgressNotifierProvider.notifier)
+            .saveShadowingSentenceIndex(widget.audioItemId, null);
         // 完成退出
         await ref.read(learningSessionProvider.notifier).exitLearningMode();
         if (mounted) context.pop();

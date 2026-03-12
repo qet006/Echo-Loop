@@ -297,8 +297,10 @@ class LearningSession extends _$LearningSession {
       learningProgressNotifierProvider.notifier,
     );
 
-    // 先确保进度存在；若数据库已有断点，直接返回持久化结果。
-    final progress = await progressNotifier.ensureProgress(audioItemId);
+    // 进入前统一读取最新持久化断点，避免命中旧内存态。
+    final progress = await progressNotifier.getLatestOrEnsureProgress(
+      audioItemId,
+    );
     final startIndex = progress.intensiveListenSentenceIndex ?? 0;
 
     state = state.copyWith(
@@ -348,7 +350,7 @@ class LearningSession extends _$LearningSession {
     // 跟读断点与难度都需要优先使用持久化的最新值，避免只吃到陈旧内存态。
     final progress = await ref
         .read(learningProgressNotifierProvider.notifier)
-        .ensureProgress(audioItemId);
+        .getLatestOrEnsureProgress(audioItemId);
     final startIndex = progress.shadowingSentenceIndex ?? 0;
     final difficultyValue = progress.difficulty.value;
     final targetPlayCount = targetPlayCountForDifficulty(difficultyValue);
@@ -391,7 +393,7 @@ class LearningSession extends _$LearningSession {
     // 复述断点保存的是段首句子的全局索引，进入时需要读取最新持久化值。
     final progress = await ref
         .read(learningProgressNotifierProvider.notifier)
-        .ensureProgress(audioItemId);
+        .getLatestOrEnsureProgress(audioItemId);
     final startSentenceIndex = progress.retellParagraphIndex;
 
     state = state.copyWith(
@@ -443,7 +445,7 @@ class LearningSession extends _$LearningSession {
     // 难句补练进入时优先恢复最新持久化断点。
     final progress = await ref
         .read(learningProgressNotifierProvider.notifier)
-        .ensureProgress(audioItemId);
+        .getLatestOrEnsureProgress(audioItemId);
     final startIndex = progress.difficultPracticeSentenceIndex ?? 0;
 
     state = state.copyWith(

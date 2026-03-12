@@ -628,7 +628,9 @@ void main() {
         retellPassCount: null,
         updatedAt: DateTime(2026, 3, 11, 9, 30),
       );
-      when(() => mockDao.getByAudioId('a1')).thenAnswer((_) async => persistedRow);
+      when(
+        () => mockDao.getByAudioId('a1'),
+      ).thenAnswer((_) async => persistedRow);
 
       final container = createContainer(const LearningProgressState());
 
@@ -636,6 +638,52 @@ void main() {
 
       expect(result.intensiveListenSentenceIndex, 3);
       expect(readProgress(container, 'a1')?.intensiveListenSentenceIndex, 3);
+      verify(() => mockDao.getByAudioId('a1')).called(1);
+      verifyNever(() => mockDao.upsert(any()));
+    });
+  });
+
+  group('getLatestOrEnsureProgress', () {
+    test('内存已有旧值时优先返回数据库最新断点并回填 state', () async {
+      final stale = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.retell,
+        retellParagraphIndex: 1,
+        updatedAt: DateTime(2026, 3, 11, 9, 0),
+      );
+      final persistedRow = db.LearningProgressesData(
+        audioItemId: 'a1',
+        currentStage: LearningStage.firstLearn.key,
+        currentSubStage: SubStageType.retell.key,
+        difficulty: DifficultyLevel.medium.value,
+        firstLearnCompletedAt: null,
+        lastStageCompletedAt: null,
+        currentStageStartedAt: DateTime(2026, 3, 11, 9, 0),
+        totalStudyDurationMs: 0,
+        blindListenPassCount: 0,
+        intensiveListenDifficultCount: null,
+        intensiveListenPassCount: null,
+        shadowingPassCount: null,
+        intensiveListenSentenceIndex: null,
+        shadowingSentenceIndex: null,
+        difficultPracticeSentenceIndex: null,
+        retellParagraphIndex: 7,
+        retellPassCount: null,
+        updatedAt: DateTime(2026, 3, 11, 9, 30),
+      );
+      when(
+        () => mockDao.getByAudioId('a1'),
+      ).thenAnswer((_) async => persistedRow);
+
+      final container = createContainer(
+        LearningProgressState(progressMap: {'a1': stale}),
+      );
+
+      final result = await notifier(container).getLatestOrEnsureProgress('a1');
+
+      expect(result.retellParagraphIndex, 7);
+      expect(readProgress(container, 'a1')?.retellParagraphIndex, 7);
       verify(() => mockDao.getByAudioId('a1')).called(1);
       verifyNever(() => mockDao.upsert(any()));
     });

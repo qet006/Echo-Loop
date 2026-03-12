@@ -28,7 +28,22 @@ class _DaoFallbackLearningProgressNotifier
     extends TestLearningProgressNotifier {
   final LearningProgress? _dbProgress;
 
-  _DaoFallbackLearningProgressNotifier(this._dbProgress);
+  _DaoFallbackLearningProgressNotifier(
+    this._dbProgress, [
+    LearningProgressState initialState = const LearningProgressState(),
+  ]) : super(initialState);
+
+  @override
+  Future<LearningProgress?> getLatestByAudioId(String audioItemId) async {
+    final persisted = _dbProgress;
+    if (persisted != null) {
+      final newMap = Map<String, LearningProgress>.from(state.progressMap);
+      newMap[audioItemId] = persisted;
+      state = state.copyWith(progressMap: newMap);
+      return persisted;
+    }
+    return super.getLatestByAudioId(audioItemId);
+  }
 
   @override
   Future<LearningProgress> ensureProgress(String audioItemId) async {
@@ -318,6 +333,37 @@ void main() {
       final playerState = container.read(intensiveListenPlayerProvider);
       expect(playerState.currentSentenceIndex, 1);
     });
+
+    test('内存旧于数据库时优先使用数据库最新精听断点', () async {
+      final stale = LearningProgress(
+        audioItemId: 'audio-1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.intensiveListen,
+        intensiveListenSentenceIndex: 0,
+        updatedAt: DateTime(2026, 3, 11, 9),
+      );
+      final latest = LearningProgress(
+        audioItemId: 'audio-1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.intensiveListen,
+        intensiveListenSentenceIndex: 2,
+        updatedAt: DateTime(2026, 3, 11, 10),
+      );
+      final container = createContainer(
+        _DaoFallbackLearningProgressNotifier(
+          latest,
+          LearningProgressState(progressMap: {'audio-1': stale}),
+        ),
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(learningSessionProvider.notifier)
+          .enterIntensiveListenMode('audio-1', sentences);
+
+      final playerState = container.read(intensiveListenPlayerProvider);
+      expect(playerState.currentSentenceIndex, 2);
+    });
   });
 
   group('LearningSession App 生命周期计时', () {
@@ -586,11 +632,9 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      await container.read(learningSessionProvider.notifier).enterRetellMode(
-        'audio-1',
-        paragraphs,
-        const {},
-      );
+      await container
+          .read(learningSessionProvider.notifier)
+          .enterRetellMode('audio-1', paragraphs, const {});
 
       final playerState = container.read(retellPlayerProvider);
       expect(playerState.currentParagraphIndex, 1);
@@ -631,11 +675,52 @@ void main() {
         1,
       );
 
-      await container.read(learningSessionProvider.notifier).enterRetellMode(
-        'audio-1',
-        paragraphs,
-        const {},
+      await container
+          .read(learningSessionProvider.notifier)
+          .enterRetellMode('audio-1', paragraphs, const {});
+      expect(container.read(retellPlayerProvider).currentParagraphIndex, 1);
+    });
+
+    test('跟读与复述进入时优先使用数据库最新断点覆盖旧内存', () async {
+      final stale = LearningProgress(
+        audioItemId: 'audio-1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.listenAndRepeat,
+        shadowingSentenceIndex: 0,
+        retellParagraphIndex: 0,
+        updatedAt: DateTime(2026, 3, 11, 9),
       );
+      final latest = LearningProgress(
+        audioItemId: 'audio-1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.retell,
+        shadowingSentenceIndex: 1,
+        retellParagraphIndex: 2,
+        updatedAt: DateTime(2026, 3, 11, 10),
+      );
+      final paragraphs = [
+        [sentences[0], sentences[1]],
+        [sentences[2], sentences[3]],
+      ];
+      final container = createContainer(
+        _DaoFallbackLearningProgressNotifier(
+          latest,
+          LearningProgressState(progressMap: {'audio-1': stale}),
+        ),
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(learningSessionProvider.notifier)
+          .enterListenAndRepeatMode('audio-1', sentences);
+      expect(
+        container.read(listenAndRepeatPlayerProvider).currentSentenceIndex,
+        1,
+      );
+
+      await container
+          .read(learningSessionProvider.notifier)
+          .enterRetellMode('audio-1', paragraphs, const {});
       expect(container.read(retellPlayerProvider).currentParagraphIndex, 1);
     });
   });

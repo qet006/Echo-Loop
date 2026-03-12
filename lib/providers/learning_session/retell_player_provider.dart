@@ -226,7 +226,7 @@ class RetellPlayer extends _$RetellPlayer {
     final session = ref.read(learningSessionProvider);
     final audioItemId = session.audioItemId;
     final sentenceIndex = currentParagraphFirstSentenceIndex;
-    if (session.isFreePlay || audioItemId == null || sentenceIndex == null) {
+    if (audioItemId == null || sentenceIndex == null) {
       return;
     }
 

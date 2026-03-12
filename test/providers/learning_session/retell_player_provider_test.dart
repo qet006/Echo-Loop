@@ -263,9 +263,7 @@ void main() {
               ),
             ),
           ),
-          learningProgressNotifierProvider.overrideWith(
-            () => progressNotifier,
-          ),
+          learningProgressNotifierProvider.overrideWith(() => progressNotifier),
         ],
       );
       addTearDown(saveContainer.dispose);
@@ -287,6 +285,54 @@ void main() {
 
       expect(progressNotifier.savedIndices, contains(3));
       expect(progressNotifier.savedIndices.first, 3);
+    });
+
+    test('freePlay 模式也会异步保存当前段首句索引', () async {
+      final progressNotifier = _RecordingLearningProgressNotifier(
+        LearningProgressState(
+          progressMap: {
+            'audio-1': LearningProgress(
+              audioItemId: 'audio-1',
+              currentStage: LearningStage.firstLearn,
+              currentSubStage: SubStageType.retell,
+              updatedAt: DateTime(2026, 3, 11),
+            ),
+          },
+        ),
+      );
+      final saveContainer = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => SequencedTestAudioEngine()),
+          learningSessionProvider.overrideWith(
+            () => TestLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.retell,
+                audioItemId: 'audio-1',
+                isFreePlay: true,
+              ),
+            ),
+          ),
+          learningProgressNotifierProvider.overrideWith(() => progressNotifier),
+        ],
+      );
+      addTearDown(saveContainer.dispose);
+
+      final saveNotifier = saveContainer.read(retellPlayerProvider.notifier);
+      saveNotifier.initialize([
+        [
+          Sentence(
+            index: 5,
+            text: 'Paragraph one',
+            startTime: Duration.zero,
+            endTime: const Duration(seconds: 3),
+          ),
+        ],
+      ], const {});
+
+      await saveNotifier.startPlaying();
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+
+      expect(progressNotifier.savedIndices, contains(5));
     });
 
     test('复述倒计时中点击上一段会正确进入上一段，不会停留在当前段', () async {
@@ -312,36 +358,43 @@ void main() {
       final countdownNotifier = countdownContainer.read(
         retellPlayerProvider.notifier,
       );
-      countdownNotifier.initialize([
+      countdownNotifier.initialize(
         [
-          Sentence(
-            index: 0,
-            text: 'Paragraph one',
-            startTime: Duration.zero,
-            endTime: const Duration(seconds: 3),
-          ),
+          [
+            Sentence(
+              index: 0,
+              text: 'Paragraph one',
+              startTime: Duration.zero,
+              endTime: const Duration(seconds: 3),
+            ),
+          ],
+          [
+            Sentence(
+              index: 1,
+              text: 'Paragraph two',
+              startTime: const Duration(seconds: 3),
+              endTime: const Duration(seconds: 6),
+            ),
+          ],
+          [
+            Sentence(
+              index: 2,
+              text: 'Paragraph three',
+              startTime: const Duration(seconds: 6),
+              endTime: const Duration(seconds: 9),
+            ),
+          ],
         ],
-        [
-          Sentence(
-            index: 1,
-            text: 'Paragraph two',
-            startTime: const Duration(seconds: 3),
-            endTime: const Duration(seconds: 6),
-          ),
-        ],
-        [
-          Sentence(
-            index: 2,
-            text: 'Paragraph three',
-            startTime: const Duration(seconds: 6),
-            endTime: const Duration(seconds: 9),
-          ),
-        ],
-      ], const {}, startSentenceIndex: 1);
+        const {},
+        startSentenceIndex: 1,
+      );
       await countdownNotifier.startPlaying();
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      expect(countdownContainer.read(retellPlayerProvider).isRetellCountdown, true);
+      expect(
+        countdownContainer.read(retellPlayerProvider).isRetellCountdown,
+        true,
+      );
       expect(
         countdownContainer.read(retellPlayerProvider).currentParagraphIndex,
         1,
@@ -411,7 +464,10 @@ void main() {
       await countdownNotifier.startPlaying();
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      expect(countdownContainer.read(retellPlayerProvider).isRetellCountdown, true);
+      expect(
+        countdownContainer.read(retellPlayerProvider).isRetellCountdown,
+        true,
+      );
       expect(
         countdownContainer.read(retellPlayerProvider).currentParagraphIndex,
         0,

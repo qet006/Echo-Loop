@@ -415,9 +415,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           audioEngineProvider.overrideWith(() => _ReplayTestAudioEngine()),
-          learningProgressNotifierProvider.overrideWith(
-            () => progressNotifier,
-          ),
+          learningProgressNotifierProvider.overrideWith(() => progressNotifier),
           learningSessionProvider.overrideWith(
             () => TestLearningSession(
               const LearningSessionState(
@@ -444,6 +442,44 @@ void main() {
             ?.intensiveListenSentenceIndex,
         isNotNull,
       );
+    });
+
+    test('freePlay 模式也会写入当前句索引', () async {
+      final progressNotifier = _RecordingLearningProgressNotifier(
+        LearningProgressState(
+          progressMap: {
+            'audio-1': LearningProgress(
+              audioItemId: 'audio-1',
+              currentStage: LearningStage.firstLearn,
+              currentSubStage: SubStageType.intensiveListen,
+              updatedAt: DateTime(2026, 3, 11),
+            ),
+          },
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => _ReplayTestAudioEngine()),
+          learningProgressNotifierProvider.overrideWith(() => progressNotifier),
+          learningSessionProvider.overrideWith(
+            () => TestLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.intensiveListen,
+                audioItemId: 'audio-1',
+                isFreePlay: true,
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(intensiveListenPlayerProvider.notifier);
+      await notifier.initialize(createTestSentences(count: 3), startIndex: 2);
+      await notifier.startPlaying();
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+
+      expect(progressNotifier.savedIndices, contains(2));
     });
   });
 

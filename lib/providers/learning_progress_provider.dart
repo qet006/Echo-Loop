@@ -85,6 +85,15 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     return latest;
   }
 
+  /// 获取指定音频的最新学习进度；若不存在则创建默认进度。
+  ///
+  /// 进入播放器前统一调用该方法，避免命中陈旧内存态。
+  Future<LearningProgress> getLatestOrEnsureProgress(String audioItemId) async {
+    final latest = await getLatestByAudioId(audioItemId);
+    if (latest != null) return latest;
+    return ensureProgress(audioItemId);
+  }
+
   /// 确保音频有学习进度记录（首次打开时自动创建）
   Future<LearningProgress> ensureProgress(String audioItemId) async {
     final existing = state.progressMap[audioItemId];

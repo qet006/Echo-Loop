@@ -113,29 +113,64 @@ void main() {
       addTearDown(container.dispose);
 
       final notifier = container.read(listenAndRepeatPlayerProvider.notifier);
-      await notifier.initialize(
-        [
-          Sentence(
-            index: 0,
-            text: 'First sentence',
-            startTime: Duration.zero,
-            endTime: const Duration(seconds: 1),
-          ),
-          Sentence(
-            index: 1,
-            text: 'Second sentence',
-            startTime: const Duration(seconds: 2),
-            endTime: const Duration(seconds: 3),
-          ),
-        ],
-        startIndex: 1,
-      );
+      await notifier.initialize([
+        Sentence(
+          index: 0,
+          text: 'First sentence',
+          startTime: Duration.zero,
+          endTime: const Duration(seconds: 1),
+        ),
+        Sentence(
+          index: 1,
+          text: 'Second sentence',
+          startTime: const Duration(seconds: 2),
+          endTime: const Duration(seconds: 3),
+        ),
+      ], startIndex: 1);
 
       await notifier.startPlaying();
       await Future<void>.delayed(const Duration(milliseconds: 1));
 
       expect(progressNotifier.savedIndices, contains(1));
       expect(progressNotifier.savedIndices.first, 1);
+    });
+
+    test('freePlay 模式也会异步保存当前句索引', () async {
+      final progressNotifier = _RecordingLearningProgressNotifier(
+        LearningProgressState(
+          progressMap: {
+            'audio-1': LearningProgress(
+              audioItemId: 'audio-1',
+              currentStage: LearningStage.firstLearn,
+              currentSubStage: SubStageType.listenAndRepeat,
+              updatedAt: DateTime(2026, 3, 11),
+            ),
+          },
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => _ReplayTestAudioEngine()),
+          learningProgressNotifierProvider.overrideWith(() => progressNotifier),
+          learningSessionProvider.overrideWith(
+            () => _PassiveLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.listenAndRepeat,
+                audioItemId: 'audio-1',
+                isFreePlay: true,
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(listenAndRepeatPlayerProvider.notifier);
+      await notifier.initialize(createTestSentences(count: 3), startIndex: 2);
+      await notifier.startPlaying();
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+
+      expect(progressNotifier.savedIndices, contains(2));
     });
   });
 }

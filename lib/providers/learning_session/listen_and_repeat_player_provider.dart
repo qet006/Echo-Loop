@@ -177,7 +177,7 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
   void _persistCurrentSentenceIndexAsync() {
     final session = ref.read(learningSessionProvider);
     final audioItemId = session.audioItemId;
-    if (session.isFreePlay || audioItemId == null) return;
+    if (audioItemId == null) return;
 
     unawaited(
       ref

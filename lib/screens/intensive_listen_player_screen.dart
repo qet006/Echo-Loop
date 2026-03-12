@@ -72,6 +72,8 @@ class _IntensiveListenPlayerScreenState
 
     final session = ref.read(learningSessionProvider);
     if (session.isFreePlay) {
+      await _saveSentenceProgress();
+
       // 保存难句书签 + 难句数快照（与非 freePlay 路径一致）
       await _saveDifficultSentences();
       final totalDifficultCount = await _loadTotalDifficultCount();
@@ -381,6 +383,9 @@ class _IntensiveListenPlayerScreenState
           .incrementIntensiveListenPassCount(widget.audioItemId);
 
       if (result == true) {
+        await ref
+            .read(learningProgressNotifierProvider.notifier)
+            .saveIntensiveListenSentenceIndex(widget.audioItemId, null);
         await ref.read(learningSessionProvider.notifier).exitLearningMode();
         if (mounted) context.pop();
       } else {

@@ -63,8 +63,20 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     final sessionState = ref.read(learningSessionProvider);
     final state = ref.read(retellPlayerProvider);
 
-    // 已完成或自由练习模式直接退出
-    if (state.isCompleted || sessionState.isFreePlay) {
+    // 已完成直接退出；断点已在完成分支清空。
+    if (state.isCompleted) {
+      await _exit();
+      return;
+    }
+
+    // 自由练习中途退出：保存当前断点后直接退出。
+    if (sessionState.isFreePlay) {
+      final sentenceIndex = ref
+          .read(retellPlayerProvider.notifier)
+          .currentParagraphFirstSentenceIndex;
+      await ref
+          .read(learningProgressNotifierProvider.notifier)
+          .saveRetellParagraphIndex(widget.audioItemId, sentenceIndex);
       await _exit();
       return;
     }
@@ -170,6 +182,10 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
         .incrementRetellPassCount(widget.audioItemId);
 
     if (result != null) {
+      await ref
+          .read(learningProgressNotifierProvider.notifier)
+          .saveRetellParagraphIndex(widget.audioItemId, null);
+
       // 完成退出
       if (!sessionState.isFreePlay) {
         await ref
