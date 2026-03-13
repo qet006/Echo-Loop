@@ -19,6 +19,7 @@ import '../l10n/app_localizations.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/learning_session/listen_and_repeat_player_provider.dart';
+import '../providers/listen_and_repeat_turn_controller_provider.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
@@ -30,6 +31,7 @@ import '../providers/sentence_ai_provider.dart';
 import '../providers/speech_practice_session_provider.dart';
 import '../widgets/intensive_listen/sentence_annotation_card.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_settings_sheet.dart';
+import '../widgets/listen_and_repeat/speech_record_button.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/retell/retell_briefing_sheet.dart';
@@ -121,6 +123,10 @@ class _ListenAndRepeatPlayerScreenState
     final player = ref.read(listenAndRepeatPlayerProvider.notifier);
     final sentence = player.currentSentence;
     final sentenceIndex = sentence?.index ?? player.currentIndex;
+    return _promptIdForSentenceIndex(sentenceIndex);
+  }
+
+  String _promptIdForSentenceIndex(int sentenceIndex) {
     return 'shadowing:${widget.audioItemId}:$sentenceIndex';
   }
 
@@ -136,26 +142,27 @@ class _ListenAndRepeatPlayerScreenState
       return;
     }
 
-    final speech = ref.read(speechPracticeSessionProvider.notifier);
     final player = ref.read(listenAndRepeatPlayerProvider.notifier);
+    final turn = ref.read(listenAndRepeatTurnControllerProvider.notifier);
     final currentSentence = player.currentSentence;
     if (currentSentence == null) {
       return;
     }
 
     final promptId = _currentPromptId();
+    final speech = ref.read(speechPracticeSessionProvider.notifier);
     if (speech.isRecordingPrompt(promptId)) {
-      await speech.stopRecordingAndEvaluate(
-        promptId: promptId,
-        referenceText: currentSentence.text,
-      );
+      await turn.handleManualStop();
       return;
     }
 
     if (!playerState.isCountdownPaused) {
       player.pauseCountdown();
     }
-    await speech.startRecording(promptId: promptId);
+    await turn.startManualRecording(
+      promptId: promptId,
+      referenceText: currentSentence.text,
+    );
   }
 
   Future<void> _handleAttemptPlaybackTap(String promptId) async {
@@ -428,6 +435,7 @@ class _ListenAndRepeatPlayerScreenState
     final playerState = ref.watch(listenAndRepeatPlayerProvider);
     final player = ref.read(listenAndRepeatPlayerProvider.notifier);
     final speechState = ref.watch(speechPracticeSessionProvider);
+    final turnState = ref.watch(listenAndRepeatTurnControllerProvider);
 
     // 监听完成状态
     ref.listen<ListenAndRepeatPlayerState>(listenAndRepeatPlayerProvider, (
@@ -442,8 +450,43 @@ class _ListenAndRepeatPlayerScreenState
     final currentSentence = player.currentSentence;
     final currentPromptId = _currentPromptId();
     final currentAttempt = speechState.attempts[currentPromptId];
-    final showRecordButton = playerState.isPauseBetweenPlays;
     final isRecordingCurrent = speechState.recordingPromptId == currentPromptId;
+
+    if (playerState.isPauseBetweenPlays &&
+        currentSentence != null &&
+        turnState.phase == ListenAndRepeatTurnPhase.idle) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        final latestTurn = ref.read(listenAndRepeatTurnControllerProvider);
+        if (latestTurn.phase != ListenAndRepeatTurnPhase.idle) {
+          return;
+        }
+        final playerNotifier = ref.read(listenAndRepeatPlayerProvider.notifier);
+        if (!ref.read(listenAndRepeatPlayerProvider).isCountdownPaused) {
+          playerNotifier.pauseCountdown();
+        }
+        unawaited(
+          ref
+              .read(listenAndRepeatTurnControllerProvider.notifier)
+              .ensureAutoTurn(
+                promptId: currentPromptId,
+                referenceText: currentSentence.text,
+              ),
+        );
+      });
+    }
+
+    if (!playerState.isPauseBetweenPlays &&
+        turnState.phase != ListenAndRepeatTurnPhase.idle) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        ref.read(listenAndRepeatTurnControllerProvider.notifier).clearTurn();
+      });
+    }
 
     // 句子时长（如 "2.8秒"）
     final hasDuration =
@@ -544,95 +587,90 @@ class _ListenAndRepeatPlayerScreenState
                       ),
                       const SizedBox(height: AppSpacing.m),
 
-                      // 跟读提示 / 倒计时控制（上） + 播放遍数（下）
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeOutCubic,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(minHeight: 96),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (playerState.isPauseBetweenPlays) ...[
-                                // 跟读提示
-                                Text(
-                                  l10n.listenAndRepeatYourTurnHint,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.colorScheme.secondary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: AppSpacing.xs),
-                                _CountdownChip(
-                                  remaining: playerState.pauseRemaining,
-                                  total: playerState.pauseDuration,
-                                  isPaused: playerState.isCountdownPaused,
-                                  onTap: playerState.isCountdownPaused
-                                      ? () => player.resumeCountdown()
-                                      : () => player.pauseCountdown(),
-                                ),
-                              ],
-                              // 播放中：先听提示 / 留白期：跟读提示
-                              if (!playerState.isPauseBetweenPlays)
-                                Text(
-                                  l10n.listenAndRepeatListenHint,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              const SizedBox(height: AppSpacing.xs),
-                              Text(
-                                l10n.listenAndRepeatPlayCount(
-                                  playerState.currentPlayCount,
-                                  playerState.settings.repeatCount,
-                                ),
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant
-                                      .withValues(alpha: 0.5),
+                      // 播放提示 / 录音面板（不使用 AnimatedSize，避免按钮位置跳变）
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 96),
+                        child: playerState.isPauseBetweenPlays
+                            ? _SpeechPracticeTurnPanel(
+                                l10n: l10n,
+                                turnState: turnState,
+                                isRecordingCurrent: isRecordingCurrent,
+                                onRecordTap: _handleRecordTap,
+                                onContinue: () {
+                                  unawaited(
+                                    ref
+                                        .read(
+                                          listenAndRepeatTurnControllerProvider
+                                              .notifier,
+                                        )
+                                        .handleContinue(),
+                                  );
+                                },
+                                onCountdownTap:
+                                    turnState.isReviewCountdownPaused
+                                    ? () => ref
+                                          .read(
+                                            listenAndRepeatTurnControllerProvider
+                                                .notifier,
+                                          )
+                                          .resumeReviewCountdown()
+                                    : () => ref
+                                          .read(
+                                            listenAndRepeatTurnControllerProvider
+                                                .notifier,
+                                          )
+                                          .pauseReviewCountdown(),
+                              )
+                            : Text(
+                                l10n.listenAndRepeatListenHint,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
                                 ),
                               ),
-                              if (showRecordButton) ...[
-                                const SizedBox(height: AppSpacing.s),
-                                if (currentAttempt?.status ==
-                                    SpeechPracticeAttemptStatus.awaitingFinal)
-                                  const _SpeechPracticeProcessingIndicator()
-                                else
-                                  _SpeechPracticeRecordPanel(
-                                    l10n: l10n,
-                                    isRecordingCurrent: isRecordingCurrent,
-                                    onRecordTap: _handleRecordTap,
-                                  ),
-                              ],
-                            ],
-                          ),
-                        ),
                       ),
                     ],
                   ),
                 ),
               ),
 
-              // 底部播放控制
-              _PlaybackControls(
-                playerState: playerState,
-                onPrevious: () {
-                  unawaited(_prepareForExternalPlaybackAction());
-                  unawaited(player.goToPrevious());
-                },
-                onNext: () {
-                  unawaited(_prepareForExternalPlaybackAction());
-                  unawaited(player.goToNext());
-                },
-                onPlayPause: () {
-                  unawaited(_prepareForExternalPlaybackAction());
-                  if (playerState.isPauseBetweenPlays) {
-                    player.replayDuringCountdown();
-                  } else if (playerState.isPlaying) {
-                    player.pause();
-                  } else {
-                    player.resume();
-                  }
-                },
+              // 底部播放控制 + 遍数
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _PlaybackControls(
+                    playerState: playerState,
+                    onPrevious: () {
+                      unawaited(_prepareForExternalPlaybackAction());
+                      unawaited(player.goToPrevious());
+                    },
+                    onNext: () {
+                      unawaited(_prepareForExternalPlaybackAction());
+                      unawaited(player.goToNext());
+                    },
+                    onPlayPause: () {
+                      unawaited(_prepareForExternalPlaybackAction());
+                      if (playerState.isPauseBetweenPlays) {
+                        player.replayDuringCountdown();
+                      } else if (playerState.isPlaying) {
+                        player.pause();
+                      } else {
+                        player.resume();
+                      }
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    l10n.listenAndRepeatPlayCount(
+                      playerState.currentPlayCount,
+                      playerState.settings.repeatCount,
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -699,7 +737,7 @@ class _ProgressSection extends StatelessWidget {
 
 /// 倒计时控制按钮
 ///
-/// 圆形按钮，外围带进度环，内部显示暂停/恢复图标，右侧显示秒数。
+/// 圆形按钮，外围带进度环，内部显示倒计时秒数，点击可暂停/恢复。
 class _CountdownChip extends StatelessWidget {
   final Duration remaining;
   final Duration total;
@@ -723,107 +761,135 @@ class _CountdownChip extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '${seconds}s',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            CircularProgressIndicator(
+              value: progress.clamp(0.0, 1.0),
+              strokeWidth: 3,
+              strokeCap: StrokeCap.round,
+              backgroundColor: theme.colorScheme.primary.withValues(
+                alpha: 0.12,
+              ),
+              valueColor: AlwaysStoppedAnimation(
+                theme.colorScheme.primary.withValues(alpha: 0.6),
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: 28,
-            height: 28,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(
-                  value: progress.clamp(0.0, 1.0),
-                  strokeWidth: 2.5,
-                  strokeCap: StrokeCap.round,
-                  backgroundColor: theme.colorScheme.primary.withValues(
-                    alpha: 0.12,
-                  ),
-                  valueColor: AlwaysStoppedAnimation(
-                    theme.colorScheme.primary.withValues(alpha: 0.6),
-                  ),
-                ),
-                Icon(
-                  isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                  size: 16,
+            if (isPaused)
+              Icon(
+                Icons.play_arrow_rounded,
+                size: 20,
+                color: theme.colorScheme.primary,
+              )
+            else
+              Text(
+                '$seconds',
+                style: theme.textTheme.labelMedium?.copyWith(
                   color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w700,
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// 跟读录音反馈面板。
-class _SpeechPracticeRecordPanel extends StatelessWidget {
+/// 跟读回合状态面板。
+class _SpeechPracticeTurnPanel extends StatelessWidget {
   final AppLocalizations l10n;
+  final ListenAndRepeatTurnState turnState;
   final bool isRecordingCurrent;
   final VoidCallback onRecordTap;
+  final VoidCallback onContinue;
+  final VoidCallback onCountdownTap;
 
-  const _SpeechPracticeRecordPanel({
+  const _SpeechPracticeTurnPanel({
     required this.l10n,
+    required this.turnState,
     required this.isRecordingCurrent,
     required this.onRecordTap,
+    required this.onContinue,
+    required this.onCountdownTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final reminderText = _reminderText(context);
+    // 提醒在上方（固定占位），按钮在下方，按钮位置不变。
+    final showReminder =
+        turnState.hasShownSpeechReminder ||
+        turnState.phase == ListenAndRepeatTurnPhase.manualFallback;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s,
-        vertical: AppSpacing.s,
-      ),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primaryContainer.withValues(alpha: 0.88),
-            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.92),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.primary.withValues(alpha: 0.14),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+    return switch (turnState.phase) {
+      ListenAndRepeatTurnPhase.awaitingSpeech ||
+      ListenAndRepeatTurnPhase.speaking ||
+      ListenAndRepeatTurnPhase.manualFallback ||
+      ListenAndRepeatTurnPhase.idle => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 提醒区：固定高度占位，有内容时显示，无内容时保持空间
+          SizedBox(
+            height: 28,
+            child: showReminder
+                ? Text(
+                    reminderText,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          SpeechRecordButton(
+            phase: switch (turnState.phase) {
+              ListenAndRepeatTurnPhase.idle =>
+                ListenAndRepeatTurnPhase.awaitingSpeech,
+              final p => p,
+            },
+            onTap: onRecordTap,
           ),
         ],
       ),
-      child: FilledButton.icon(
-        style: FilledButton.styleFrom(
-          backgroundColor: theme.colorScheme.surface,
-          foregroundColor: theme.colorScheme.primary,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.l,
-            vertical: AppSpacing.m,
+      ListenAndRepeatTurnPhase.processing =>
+        const _SpeechPracticeProcessingIndicator(),
+      ListenAndRepeatTurnPhase.reviewCountdown => Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          _CountdownChip(
+            remaining: turnState.reviewCountdownRemaining,
+            total: const Duration(seconds: 5),
+            isPaused: turnState.isReviewCountdownPaused,
+            onTap: onCountdownTap,
           ),
-        ),
-        onPressed: onRecordTap,
-        icon: Icon(isRecordingCurrent ? Icons.stop_rounded : Icons.mic_rounded),
-        label: Text(
-          isRecordingCurrent
-              ? l10n.listenAndRepeatStopRecordingButton
-              : l10n.listenAndRepeatRecordButton,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
+          const SizedBox(width: AppSpacing.s),
+          FilledButton.tonal(
+            onPressed: onContinue,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(l10n.continueButton),
+                const SizedBox(width: 4),
+                const Icon(Icons.arrow_forward_rounded, size: 18),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
-    );
+    };
+  }
+
+  String _reminderText(BuildContext context) {
+    final languageCode = Localizations.localeOf(context).languageCode;
+    if (languageCode == 'zh') {
+      return '开口跟读一下这句话';
+    }
+    return 'Start repeating this sentence out loud.';
   }
 }
 
