@@ -4,6 +4,8 @@
 /// 各测试 group 文件共享此模块，避免重复定义。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
@@ -35,10 +37,13 @@ import 'package:fluency/providers/learning_session/intensive_listen_player_provi
 import 'package:fluency/providers/learning_session/listen_and_repeat_player_provider.dart';
 import 'package:fluency/providers/learning_session/retell_player_provider.dart';
 import 'package:fluency/providers/learning_session/review_difficult_practice_provider.dart';
+import 'package:fluency/providers/speech_practice_session_provider.dart';
 import 'package:fluency/providers/package_info_provider.dart';
 import 'package:fluency/models/retell_settings.dart';
+import 'package:fluency/models/speech_practice_models.dart';
 import 'package:fluency/database/daos/sentence_ai_cache_dao.dart';
 import 'package:fluency/services/sentence_ai_api_client.dart';
+import 'package:fluency/services/speech_practice_platform.dart';
 import 'package:fluency/providers/sentence_ai_provider.dart';
 import 'package:fluency/providers/daily_study_time_provider.dart';
 import 'package:fluency/providers/saved_word_provider.dart';
@@ -62,6 +67,80 @@ class _MockSentenceAiCacheDao extends Mock implements SentenceAiCacheDao {}
 
 /// Mock SentenceAiApiClient（集成测试用）
 class _MockSentenceAiApiClient extends Mock implements SentenceAiApiClient {}
+
+/// 集成测试用录音识别后端替身。
+class TestSpeechPracticePlatform implements SpeechPracticeBackend {
+  TestSpeechPracticePlatform({
+    this.permissions = const SpeechPracticePermissionState(
+      microphone: SpeechPracticePermissionStatus.granted,
+      speech: SpeechPracticePermissionStatus.granted,
+    ),
+  });
+
+  final _controller = StreamController<SpeechPracticeEvent>.broadcast();
+  SpeechPracticePermissionState permissions;
+  final Map<String, String> transcriptsByPath = {};
+  String? lastPromptId;
+  int _counter = 0;
+
+  @override
+  bool get isSupported => true;
+
+  @override
+  Stream<SpeechPracticeEvent> get events => _controller.stream;
+
+  @override
+  Future<SpeechPracticePermissionState> getPermissionStatus() async {
+    return permissions;
+  }
+
+  @override
+  Future<SpeechPracticePermissionState> requestPermissions() async {
+    return permissions;
+  }
+
+  @override
+  Future<String> startSession({
+    required String promptId,
+    String locale = 'en-US',
+  }) async {
+    lastPromptId = promptId;
+    _counter += 1;
+    final path = '/tmp/test-recording-$_counter.caf';
+    transcriptsByPath[path] = '';
+    return path;
+  }
+
+  @override
+  Future<SpeechPracticeStopResult> stopSession() async {
+    if (_counter == 0) return const SpeechPracticeStopResult();
+    final filePath = '/tmp/test-recording-$_counter.caf';
+    scheduleMicrotask(() {
+      _controller.add(
+        SpeechPracticeEvent(
+          type: SpeechPracticeEventType.finalTranscriptReady,
+          promptId: lastPromptId ?? 'prompt',
+          transcript: transcriptsByPath[filePath] ?? '',
+        ),
+      );
+    });
+    return SpeechPracticeStopResult(filePath: filePath);
+  }
+
+  @override
+  Future<void> cancelSession() async {
+    lastPromptId = null;
+  }
+
+  @override
+  Future<void> deleteRecording(String filePath) async {
+    transcriptsByPath.remove(filePath);
+  }
+
+  Future<void> dispose() async {
+    await _controller.close();
+  }
+}
 
 // ========== 测试数据工厂 ==========
 
@@ -1014,6 +1093,24 @@ class TestListenAndRepeatPlayer extends ListenAndRepeatPlayer {
   }
 
   @override
+  void pauseCountdown() {
+    state = state.copyWith(isCountdownPaused: true);
+  }
+
+  @override
+  void resumeCountdown() {
+    state = state.copyWith(isCountdownPaused: false);
+  }
+
+  @override
+  void toggleCountdownFastForward() {
+    state = state.copyWith(
+      isCountdownFastForward: !state.isCountdownFastForward,
+      isCountdownPaused: false,
+    );
+  }
+
+  @override
   Sentence? removeDifficultMark() {
     if (_testSentences.isEmpty) return null;
 
@@ -1529,8 +1626,7 @@ class TestFlashcardNotifier extends FlashcardNotifier {
 
   @override
   Future<void> initialize(List<SavedWord> words) async {
-    final items =
-        words.map((w) => FlashcardWordItem(savedWord: w)).toList();
+    final items = words.map((w) => FlashcardWordItem(savedWord: w)).toList();
     state = FlashcardState(words: items, currentIndex: 0);
   }
 
@@ -1586,8 +1682,8 @@ class TestFlashcardNotifier extends FlashcardNotifier {
       ..removeAt(state.currentIndex);
     final newIndex =
         state.currentIndex >= newWords.length && newWords.isNotEmpty
-            ? newWords.length - 1
-            : state.currentIndex;
+        ? newWords.length - 1
+        : state.currentIndex;
     if (newWords.isEmpty) {
       state = state.copyWith(
         words: newWords,
@@ -1666,8 +1762,9 @@ Widget createTestApp() {
       ),
       dailyStudyTimeProvider.overrideWith(() => TestDailyStudyTime()),
       savedWordListProvider.overrideWith(() => TestSavedWordList()),
-      flashcardNotifierProvider.overrideWith(
-        () => TestFlashcardNotifier(),
+      flashcardNotifierProvider.overrideWith(() => TestFlashcardNotifier()),
+      speechPracticeBackendProvider.overrideWithValue(
+        TestSpeechPracticePlatform(),
       ),
     ],
     child: const FluencyApp(),
@@ -1734,8 +1831,9 @@ Widget createTestAppWithAudio({
       ),
       dailyStudyTimeProvider.overrideWith(() => TestDailyStudyTime()),
       savedWordListProvider.overrideWith(() => TestSavedWordList()),
-      flashcardNotifierProvider.overrideWith(
-        () => TestFlashcardNotifier(),
+      flashcardNotifierProvider.overrideWith(() => TestFlashcardNotifier()),
+      speechPracticeBackendProvider.overrideWithValue(
+        TestSpeechPracticePlatform(),
       ),
     ],
     child: _AudioPreloadWrapper(

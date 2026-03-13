@@ -18,6 +18,7 @@ import '../learned_vocabulary_tracker_provider.dart';
 import '../study_stats_provider.dart';
 import '../audio_engine/audio_engine_provider.dart';
 import '../learning_progress_provider.dart';
+import '../speech_practice_session_provider.dart';
 import '../listening_practice/listening_practice_provider.dart';
 import 'blind_listen_player_provider.dart';
 import 'intensive_listen_player_provider.dart';
@@ -535,6 +536,7 @@ class LearningSession extends _$LearningSession {
     // 通用：清除 clip 防止残留影响 LP 的 absolutePositionStream
     final engine = ref.read(audioEngineProvider.notifier);
     await engine.clearClip();
+    await ref.read(speechPracticeSessionProvider.notifier).disposeSession();
 
     // 恢复 LP 的 stream 监听
     final practice = ref.read(listeningPracticeProvider.notifier);

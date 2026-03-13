@@ -942,6 +942,24 @@ class TestListenAndRepeatPlayer extends ListenAndRepeatPlayer {
   }
 
   @override
+  void pauseCountdown() {
+    state = state.copyWith(isCountdownPaused: true);
+  }
+
+  @override
+  void resumeCountdown() {
+    state = state.copyWith(isCountdownPaused: false);
+  }
+
+  @override
+  void toggleCountdownFastForward() {
+    state = state.copyWith(
+      isCountdownFastForward: !state.isCountdownFastForward,
+      isCountdownPaused: false,
+    );
+  }
+
+  @override
   Sentence? removeDifficultMark() {
     if (_testSentences.isEmpty) return null;
 

@@ -506,6 +506,29 @@
   },
   "listenAndRepeatListenHint": "Listen first, then repeat",
   "listenAndRepeatYourTurnHint": "Your turn — repeat out loud!",
+  "listenAndRepeatRecordButton": "Record",
+  "listenAndRepeatStopRecordingButton": "Stop",
+  "listenAndRepeatPlayRecordingButton": "Play My Recording",
+  "listenAndRepeatRecordingInProgress": "Recording...",
+  "listenAndRepeatAwaitingFinalTranscript": "Confirming final transcript...",
+  "listenAndRepeatYourTakeLabel": "Your Take",
+  "listenAndRepeatRecognitionInProgress": "Checking your recording...",
+  "listenAndRepeatRecognitionPassed": "Matched {percent}% of the target words.",
+  "@listenAndRepeatRecognitionPassed": {
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "listenAndRepeatRecognitionBelowThreshold": "Matched {percent}% of the target words.",
+  "@listenAndRepeatRecognitionBelowThreshold": {
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "listenAndRepeatRecognitionNoEnglish": "No English speech was detected. Please try again.",
+  "listenAndRepeatRecognitionPermissionDenied": "Microphone or speech recognition permission is required.",
+  "listenAndRepeatRecognitionUnavailable": "Speech recognition is unavailable on this device.",
+  "listenAndRepeatRecognitionError": "Unable to check this recording right now.",
   "listenAndRepeatCompleteTitle": "Listen & Repeat Complete",
   "listenAndRepeatCompleteMessage": "You've completed listen & repeat for all {total} difficult sentences.",
   "@listenAndRepeatCompleteMessage": {

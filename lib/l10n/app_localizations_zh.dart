@@ -929,6 +929,49 @@ class AppLocalizationsZh extends AppLocalizations {
   String get listenAndRepeatYourTurnHint => '请跟读这个句子';
 
   @override
+  String get listenAndRepeatRecordButton => '录音';
+
+  @override
+  String get listenAndRepeatStopRecordingButton => '停止';
+
+  @override
+  String get listenAndRepeatPlayRecordingButton => '播放我的录音';
+
+  @override
+  String get listenAndRepeatRecordingInProgress => '正在录音...';
+
+  @override
+  String get listenAndRepeatAwaitingFinalTranscript => '正在确认最终转录...';
+
+  @override
+  String get listenAndRepeatYourTakeLabel => '你的转录';
+
+  @override
+  String get listenAndRepeatRecognitionInProgress => '正在识别录音...';
+
+  @override
+  String listenAndRepeatRecognitionPassed(int percent) {
+    return '匹配了目标词的 $percent%。';
+  }
+
+  @override
+  String listenAndRepeatRecognitionBelowThreshold(int percent) {
+    return '匹配了目标词的 $percent%。';
+  }
+
+  @override
+  String get listenAndRepeatRecognitionNoEnglish => '没有检测到英语，请再试一次。';
+
+  @override
+  String get listenAndRepeatRecognitionPermissionDenied => '需要麦克风和语音识别权限。';
+
+  @override
+  String get listenAndRepeatRecognitionUnavailable => '当前设备暂不支持语音识别。';
+
+  @override
+  String get listenAndRepeatRecognitionError => '暂时无法识别这段录音。';
+
+  @override
   String get listenAndRepeatCompleteTitle => '跟读完成';
 
   @override

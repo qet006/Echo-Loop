@@ -7,6 +7,8 @@
 /// 退出处理：PopScope → 保存断点 → exitLearningMode → pop
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,9 +23,11 @@ import '../providers/listening_practice/listening_practice_provider.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
 import '../models/retell_settings.dart';
+import '../models/speech_practice_models.dart';
 import '../utils/keyword_extraction.dart';
 import '../utils/paragraph_grouping.dart';
 import '../providers/sentence_ai_provider.dart';
+import '../providers/speech_practice_session_provider.dart';
 import '../widgets/intensive_listen/sentence_annotation_card.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_settings_sheet.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
@@ -66,6 +70,7 @@ class _ListenAndRepeatPlayerScreenState
 
   /// 处理退出（close 按钮 / 系统返回）
   Future<void> _handleExit() async {
+    await _prepareForExternalPlaybackAction();
     final player = ref.read(listenAndRepeatPlayerProvider.notifier);
     await player.pause();
     if (!mounted) return;
@@ -112,6 +117,57 @@ class _ListenAndRepeatPlayerScreenState
     if (mounted) context.pop();
   }
 
+  String _currentPromptId() {
+    final player = ref.read(listenAndRepeatPlayerProvider.notifier);
+    final sentence = player.currentSentence;
+    final sentenceIndex = sentence?.index ?? player.currentIndex;
+    return 'shadowing:${widget.audioItemId}:$sentenceIndex';
+  }
+
+  Future<void> _prepareForExternalPlaybackAction() async {
+    final speech = ref.read(speechPracticeSessionProvider.notifier);
+    await speech.cancelActiveRecording();
+    await speech.stopAttemptPlayback();
+  }
+
+  Future<void> _handleRecordTap() async {
+    final playerState = ref.read(listenAndRepeatPlayerProvider);
+    if (!playerState.isPauseBetweenPlays) {
+      return;
+    }
+
+    final speech = ref.read(speechPracticeSessionProvider.notifier);
+    final player = ref.read(listenAndRepeatPlayerProvider.notifier);
+    final currentSentence = player.currentSentence;
+    if (currentSentence == null) {
+      return;
+    }
+
+    final promptId = _currentPromptId();
+    if (speech.isRecordingPrompt(promptId)) {
+      await speech.stopRecordingAndEvaluate(
+        promptId: promptId,
+        referenceText: currentSentence.text,
+      );
+      return;
+    }
+
+    if (!playerState.isCountdownPaused) {
+      player.pauseCountdown();
+    }
+    await speech.startRecording(promptId: promptId);
+  }
+
+  Future<void> _handleAttemptPlaybackTap(String promptId) async {
+    final speech = ref.read(speechPracticeSessionProvider.notifier);
+    final speechState = ref.read(speechPracticeSessionProvider);
+    if (speechState.playingPromptId == promptId) {
+      await speech.stopAttemptPlayback();
+      return;
+    }
+    await speech.playAttempt(promptId);
+  }
+
   /// 保存跟读断点进度
   Future<void> _saveSentenceProgress() async {
     final player = ref.read(listenAndRepeatPlayerProvider.notifier);
@@ -121,7 +177,12 @@ class _ListenAndRepeatPlayerScreenState
   }
 
   /// 构建带 AI 翻译/解析回调的句子卡片
-  Widget _buildAnnotationCard(String text, int sentenceIndex) {
+  Widget _buildAnnotationCard(
+    String text,
+    int sentenceIndex, {
+    Widget? inlineFeedback,
+    List<SpeechTranscriptSegment>? highlightedSegments,
+  }) {
     final ai = ref.read(sentenceAiNotifierProvider);
     final cachedTranslation = ai.getCachedTranslation(text)?.translation;
     final cachedAnalysis = ai.getCachedAnalysis(text);
@@ -134,6 +195,8 @@ class _ListenAndRepeatPlayerScreenState
       onToggle: _handleRemoveDifficult,
       audioItemId: widget.audioItemId,
       sentenceIndex: sentenceIndex,
+      inlineFeedback: inlineFeedback,
+      highlightedSegments: highlightedSegments,
       onRequestTranslation: () async {
         final result = await ai.getTranslation(text);
         return result.translation;
@@ -262,6 +325,7 @@ class _ListenAndRepeatPlayerScreenState
         if (mounted) context.pop();
       } else {
         // 再来一遍：重置到第一句重新开始
+        await ref.read(speechPracticeSessionProvider.notifier).disposeSession();
         ref.read(listenAndRepeatPlayerProvider.notifier).resetToStart();
       }
       return;
@@ -363,6 +427,7 @@ class _ListenAndRepeatPlayerScreenState
 
     final playerState = ref.watch(listenAndRepeatPlayerProvider);
     final player = ref.read(listenAndRepeatPlayerProvider.notifier);
+    final speechState = ref.watch(speechPracticeSessionProvider);
 
     // 监听完成状态
     ref.listen<ListenAndRepeatPlayerState>(listenAndRepeatPlayerProvider, (
@@ -375,6 +440,10 @@ class _ListenAndRepeatPlayerScreenState
     });
 
     final currentSentence = player.currentSentence;
+    final currentPromptId = _currentPromptId();
+    final currentAttempt = speechState.attempts[currentPromptId];
+    final showRecordButton = playerState.isPauseBetweenPlays;
+    final isRecordingCurrent = speechState.recordingPromptId == currentPromptId;
 
     // 句子时长（如 "2.8秒"）
     final hasDuration =
@@ -389,6 +458,7 @@ class _ListenAndRepeatPlayerScreenState
 
     return LearningHotkeyScope(
       onPlayPause: () {
+        unawaited(_prepareForExternalPlaybackAction());
         if (playerState.isPauseBetweenPlays) {
           player.replayDuringCountdown();
         } else if (playerState.isPlaying) {
@@ -397,8 +467,14 @@ class _ListenAndRepeatPlayerScreenState
           player.resume();
         }
       },
-      onPrevious: () => player.goToPrevious(),
-      onNext: () => player.goToNext(),
+      onPrevious: () {
+        unawaited(_prepareForExternalPlaybackAction());
+        unawaited(player.goToPrevious());
+      },
+      onNext: () {
+        unawaited(_prepareForExternalPlaybackAction());
+        unawaited(player.goToNext());
+      },
       child: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
@@ -443,6 +519,25 @@ class _ListenAndRepeatPlayerScreenState
                               ? _buildAnnotationCard(
                                   currentSentence.text,
                                   player.currentIndex,
+                                  highlightedSegments:
+                                      currentAttempt?.referenceSegments,
+                                  inlineFeedback: switch (currentAttempt) {
+                                    final attempt?
+                                        when attempt.hasFinalFeedback =>
+                                      _SpeechPracticeResultCard(
+                                        l10n: l10n,
+                                        attempt: attempt,
+                                        isPlayingAttempt:
+                                            speechState.playingPromptId ==
+                                            currentPromptId,
+                                        onPlayAttempt: attempt.hasRecording
+                                            ? () => _handleAttemptPlaybackTap(
+                                                currentPromptId,
+                                              )
+                                            : null,
+                                      ),
+                                    _ => null,
+                                  },
                                 )
                               : const SizedBox.shrink(),
                         ),
@@ -450,50 +545,66 @@ class _ListenAndRepeatPlayerScreenState
                       const SizedBox(height: AppSpacing.m),
 
                       // 跟读提示 / 倒计时控制（上） + 播放遍数（下）
-                      SizedBox(
-                        height: 96,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            if (playerState.isPauseBetweenPlays) ...[
-                              // 跟读提示
-                              Text(
-                                l10n.listenAndRepeatYourTurnHint,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.secondary,
-                                  fontWeight: FontWeight.w600,
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutCubic,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 96),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (playerState.isPauseBetweenPlays) ...[
+                                // 跟读提示
+                                Text(
+                                  l10n.listenAndRepeatYourTurnHint,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.secondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(height: AppSpacing.xs),
+                                _CountdownChip(
+                                  remaining: playerState.pauseRemaining,
+                                  total: playerState.pauseDuration,
+                                  isPaused: playerState.isCountdownPaused,
+                                  onTap: playerState.isCountdownPaused
+                                      ? () => player.resumeCountdown()
+                                      : () => player.pauseCountdown(),
+                                ),
+                              ],
+                              // 播放中：先听提示 / 留白期：跟读提示
+                              if (!playerState.isPauseBetweenPlays)
+                                Text(
+                                  l10n.listenAndRepeatListenHint,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
                               const SizedBox(height: AppSpacing.xs),
-                              _CountdownChip(
-                                remaining: playerState.pauseRemaining,
-                                total: playerState.pauseDuration,
-                                isPaused: playerState.isCountdownPaused,
-                                onTap: playerState.isCountdownPaused
-                                    ? () => player.resumeCountdown()
-                                    : () => player.pauseCountdown(),
-                              ),
-                            ],
-                            // 播放中：先听提示 / 留白期：跟读提示
-                            if (!playerState.isPauseBetweenPlays)
                               Text(
-                                l10n.listenAndRepeatListenHint,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
+                                l10n.listenAndRepeatPlayCount(
+                                  playerState.currentPlayCount,
+                                  playerState.settings.repeatCount,
+                                ),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.5),
                                 ),
                               ),
-                            const SizedBox(height: AppSpacing.xs),
-                            Text(
-                              l10n.listenAndRepeatPlayCount(
-                                playerState.currentPlayCount,
-                                playerState.settings.repeatCount,
-                              ),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.5),
-                              ),
-                            ),
-                          ],
+                              if (showRecordButton) ...[
+                                const SizedBox(height: AppSpacing.s),
+                                if (currentAttempt?.status ==
+                                    SpeechPracticeAttemptStatus.awaitingFinal)
+                                  const _SpeechPracticeProcessingIndicator()
+                                else
+                                  _SpeechPracticeRecordPanel(
+                                    l10n: l10n,
+                                    isRecordingCurrent: isRecordingCurrent,
+                                    onRecordTap: _handleRecordTap,
+                                  ),
+                              ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -504,9 +615,16 @@ class _ListenAndRepeatPlayerScreenState
               // 底部播放控制
               _PlaybackControls(
                 playerState: playerState,
-                onPrevious: () => player.goToPrevious(),
-                onNext: () => player.goToNext(),
+                onPrevious: () {
+                  unawaited(_prepareForExternalPlaybackAction());
+                  unawaited(player.goToPrevious());
+                },
+                onNext: () {
+                  unawaited(_prepareForExternalPlaybackAction());
+                  unawaited(player.goToNext());
+                },
                 onPlayPause: () {
+                  unawaited(_prepareForExternalPlaybackAction());
                   if (playerState.isPauseBetweenPlays) {
                     player.replayDuringCountdown();
                   } else if (playerState.isPlaying) {
@@ -562,9 +680,12 @@ class _ProgressSection extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           Row(
             children: [
-              Text(
-                l10n.listenAndRepeatProgress(current, total),
-                style: subtitleStyle,
+              Flexible(
+                child: Text(
+                  l10n.listenAndRepeatProgress(current, total),
+                  style: subtitleStyle,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               const Spacer(),
               if (durationText case final dur?) Text(dur, style: subtitleStyle),
@@ -638,6 +759,298 @@ class _CountdownChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 跟读录音反馈面板。
+class _SpeechPracticeRecordPanel extends StatelessWidget {
+  final AppLocalizations l10n;
+  final bool isRecordingCurrent;
+  final VoidCallback onRecordTap;
+
+  const _SpeechPracticeRecordPanel({
+    required this.l10n,
+    required this.isRecordingCurrent,
+    required this.onRecordTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s,
+        vertical: AppSpacing.s,
+      ),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primaryContainer.withValues(alpha: 0.88),
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.92),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withValues(alpha: 0.14),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: theme.colorScheme.surface,
+          foregroundColor: theme.colorScheme.primary,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.l,
+            vertical: AppSpacing.m,
+          ),
+        ),
+        onPressed: onRecordTap,
+        icon: Icon(isRecordingCurrent ? Icons.stop_rounded : Icons.mic_rounded),
+        label: Text(
+          isRecordingCurrent
+              ? l10n.listenAndRepeatStopRecordingButton
+              : l10n.listenAndRepeatRecordButton,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 跟读录音结果卡。
+class _SpeechPracticeResultCard extends StatelessWidget {
+  final AppLocalizations l10n;
+  final SpeechPracticeAttempt attempt;
+  final bool isPlayingAttempt;
+  final VoidCallback? onPlayAttempt;
+
+  const _SpeechPracticeResultCard({
+    required this.l10n,
+    required this.attempt,
+    required this.isPlayingAttempt,
+    this.onPlayAttempt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final statusColor = _statusColor(theme);
+    final ratingStyle = _ratingStyle(theme);
+    final hasTranscript = (attempt.finalTranscript ?? '').isNotEmpty;
+    if (!hasTranscript) {
+      return Text(
+        _feedbackText(),
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: statusColor,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [ratingStyle.backgroundStart, ratingStyle.backgroundEnd],
+            ),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: ratingStyle.borderColor),
+          ),
+          child: Text(
+            _ratingLabel(),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: ratingStyle.textColor,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+        const Spacer(),
+        if (attempt.hasRecording) ...[
+          const SizedBox(width: AppSpacing.xs),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.28,
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              visualDensity: VisualDensity.compact,
+              splashRadius: 16,
+              tooltip: isPlayingAttempt
+                  ? l10n.stop
+                  : l10n.listenAndRepeatPlayRecordingButton,
+              onPressed: onPlayAttempt,
+              icon: Icon(
+                isPlayingAttempt
+                    ? Icons.stop_rounded
+                    : Icons.volume_up_outlined,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.76,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  String _ratingLabel() {
+    final score = attempt.score ?? 0;
+    if (score >= 0.85) {
+      return 'Excellent';
+    }
+    if (score >= 0.65) {
+      return 'Good';
+    }
+    if (score >= 0.45) {
+      return 'Fair';
+    }
+    return 'Try again';
+  }
+
+  String _feedbackText() {
+    return switch (attempt.status) {
+      SpeechPracticeAttemptStatus.noEnglishDetected =>
+        l10n.listenAndRepeatRecognitionNoEnglish,
+      SpeechPracticeAttemptStatus.permissionDenied =>
+        l10n.listenAndRepeatRecognitionPermissionDenied,
+      SpeechPracticeAttemptStatus.unavailable =>
+        l10n.listenAndRepeatRecognitionUnavailable,
+      SpeechPracticeAttemptStatus.error =>
+        attempt.errorMessage ?? l10n.listenAndRepeatRecognitionError,
+      SpeechPracticeAttemptStatus.awaitingFinal ||
+      SpeechPracticeAttemptStatus.passed ||
+      SpeechPracticeAttemptStatus.belowThreshold ||
+      SpeechPracticeAttemptStatus.recording ||
+      SpeechPracticeAttemptStatus.idle => '',
+    };
+  }
+
+  Color _statusColor(ThemeData theme) {
+    return switch (attempt.status) {
+      SpeechPracticeAttemptStatus.passed => const Color(0xFF2E9B51),
+      SpeechPracticeAttemptStatus.awaitingFinal => theme.colorScheme.primary,
+      SpeechPracticeAttemptStatus.belowThreshold ||
+      SpeechPracticeAttemptStatus.noEnglishDetected ||
+      SpeechPracticeAttemptStatus.permissionDenied ||
+      SpeechPracticeAttemptStatus.unavailable ||
+      SpeechPracticeAttemptStatus.error => theme.colorScheme.error,
+      _ => theme.colorScheme.onSurface,
+    };
+  }
+
+  _RatingBadgeStyle _ratingStyle(ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+    final score = attempt.score ?? 0;
+    if (score >= 0.85) {
+      return isDark
+          ? const _RatingBadgeStyle(
+              textColor: Color(0xFFB9F5C8),
+              backgroundStart: Color(0x3347B66B),
+              backgroundEnd: Color(0x1A245B38),
+              borderColor: Color(0x4057C878),
+            )
+          : const _RatingBadgeStyle(
+              textColor: Color(0xFF1E7A3D),
+              backgroundStart: Color(0xFFEAF8EF),
+              backgroundEnd: Color(0xFFDDF2E4),
+              borderColor: Color(0xFFA8D6B6),
+            );
+    }
+    if (score >= 0.65) {
+      return isDark
+          ? const _RatingBadgeStyle(
+              textColor: Color(0xFFE4F3B2),
+              backgroundStart: Color(0x33A4B84B),
+              backgroundEnd: Color(0x1A56611F),
+              borderColor: Color(0x40BDD460),
+            )
+          : const _RatingBadgeStyle(
+              textColor: Color(0xFF687A18),
+              backgroundStart: Color(0xFFF6F8DF),
+              backgroundEnd: Color(0xFFEEF3C8),
+              borderColor: Color(0xFFD6DD9A),
+            );
+    }
+    if (score >= 0.45) {
+      return isDark
+          ? const _RatingBadgeStyle(
+              textColor: Color(0xFFF7D79B),
+              backgroundStart: Color(0x33C68A38),
+              backgroundEnd: Color(0x1A6D4617),
+              borderColor: Color(0x40E0A450),
+            )
+          : const _RatingBadgeStyle(
+              textColor: Color(0xFF8A5A14),
+              backgroundStart: Color(0xFFFFF1DD),
+              backgroundEnd: Color(0xFFF9E3BF),
+              borderColor: Color(0xFFE6C48C),
+            );
+    }
+    return isDark
+        ? const _RatingBadgeStyle(
+            textColor: Color(0xFFFFC4B8),
+            backgroundStart: Color(0x33C55A4F),
+            backgroundEnd: Color(0x1A642722),
+            borderColor: Color(0x40DD756A),
+          )
+        : const _RatingBadgeStyle(
+            textColor: Color(0xFFA0433C),
+            backgroundStart: Color(0xFFFFECE8),
+            backgroundEnd: Color(0xFFF8D9D4),
+            borderColor: Color(0xFFE5B2AA),
+          );
+  }
+}
+
+class _RatingBadgeStyle {
+  final Color textColor;
+  final Color backgroundStart;
+  final Color backgroundEnd;
+  final Color borderColor;
+
+  const _RatingBadgeStyle({
+    required this.textColor,
+    required this.backgroundStart,
+    required this.backgroundEnd,
+    required this.borderColor,
+  });
+}
+
+class _SpeechPracticeProcessingIndicator extends StatelessWidget {
+  const _SpeechPracticeProcessingIndicator();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      height: 56,
+      child: Center(
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.2,
+            color: theme.colorScheme.primary,
+          ),
+        ),
       ),
     );
   }

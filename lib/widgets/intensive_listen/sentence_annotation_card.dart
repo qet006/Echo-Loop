@@ -8,6 +8,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/sentence_ai_result.dart';
+import '../../models/speech_practice_models.dart';
 import '../../theme/app_theme.dart';
 import '../common/ai_content_section.dart';
 import 'word_dictionary_sheet.dart';
@@ -56,6 +57,12 @@ class SentenceAnnotationCard extends StatefulWidget {
   /// 来源句子结束时间（毫秒）
   final int? sentenceEndMs;
 
+  /// 句子正文下方的附加反馈区域。
+  final Widget? inlineFeedback;
+
+  /// 句子正文的高亮片段；为空时按原始句子构建。
+  final List<SpeechTranscriptSegment>? highlightedSegments;
+
   const SentenceAnnotationCard({
     super.key,
     required this.text,
@@ -70,6 +77,8 @@ class SentenceAnnotationCard extends StatefulWidget {
     this.sentenceIndex,
     this.sentenceStartMs,
     this.sentenceEndMs,
+    this.inlineFeedback,
+    this.highlightedSegments,
   });
 
   @override
@@ -78,6 +87,7 @@ class SentenceAnnotationCard extends StatefulWidget {
 
 class _SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
   final List<TapGestureRecognizer> _recognizers = [];
+  static final RegExp _textPartPattern = RegExp(r'\s+|[^\s]+');
 
   @override
   void dispose() {
@@ -95,14 +105,17 @@ class _SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
     }
     _recognizers.clear();
 
-    final words = widget.text.split(RegExp(r'(\s+)'));
-    return words.map((word) {
-      if (word.trim().isEmpty) {
-        return TextSpan(text: word);
+    final parts = _textPartPattern
+        .allMatches(widget.text)
+        .map((match) => match.group(0) ?? '')
+        .toList();
+    return parts.map((part) {
+      final cleanWord = part.replaceAll(RegExp(r'[.,!?;:\-—…、，。！？；：]'), '');
+      if (part.trim().isEmpty) {
+        return TextSpan(text: part);
       }
       final recognizer = TapGestureRecognizer()
         ..onTap = () {
-          final cleanWord = word.replaceAll(RegExp(r'[.,!?;:\-—…、，。！？；：]'), '');
           if (cleanWord.isNotEmpty) {
             showWordDictionarySheet(
               context: context,
@@ -116,8 +129,64 @@ class _SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
           }
         };
       _recognizers.add(recognizer);
-      return TextSpan(text: '$word ', recognizer: recognizer);
+      return TextSpan(text: part, recognizer: recognizer);
     }).toList();
+  }
+
+  /// 基于高亮片段生成可点击的富文本 span。
+  List<InlineSpan> _buildHighlightedWordSpans(ThemeData theme) {
+    final segments = widget.highlightedSegments;
+    if (segments == null || segments.isEmpty) {
+      return _buildWordSpans(theme);
+    }
+
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    _recognizers.clear();
+
+    final spans = <InlineSpan>[];
+    for (final segment in segments) {
+      final parts = _textPartPattern
+          .allMatches(segment.text)
+          .map((match) => match.group(0) ?? '')
+          .toList();
+      for (final part in parts) {
+        if (part.isEmpty) {
+          continue;
+        }
+        if (part.trim().isEmpty) {
+          spans.add(TextSpan(text: part));
+          continue;
+        }
+        final cleanWord = part.replaceAll(RegExp(r'[.,!?;:\-—…、，。！？；：]'), '');
+        final recognizer = TapGestureRecognizer()
+          ..onTap = () {
+            if (cleanWord.isNotEmpty) {
+              showWordDictionarySheet(
+                context: context,
+                word: cleanWord,
+                audioItemId: widget.audioItemId,
+                sentenceIndex: widget.sentenceIndex,
+                sentenceText: widget.text,
+                sentenceStartMs: widget.sentenceStartMs,
+                sentenceEndMs: widget.sentenceEndMs,
+              );
+            }
+          };
+        _recognizers.add(recognizer);
+        spans.add(
+          TextSpan(
+            text: part,
+            recognizer: recognizer,
+            style: segment.isMatched
+                ? const TextStyle(color: Color(0xFF2E9B51))
+                : null,
+          ),
+        );
+      }
+    }
+    return spans;
   }
 
   @override
@@ -165,9 +234,13 @@ class _SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
               height: 1.6,
               color: theme.colorScheme.onSurface,
             ),
-            children: _buildWordSpans(theme),
+            children: _buildHighlightedWordSpans(theme),
           ),
         ),
+        if (widget.inlineFeedback case final inlineFeedback?) ...[
+          const SizedBox(height: AppSpacing.l),
+          inlineFeedback,
+        ],
         // AI 翻译区域（仅在有回调或缓存时显示）
         if (widget.onRequestTranslation != null ||
             widget.cachedTranslation != null) ...[

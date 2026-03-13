@@ -1778,6 +1778,84 @@ abstract class AppLocalizations {
   /// **'Your turn — repeat out loud!'**
   String get listenAndRepeatYourTurnHint;
 
+  /// No description provided for @listenAndRepeatRecordButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Record'**
+  String get listenAndRepeatRecordButton;
+
+  /// No description provided for @listenAndRepeatStopRecordingButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get listenAndRepeatStopRecordingButton;
+
+  /// No description provided for @listenAndRepeatPlayRecordingButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Play My Recording'**
+  String get listenAndRepeatPlayRecordingButton;
+
+  /// No description provided for @listenAndRepeatRecordingInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording...'**
+  String get listenAndRepeatRecordingInProgress;
+
+  /// No description provided for @listenAndRepeatAwaitingFinalTranscript.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirming final transcript...'**
+  String get listenAndRepeatAwaitingFinalTranscript;
+
+  /// No description provided for @listenAndRepeatYourTakeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Take'**
+  String get listenAndRepeatYourTakeLabel;
+
+  /// No description provided for @listenAndRepeatRecognitionInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking your recording...'**
+  String get listenAndRepeatRecognitionInProgress;
+
+  /// No description provided for @listenAndRepeatRecognitionPassed.
+  ///
+  /// In en, this message translates to:
+  /// **'Matched {percent}% of the target words.'**
+  String listenAndRepeatRecognitionPassed(int percent);
+
+  /// No description provided for @listenAndRepeatRecognitionBelowThreshold.
+  ///
+  /// In en, this message translates to:
+  /// **'Matched {percent}% of the target words.'**
+  String listenAndRepeatRecognitionBelowThreshold(int percent);
+
+  /// No description provided for @listenAndRepeatRecognitionNoEnglish.
+  ///
+  /// In en, this message translates to:
+  /// **'No English speech was detected. Please try again.'**
+  String get listenAndRepeatRecognitionNoEnglish;
+
+  /// No description provided for @listenAndRepeatRecognitionPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone or speech recognition permission is required.'**
+  String get listenAndRepeatRecognitionPermissionDenied;
+
+  /// No description provided for @listenAndRepeatRecognitionUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech recognition is unavailable on this device.'**
+  String get listenAndRepeatRecognitionUnavailable;
+
+  /// No description provided for @listenAndRepeatRecognitionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to check this recording right now.'**
+  String get listenAndRepeatRecognitionError;
+
   /// No description provided for @listenAndRepeatCompleteTitle.
   ///
   /// In en, this message translates to:

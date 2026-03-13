@@ -12,6 +12,7 @@ import 'package:fluency/database/enums.dart';
 import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/providers/learning_session/listen_and_repeat_player_provider.dart';
 import 'package:fluency/providers/learning_session/learning_session_provider.dart';
+import 'package:fluency/providers/speech_practice_session_provider.dart';
 import 'package:fluency/router/app_router.dart';
 import 'package:fluency/screens/listen_and_repeat_player_screen.dart';
 import 'package:fluency/widgets/intensive_listen/sentence_annotation_card.dart';
@@ -216,6 +217,49 @@ void listenAndRepeatTests() {
       // 验证设置面板弹出（包含循环次数配置）
       expect(find.text('Repeat per sentence'), findsOneWidget);
       expect(find.text('Smart'), findsOneWidget);
+    });
+
+    testWidgets('轮到用户说时可录音并显示识别结果', (tester) async {
+      await tester.pumpWidget(
+        createTestAppWithAudio(
+          progressOverride: createTestLearningProgress(
+            currentSubStage: SubStageType.listenAndRepeat,
+            currentStageStartedAt: DateTime.now(),
+          ),
+        ),
+      );
+      await navigateToListenAndRepeat(tester);
+
+      final container = getContainer(tester);
+      final player =
+          container.read(listenAndRepeatPlayerProvider.notifier)
+              as TestListenAndRepeatPlayer;
+      final platform =
+          container.read(speechPracticeBackendProvider)
+              as TestSpeechPracticePlatform;
+      platform.transcriptsByPath['/tmp/test-recording-1.caf'] =
+          'test sentence number 1';
+
+      player.setState(
+        player.state.copyWith(
+          isPlaying: false,
+          isPauseBetweenPlays: true,
+          pauseRemaining: const Duration(seconds: 3),
+          pauseDuration: const Duration(seconds: 3),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Record'), findsOneWidget);
+
+      await tester.tap(find.text('Record'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Stop'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Matched'), findsOneWidget);
+      expect(find.text('Play My Recording'), findsOneWidget);
     });
   });
 }

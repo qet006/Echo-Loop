@@ -1,4 +1,6 @@
 // 跟读播放器页面测试
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,10 +14,13 @@ import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
 import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/providers/learning_session/learning_session_provider.dart';
 import 'package:fluency/models/intensive_listen_settings.dart';
+import 'package:fluency/models/speech_practice_models.dart';
 import 'package:fluency/providers/learning_session/listen_and_repeat_player_provider.dart';
+import 'package:fluency/providers/speech_practice_session_provider.dart';
 import 'package:fluency/providers/sentence_ai_provider.dart';
 import 'package:fluency/database/daos/sentence_ai_cache_dao.dart';
 import 'package:fluency/services/sentence_ai_api_client.dart';
+import 'package:fluency/services/speech_practice_platform.dart';
 import 'package:fluency/theme/app_theme.dart';
 
 import '../helpers/mock_providers.dart';
@@ -23,6 +28,78 @@ import '../helpers/mock_providers.dart';
 class _MockCacheDao extends Mock implements SentenceAiCacheDao {}
 
 class _MockApiClient extends Mock implements SentenceAiApiClient {}
+
+class _FakeSpeechPracticeBackend implements SpeechPracticeBackend {
+  _FakeSpeechPracticeBackend({this.autoEmitFinal = true});
+
+  SpeechPracticePermissionState permissions =
+      const SpeechPracticePermissionState(
+        microphone: SpeechPracticePermissionStatus.granted,
+        speech: SpeechPracticePermissionStatus.granted,
+      );
+  final _controller = StreamController<SpeechPracticeEvent>.broadcast();
+  String finalTranscript = '';
+  final bool autoEmitFinal;
+  int _counter = 0;
+  String? _activePromptId;
+
+  @override
+  bool get isSupported => true;
+
+  @override
+  Stream<SpeechPracticeEvent> get events => _controller.stream;
+
+  @override
+  Future<SpeechPracticePermissionState> getPermissionStatus() async {
+    return permissions;
+  }
+
+  @override
+  Future<SpeechPracticePermissionState> requestPermissions() async {
+    return permissions;
+  }
+
+  @override
+  Future<String> startSession({
+    required String promptId,
+    String locale = 'en-US',
+  }) async {
+    _activePromptId = promptId;
+    _counter += 1;
+    return '/tmp/$promptId-$_counter.caf';
+  }
+
+  @override
+  Future<SpeechPracticeStopResult> stopSession() async {
+    final promptId = _activePromptId ?? 'shadowing:a1:0';
+    if (autoEmitFinal) {
+      scheduleMicrotask(() {
+        emitFinal(promptId: promptId);
+      });
+    }
+    return SpeechPracticeStopResult(filePath: '/tmp/$promptId-$_counter.caf');
+  }
+
+  @override
+  Future<void> cancelSession() async {}
+
+  @override
+  Future<void> deleteRecording(String filePath) async {}
+
+  void emitFinal({String? promptId, String? transcript}) {
+    _controller.add(
+      SpeechPracticeEvent(
+        type: SpeechPracticeEventType.finalTranscriptReady,
+        promptId: promptId ?? _activePromptId ?? 'shadowing:a1:0',
+        transcript: transcript ?? finalTranscript,
+      ),
+    );
+  }
+
+  Future<void> dispose() async {
+    await _controller.close();
+  }
+}
 
 void main() {
   /// 创建测试用的跟读播放器状态
@@ -57,6 +134,7 @@ void main() {
     Locale locale = const Locale('en'),
     ListenAndRepeatPlayerState? playerState,
     LearningSessionState? sessionState,
+    SpeechPracticeBackend? speechBackend,
   }) {
     final sentences = createTestSentences(count: 5);
 
@@ -103,6 +181,9 @@ void main() {
             cacheDao: _MockCacheDao(),
             apiClient: _MockApiClient(),
           ),
+        ),
+        speechPracticeBackendProvider.overrideWithValue(
+          speechBackend ?? _FakeSpeechPracticeBackend(),
         ),
       ],
       child: MaterialApp.router(
@@ -222,6 +303,157 @@ void main() {
       // 暂停后显示播放图标
       expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
       expect(find.byIcon(Icons.pause_rounded), findsNothing);
+    });
+
+    testWidgets('播放原句阶段不显示录音按钮', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            isPlaying: true,
+            isPauseBetweenPlays: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Record'), findsNothing);
+    });
+
+    testWidgets('轮到用户说时显示录音按钮', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            isPlaying: false,
+            isPauseBetweenPlays: true,
+            pauseRemaining: const Duration(seconds: 3),
+            pauseDuration: const Duration(seconds: 3),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Record'), findsOneWidget);
+    });
+
+    testWidgets('长识别结果不会挤爆底部布局', (tester) async {
+      final speechBackend = _FakeSpeechPracticeBackend()
+        ..finalTranscript =
+            'Test sentence number one with extra words for layout testing on a narrow screen.';
+      addTearDown(speechBackend.dispose);
+
+      await tester.binding.setSurfaceSize(const Size(390, 720));
+      addTearDown(() async {
+        await tester.binding.setSurfaceSize(null);
+      });
+
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            isPlaying: false,
+            isPauseBetweenPlays: true,
+            pauseRemaining: const Duration(seconds: 3),
+            pauseDuration: const Duration(seconds: 3),
+          ),
+          speechBackend: speechBackend,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Record'));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.stop_rounded), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.stop_rounded));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Your Take'), findsNothing);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Text &&
+              const {
+                'Excellent',
+                'Good',
+                'Fair',
+                'Try again',
+              }.contains(widget.data),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Test sentence number one with extra words for layout testing on a narrow screen.',
+        ),
+        findsNothing,
+      );
+      expect(find.byTooltip('Play My Recording'), findsOneWidget);
+      expect(find.byIcon(Icons.volume_up_outlined), findsOneWidget);
+      expect(
+        find.byWidgetPredicate((widget) {
+          if (widget is! RichText) {
+            return false;
+          }
+          final text = widget.text;
+          if (text is! TextSpan) {
+            return false;
+          }
+          return text.children?.any((span) {
+                if (span is! TextSpan) {
+                  return false;
+                }
+                return span.style?.color == const Color(0xFF2E9B51);
+              }) ??
+              false;
+        }),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('停止录音后先显示处理中图标，final 到达后再展示转录结果', (tester) async {
+      final speechBackend = _FakeSpeechPracticeBackend(autoEmitFinal: false)
+        ..finalTranscript = 'Test sentence number one';
+      addTearDown(speechBackend.dispose);
+
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            isPlaying: false,
+            isPauseBetweenPlays: true,
+            pauseRemaining: const Duration(seconds: 3),
+            pauseDuration: const Duration(seconds: 3),
+          ),
+          speechBackend: speechBackend,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Record'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.stop_rounded));
+      await tester.pump();
+
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is CircularProgressIndicator && widget.value == null,
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Test sentence number one'), findsNothing);
+
+      speechBackend.emitFinal();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is CircularProgressIndicator && widget.value == null,
+        ),
+        findsNothing,
+      );
+      expect(find.text('Excellent'), findsOneWidget);
+      expect(find.byIcon(Icons.volume_up_outlined), findsOneWidget);
     });
   });
 }

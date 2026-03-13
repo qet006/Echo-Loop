@@ -57,6 +57,10 @@
 	<string>This app needs access to your photo library to select audio files.</string>
 	<key>NSAppleMusicUsageDescription</key>
 	<string>This app needs access to your music library to select audio files.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs microphone access so you can record your spoken English practice.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>This app needs speech recognition access to compare your spoken English with the target sentence.</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

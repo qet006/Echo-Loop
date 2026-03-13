@@ -945,6 +945,55 @@ class AppLocalizationsEn extends AppLocalizations {
   String get listenAndRepeatYourTurnHint => 'Your turn — repeat out loud!';
 
   @override
+  String get listenAndRepeatRecordButton => 'Record';
+
+  @override
+  String get listenAndRepeatStopRecordingButton => 'Stop';
+
+  @override
+  String get listenAndRepeatPlayRecordingButton => 'Play My Recording';
+
+  @override
+  String get listenAndRepeatRecordingInProgress => 'Recording...';
+
+  @override
+  String get listenAndRepeatAwaitingFinalTranscript =>
+      'Confirming final transcript...';
+
+  @override
+  String get listenAndRepeatYourTakeLabel => 'Your Take';
+
+  @override
+  String get listenAndRepeatRecognitionInProgress =>
+      'Checking your recording...';
+
+  @override
+  String listenAndRepeatRecognitionPassed(int percent) {
+    return 'Matched $percent% of the target words.';
+  }
+
+  @override
+  String listenAndRepeatRecognitionBelowThreshold(int percent) {
+    return 'Matched $percent% of the target words.';
+  }
+
+  @override
+  String get listenAndRepeatRecognitionNoEnglish =>
+      'No English speech was detected. Please try again.';
+
+  @override
+  String get listenAndRepeatRecognitionPermissionDenied =>
+      'Microphone or speech recognition permission is required.';
+
+  @override
+  String get listenAndRepeatRecognitionUnavailable =>
+      'Speech recognition is unavailable on this device.';
+
+  @override
+  String get listenAndRepeatRecognitionError =>
+      'Unable to check this recording right now.';
+
+  @override
   String get listenAndRepeatCompleteTitle => 'Listen & Repeat Complete';
 
   @override
