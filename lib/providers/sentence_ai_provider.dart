@@ -112,14 +112,18 @@ class SentenceAiNotifier {
     String text, {
     CancelToken? cancelToken,
   }) async {
-    // L2: SQLite 缓存
+    // L2: SQLite 缓存（JSON 损坏时跳过，fallthrough 到 L3）
     final dbResult = await _cacheDao.getByHash(hash, 'translation');
     if (dbResult != null) {
-      final translation = SentenceTranslation.fromJson(
-        jsonDecode(dbResult) as Map<String, dynamic>,
-      );
-      _translationCache[hash] = translation;
-      return translation;
+      try {
+        final translation = SentenceTranslation.fromJson(
+          jsonDecode(dbResult) as Map<String, dynamic>,
+        );
+        _translationCache[hash] = translation;
+        return translation;
+      } catch (_) {
+        // L2 数据损坏或结构变更，继续到 L3 API 调用
+      }
     }
 
     // L3: API 调用
@@ -143,14 +147,18 @@ class SentenceAiNotifier {
     String text, {
     CancelToken? cancelToken,
   }) async {
-    // L2: SQLite 缓存
+    // L2: SQLite 缓存（JSON 损坏时跳过，fallthrough 到 L3）
     final dbResult = await _cacheDao.getByHash(hash, 'analysis');
     if (dbResult != null) {
-      final analysis = SentenceAnalysis.fromJson(
-        jsonDecode(dbResult) as Map<String, dynamic>,
-      );
-      _analysisCache[hash] = analysis;
-      return analysis;
+      try {
+        final analysis = SentenceAnalysis.fromJson(
+          jsonDecode(dbResult) as Map<String, dynamic>,
+        );
+        _analysisCache[hash] = analysis;
+        return analysis;
+      } catch (_) {
+        // L2 数据损坏或结构变更，继续到 L3 API 调用
+      }
     }
 
     // L3: API 调用

@@ -67,4 +67,11 @@ class SentenceAiCacheDao extends DatabaseAccessor<AppDatabase>
       (t) => t.lastAccessedAt.isSmallerThanValue(threshold),
     )).go();
   }
+
+  /// 清空所有 AI 缓存
+  ///
+  /// 用于用户手动清理缓存，不影响其他用户数据。
+  Future<int> deleteAll() {
+    return delete(sentenceAiCache).go();
+  }
 }

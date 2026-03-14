@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../database/providers.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/developer_options_provider.dart';
 import '../providers/package_info_provider.dart';
+import '../providers/sentence_ai_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/word_ai_provider.dart';
 import '../theme/app_theme.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -30,6 +33,8 @@ class SettingsScreen extends ConsumerWidget {
               _buildLanguageTile(context, l10n, settings, settingsController),
             ],
           ),
+          const SizedBox(height: AppSpacing.m),
+          _buildStorageSection(context, ref, l10n),
           const SizedBox(height: AppSpacing.m),
           _buildAboutSection(context, ref, l10n),
           if (showDeveloperOptions) ...[
@@ -66,6 +71,68 @@ class SettingsScreen extends ConsumerWidget {
         ),
         Card(child: Column(children: _intersperseDividers(children))),
       ],
+    );
+  }
+
+  /// 构建存储管理区域
+  Widget _buildStorageSection(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+  ) {
+    return _buildSection(
+      context,
+      title: l10n.storage,
+      children: [
+        ListTile(
+          leading: _emojiIcon('🗑️'),
+          title: Text(l10n.clearCache),
+          onTap: () => _clearAiCache(context, ref, l10n),
+        ),
+      ],
+    );
+  }
+
+  /// 清空 AI 缓存（翻译 + 解析 + 单词解析）
+  Future<void> _clearAiCache(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.clearCache),
+        content: Text(l10n.clearCacheConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.confirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    // 清空 SQLite 缓存
+    final dao = ref.read(sentenceAiCacheDaoProvider);
+    final deleted = await dao.deleteAll();
+
+    // 清空内存缓存
+    ref.read(sentenceAiNotifierProvider).clearMemoryCache();
+    ref.read(wordAiNotifierProvider).clearMemoryCache();
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          deleted > 0 ? l10n.clearCacheSuccess : l10n.clearCacheEmpty,
+        ),
+      ),
     );
   }
 

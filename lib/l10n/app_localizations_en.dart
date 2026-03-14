@@ -1735,4 +1735,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wordAiWordFamily => 'Word Family';
+
+  @override
+  String get storage => 'Storage';
+
+  @override
+  String get clearCache => 'Clear Cache';
+
+  @override
+  String get clearCacheConfirm =>
+      'This will clear all cached data such as AI translations and analyses. They will be re-fetched when needed. Continue?';
+
+  @override
+  String get clearCacheSuccess => 'Cache cleared';
+
+  @override
+  String get clearCacheEmpty => 'Cache is already empty';
+
+  @override
+  String get confirm => 'Confirm';
 }

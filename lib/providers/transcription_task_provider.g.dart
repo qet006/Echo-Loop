@@ -7,7 +7,7 @@ part of 'transcription_task_provider.dart';
 // **************************************************************************
 
 String _$transcriptionFileOpsHash() =>
-    r'919f16ed565c84e292f4f4eca0fa667f71528450';
+    r'2a992d1eefd0d638205b7007933d572ea5179243';
 
 /// 文件操作 Provider（测试时可覆盖）
 ///
@@ -27,12 +27,12 @@ final transcriptionFileOpsProvider = Provider<TranscriptionFileOps>.internal(
 // ignore: unused_element
 typedef TranscriptionFileOpsRef = ProviderRef<TranscriptionFileOps>;
 String _$transcriptionTaskManagerHash() =>
-    r'0372270be70afdc5f48b2dd4038e28a7d93c78e4';
+    r'08c4c96caf03f0e8b23f68e2613fbfe814a0a908';
 
 /// 转录任务管理器
 ///
 /// keepAlive: 弹窗关闭后任务仍在后台运行。
-/// state: Map<String, TranscriptionTaskState>  (audioId → state)
+/// state: `Map<String, TranscriptionTaskState>`（audioId -> state）
 ///
 /// Copied from [TranscriptionTaskManager].
 @ProviderFor(TranscriptionTaskManager)

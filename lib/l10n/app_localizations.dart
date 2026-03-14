@@ -3115,6 +3115,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Word Family'**
   String get wordAiWordFamily;
+
+  /// No description provided for @storage.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage'**
+  String get storage;
+
+  /// No description provided for @clearCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Cache'**
+  String get clearCache;
+
+  /// No description provided for @clearCacheConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'This will clear all cached data such as AI translations and analyses. They will be re-fetched when needed. Continue?'**
+  String get clearCacheConfirm;
+
+  /// No description provided for @clearCacheSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache cleared'**
+  String get clearCacheSuccess;
+
+  /// No description provided for @clearCacheEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache is already empty'**
+  String get clearCacheEmpty;
+
+  /// No description provided for @confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get confirm;
 }
 
 class _AppLocalizationsDelegate

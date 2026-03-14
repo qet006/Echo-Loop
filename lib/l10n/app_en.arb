@@ -954,5 +954,11 @@
   "wordAiContextMeaning": "Contextual Meaning",
   "wordAiCollocations": "Collocations",
   "wordAiUsage": "Usage Notes",
-  "wordAiWordFamily": "Word Family"
+  "wordAiWordFamily": "Word Family",
+  "storage": "Storage",
+  "clearCache": "Clear Cache",
+  "clearCacheConfirm": "This will clear all cached data such as AI translations and analyses. They will be re-fetched when needed. Continue?",
+  "clearCacheSuccess": "Cache cleared",
+  "clearCacheEmpty": "Cache is already empty",
+  "confirm": "Confirm"
 }

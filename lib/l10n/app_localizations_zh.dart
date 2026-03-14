@@ -1692,4 +1692,22 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wordAiWordFamily => '词族扩展';
+
+  @override
+  String get storage => '存储';
+
+  @override
+  String get clearCache => '清除缓存';
+
+  @override
+  String get clearCacheConfirm => '将清除所有缓存数据（如 AI 翻译和解析结果），需要时会重新获取。是否继续？';
+
+  @override
+  String get clearCacheSuccess => '缓存已清除';
+
+  @override
+  String get clearCacheEmpty => '缓存已为空';
+
+  @override
+  String get confirm => '确认';
 }
