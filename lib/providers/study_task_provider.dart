@@ -80,6 +80,27 @@ final studyTaskProvider = Provider<List<StudyTask>>((ref) {
     }
   }
 
+  // 只保留学习进度最深的首学任务（规则：同时只允许一个首学）
+  // 优先级：子阶段更靠后 > updatedAt 更新
+  final firstStudyTasks =
+      tasks.where((t) => t.type == StudyTaskType.firstStudy).toList();
+  if (firstStudyTasks.length > 1) {
+    firstStudyTasks.sort((a, b) {
+      final stageCmp = b.subStage.index.compareTo(a.subStage.index);
+      if (stageCmp != 0) return stageCmp;
+      return b.updatedAt.compareTo(a.updatedAt);
+    });
+    final keepId = firstStudyTasks.first.audioId;
+    tasks.removeWhere(
+      (t) => t.type == StudyTaskType.firstStudy && t.audioId != keepId,
+    );
+    activeProgresses.removeWhere(
+      (p) =>
+          p.currentStage == LearningStage.firstLearn &&
+          p.audioItemId != keepId,
+    );
+  }
+
   if (_shouldInjectNewAudio(tasks: tasks, activeProgresses: activeProgresses)) {
     final selectedAudio = _pickNextNewAudio(unstartedAudioItems);
     if (selectedAudio != null) {

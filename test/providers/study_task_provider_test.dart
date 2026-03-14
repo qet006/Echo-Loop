@@ -80,6 +80,65 @@ void main() {
       expect(tasks[2].type, StudyTaskType.firstStudy);
     });
 
+    test('多个 firstLearn 音频时只显示学习进度最深的那个', () {
+      final now = DateTime(2026, 2, 25, 12, 0);
+      final audioItems = [
+        AudioItem(
+          id: 'first-shallow',
+          name: 'TPO-46-C2',
+          audioPath: 'audios/tpo46c2.mp3',
+          addedDate: now.subtract(const Duration(days: 2)),
+          totalDuration: 300,
+        ),
+        AudioItem(
+          id: 'first-deep',
+          name: 'TPO-57-C1',
+          audioPath: 'audios/tpo57c1.mp3',
+          addedDate: now.subtract(const Duration(days: 1)),
+          totalDuration: 280,
+        ),
+      ];
+
+      final progressMap = {
+        // blindListen 是首学最初始的子阶段，进度最浅
+        'first-shallow': LearningProgress(
+          audioItemId: 'first-shallow',
+          currentStage: LearningStage.firstLearn,
+          currentSubStage: SubStageType.blindListen,
+          // 即使 updatedAt 更新，进度浅的也不应被保留
+          updatedAt: now,
+        ),
+        // listenAndRepeat 子阶段更靠后，说明已有实际学习进度
+        'first-deep': LearningProgress(
+          audioItemId: 'first-deep',
+          currentStage: LearningStage.firstLearn,
+          currentSubStage: SubStageType.listenAndRepeat,
+          updatedAt: now.subtract(const Duration(hours: 3)),
+        ),
+      };
+
+      final container = ProviderContainer(
+        overrides: [
+          audioLibraryProvider.overrideWith(
+            () => TestAudioLibrary(AudioLibraryState(audioItems: audioItems)),
+          ),
+          learningProgressNotifierProvider.overrideWith(
+            () => TestLearningProgressNotifier(
+              LearningProgressState(progressMap: progressMap),
+            ),
+          ),
+          nowProvider.overrideWithValue(() => now),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final tasks = container.read(studyTaskProvider);
+      expect(tasks.length, 1);
+      expect(tasks.single.audioId, 'first-deep');
+      expect(tasks.single.type, StudyTaskType.firstStudy);
+      expect(tasks.single.subStage, SubStageType.listenAndRepeat);
+    });
+
     test('无进度音频时只投放 1 个首学任务', () {
       final now = DateTime(2026, 2, 25, 12, 0);
       final audioItems = [

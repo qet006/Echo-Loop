@@ -106,8 +106,7 @@ class StudyScreen extends ConsumerWidget {
                 if (readyReviews.isNotEmpty) ...[
                   _TaskSection(
                     title: l10n.readyToReview(readyReviews.length),
-                    icon: Icons.replay_rounded,
-                    iconColor: Theme.of(context).colorScheme.primary,
+                    emoji: '🔁',
                     tasks: readyReviews,
                     l10n: l10n,
                     now: now,
@@ -134,8 +133,7 @@ class StudyScreen extends ConsumerWidget {
                 if (firstStudies.isNotEmpty) ...[
                   _TaskSection(
                     title: l10n.firstStudySection(firstStudies.length),
-                    icon: Icons.school_outlined,
-                    iconColor: Theme.of(context).colorScheme.tertiary,
+                    emoji: '🌱',
                     tasks: firstStudies,
                     l10n: l10n,
                     now: now,
@@ -181,19 +179,17 @@ class StudyScreen extends ConsumerWidget {
 // Task Sections
 // ============================================================
 
-/// 任务区段（图标 + 标题 + 卡片列表）
+/// 任务区段（emoji + 标题 + 卡片列表）
 class _TaskSection extends StatelessWidget {
   final String title;
-  final IconData icon;
-  final Color iconColor;
+  final String emoji;
   final List<StudyTask> tasks;
   final AppLocalizations l10n;
   final DateTime now;
 
   const _TaskSection({
     required this.title,
-    required this.icon,
-    required this.iconColor,
+    required this.emoji,
     required this.tasks,
     required this.l10n,
     required this.now,
@@ -208,7 +204,7 @@ class _TaskSection extends StatelessWidget {
         // 区段标题
         Row(
           children: [
-            Icon(icon, size: 18, color: iconColor),
+            Text(emoji, style: const TextStyle(fontSize: 18)),
             const SizedBox(width: 6),
             Text(
               title,
@@ -355,35 +351,11 @@ class _TaskCard extends StatelessWidget {
                                   ),
                                   if (statusText.isNotEmpty) ...[
                                     const SizedBox(width: AppSpacing.s),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 1,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: isOverdue
-                                            ? theme.colorScheme.error
-                                                  .withValues(alpha: 0.1)
-                                            : theme
-                                                  .colorScheme
-                                                  .surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        statusText,
-                                        style: theme.textTheme.labelSmall
-                                            ?.copyWith(
-                                              fontSize: 10,
-                                              color: isOverdue
-                                                  ? theme.colorScheme.error
-                                                  : theme
-                                                        .colorScheme
-                                                        .onSurfaceVariant,
-                                              fontWeight: isOverdue
-                                                  ? FontWeight.w600
-                                                  : FontWeight.normal,
-                                            ),
-                                      ),
+                                    _StatusBadge(
+                                      text: statusText,
+                                      isOverdue: isOverdue,
+                                      isInProgress: statusText ==
+                                          l10n.learningInProgress,
                                     ),
                                   ],
                                 ],
@@ -610,6 +582,47 @@ String _actionLabel(AppLocalizations l10n, StudyTask task) {
     return l10n.startButton;
   }
   return l10n.continueButton;
+}
+
+/// 状态标签（学习中 / 逾期 / 倒计时等）
+///
+/// "学习中"始终使用中性色，逾期使用 error 色，其余使用 surface 色。
+class _StatusBadge extends StatelessWidget {
+  final String text;
+  final bool isOverdue;
+  final bool isInProgress;
+
+  const _StatusBadge({
+    required this.text,
+    required this.isOverdue,
+    required this.isInProgress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    // "学习中"统一使用中性色，不受逾期影响
+    final useErrorStyle = isOverdue && !isInProgress;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: useErrorStyle
+            ? theme.colorScheme.error.withValues(alpha: 0.1)
+            : theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: theme.textTheme.labelSmall?.copyWith(
+          fontSize: 10,
+          color: useErrorStyle
+              ? theme.colorScheme.error
+              : theme.colorScheme.onSurfaceVariant,
+          fontWeight: useErrorStyle ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+    );
+  }
 }
 
 /// 状态文案（逾期、距离可复习时间等）

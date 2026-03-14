@@ -1429,7 +1429,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String firstStudySection(int count) {
-    return '首学 ($count)';
+    return '首次学习 ($count)';
   }
 
   @override
