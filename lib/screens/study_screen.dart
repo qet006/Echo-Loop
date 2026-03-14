@@ -614,6 +614,7 @@ String _actionLabel(AppLocalizations l10n, StudyTask task) {
 
 /// 状态文案（逾期、距离可复习时间等）
 ///
+/// 已有进度（非首个子阶段）→ "学习中"
 /// 逾期分级：无时长/>7天→"待复习"，≤7天→"待复习 · X天前到期"，<1天→"待复习 · X小时前到期"
 String _statusText(
   BuildContext context,
@@ -621,6 +622,11 @@ String _statusText(
   StudyTask task,
   DateTime now,
 ) {
+  // 已有进度（当前子阶段不是该阶段的第一个）→ 显示"学习中"
+  final subStages = task.stage.subStages;
+  if (subStages.isNotEmpty && task.subStage != subStages.first) {
+    return l10n.learningInProgress;
+  }
   if (task.isOverdue) {
     final overdue = task.overdueDuration;
     if (overdue == null || overdue.inDays > 7) return l10n.reviewDue;

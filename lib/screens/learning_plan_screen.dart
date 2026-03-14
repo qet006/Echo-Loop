@@ -1369,10 +1369,15 @@ class _ReviewRoundSection extends ConsumerWidget {
 
   /// 当前复习轮次时间文案（仅当前轮次显示）。
   ///
-  /// 展示优先级：未到时间倒计时 > 逾期提示 > 可复习。
+  /// 展示优先级：已有进度→"学习中" > 未到时间倒计时 > 逾期提示 > 可复习。
   String? _reviewTimingText(BuildContext context) {
     if (progress == null) return null;
     if (!progress!.isCurrentStage(review.stage)) return null;
+
+    // 已有进度（至少完成 1 个子阶段）→ 显示"学习中"
+    if (_completedSubStageCount() > 0) {
+      return l10n.learningInProgress;
+    }
 
     final nextReview = progress!.nextReviewAt;
     if (nextReview == null) return null;
