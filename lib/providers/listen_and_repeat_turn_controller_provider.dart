@@ -11,8 +11,7 @@ import 'speech_practice_session_provider.dart';
 
 const _awaitingSpeechReminderDelay = Duration(seconds: 5);
 const _awaitingSpeechFallbackDelay = Duration(seconds: 15);
-const _silenceCompletionCheckDelay = Duration(seconds: 1);
-const _silenceAutoStopDelay = Duration(seconds: 5);
+const _defaultSilenceThreshold = Duration(seconds: 5);
 const _maxRecordingMultiplier = 2.5;
 const _maxRecordingBuffer = Duration(seconds: 5);
 const _maxRecordingFloor = Duration(seconds: 10);
@@ -20,8 +19,6 @@ const _reviewCountdownDuration = Duration(seconds: 5);
 const _fairScoreThreshold = 0.45;
 const _autoRetryDelay = Duration(seconds: 4);
 const _maxConsecutiveFailures = 3;
-const _uniqueTailScoreThreshold = 0.40;
-const _nonUniqueTailScoreThreshold = 0.60;
 
 enum ListenAndRepeatTurnPhase {
   idle,
@@ -88,54 +85,79 @@ class SpeechPracticeCompletionHeuristic {
 
   static final RegExp _englishWordPattern = RegExp(r"[A-Za-z]+(?:'[A-Za-z]+)?");
 
-  /// 判断用户是否已读完参考句。
+  /// 根据实时转录与参考句的匹配程度，计算所需静音等待时长。
   ///
-  /// 算法：
-  /// 1. LCS 匹配，计算 score = 匹配数 / reference 词数
-  /// 2. 从 reference 末尾往前数连续匹配长度 N（N=0 直接返回 false）
-  /// 3. 检查尾部 N 个词在 reference 中是否唯一出现
-  /// 4. 唯一 → score >= 0.40 判定完成；非唯一 → score >= 0.60
-  bool isLikelyComplete({
+  /// 三条规则取最小值：
+  /// A. 连续尾部匹配 ≥ 1 且唯一 → 1s
+  /// B. 全句匹配率：100% → 1s, ≥95% → 2s, ≥90% → 3s
+  /// C. 末尾 5 词命中数 → 5s/4s/3s/2s/1s
+  Duration computeSilenceThreshold({
     required String referenceText,
     required String partialTranscript,
   }) {
     final referenceTokens = _tokenize(referenceText);
     final transcriptTokens = _tokenize(partialTranscript);
     if (referenceTokens.isEmpty || transcriptTokens.isEmpty) {
-      return false;
+      return _defaultSilenceThreshold;
     }
 
     final lcsPairs = _computeLcsPairs(referenceTokens, transcriptTokens);
     if (lcsPairs.isEmpty) {
-      return false;
+      return _defaultSilenceThreshold;
     }
 
-    final score = lcsPairs.length / referenceTokens.length;
+    final matchedRefIndexes = lcsPairs.map((p) => p.$1).toSet();
+    final tailSize = referenceTokens.length < 5 ? referenceTokens.length : 5;
+    final tailStart = referenceTokens.length - tailSize;
 
-    // 从 reference 末尾往前数，连续多少个词都在 LCS 匹配中
-    final matchedRefIndexes = lcsPairs.map((pair) => pair.$1).toSet();
-    var tailMatchLength = 0;
+    // 规则 A：连续尾部完整匹配 + 唯一 → 1s
+    var ruleA = _defaultSilenceThreshold;
+    var consecutiveTail = 0;
     for (var i = referenceTokens.length - 1; i >= 0; i--) {
       if (matchedRefIndexes.contains(i)) {
-        tailMatchLength++;
+        consecutiveTail++;
       } else {
         break;
       }
     }
-
-    // 句尾完全没匹配，不可能读完
-    if (tailMatchLength == 0) {
-      return false;
+    if (consecutiveTail >= 1) {
+      final uniqueStart = referenceTokens.length - consecutiveTail;
+      if (_isSubsequenceUnique(referenceTokens, uniqueStart)) {
+        ruleA = const Duration(seconds: 1);
+      }
     }
 
-    // 检查尾部 N 个词组合在 reference 中是否唯一
-    final tailStart = referenceTokens.length - tailMatchLength;
-    final isTailUnique = _isSubsequenceUnique(referenceTokens, tailStart);
+    // 规则 B：全句匹配率
+    var ruleB = _defaultSilenceThreshold;
+    final score = lcsPairs.length / referenceTokens.length;
+    if (score >= 1.0) {
+      ruleB = const Duration(seconds: 1);
+    } else if (score >= 0.95) {
+      ruleB = const Duration(seconds: 2);
+    } else if (score >= 0.90) {
+      ruleB = const Duration(seconds: 3);
+    }
 
-    final threshold = isTailUnique
-        ? _uniqueTailScoreThreshold
-        : _nonUniqueTailScoreThreshold;
-    return score >= threshold;
+    // 规则 C：末尾 5 词命中数
+    var tailMatchCount = 0;
+    for (var i = tailStart; i < referenceTokens.length; i++) {
+      if (matchedRefIndexes.contains(i)) {
+        tailMatchCount++;
+      }
+    }
+    final ruleC = switch (tailMatchCount) {
+      <= 1 => const Duration(seconds: 5),
+      2 => const Duration(seconds: 4),
+      3 => const Duration(seconds: 3),
+      4 => const Duration(seconds: 2),
+      _ => const Duration(seconds: 1),
+    };
+
+    // 取三条规则最小值
+    var result = ruleA;
+    if (ruleB < result) result = ruleB;
+    if (ruleC < result) result = ruleC;
+    return result;
   }
 
   /// 检查 [tokens] 从 [start] 到末尾的连续子序列在 [tokens] 中是否只出现一次。
@@ -219,6 +241,8 @@ class ListenAndRepeatTurnController extends Notifier<ListenAndRepeatTurnState> {
   Timer? _reviewTickTimer;
   Timer? _maxDurationTimer;
   Timer? _autoRetryTimer;
+  Timer? _transcriptStaleTimer;
+  String? _lastKnownTranscript;
   Duration _sentenceDuration = Duration.zero;
   int _consecutiveFailureCount = 0;
   bool _isStopping = false;
@@ -259,6 +283,7 @@ class ListenAndRepeatTurnController extends Notifier<ListenAndRepeatTurnState> {
 
     _cancelAllTimers();
     _isStopping = false;
+    _lastKnownTranscript = null;
     _sentenceDuration = sentenceDuration;
     state = ListenAndRepeatTurnState(
       phase: ListenAndRepeatTurnPhase.awaitingSpeech,
@@ -531,33 +556,62 @@ class ListenAndRepeatTurnController extends Notifier<ListenAndRepeatTurnState> {
     if (prompt != promptId || referenceText == null) {
       return;
     }
-
-    final currentSilence = attempt.silenceDuration;
-    final previousSilence = previousAttempt?.silenceDuration ?? Duration.zero;
     if (!attempt.hasDetectedSpeech) {
       return;
     }
 
-    if (currentSilence >= _silenceAutoStopDelay &&
-        previousSilence < _silenceAutoStopDelay) {
+    final liveTranscript = attempt.liveTranscript?.trim() ?? '';
+
+    // ── 通道 1：声学静音 ──
+    final currentSilence = attempt.silenceDuration;
+    if (currentSilence > Duration.zero && liveTranscript.isNotEmpty) {
+      final heuristic = ref.read(speechPracticeCompletionHeuristicProvider);
+      final required = heuristic.computeSilenceThreshold(
+        referenceText: referenceText,
+        partialTranscript: liveTranscript,
+      );
+      if (currentSilence >= required) {
+        _stopForEvaluation(promptId: promptId, referenceText: referenceText);
+        return;
+      }
+    }
+    // 静音 5s 兜底（无转录时）
+    if (currentSilence >= _defaultSilenceThreshold) {
       _stopForEvaluation(promptId: promptId, referenceText: referenceText);
       return;
     }
 
-    if (currentSilence >= _silenceCompletionCheckDelay &&
-        previousSilence < _silenceCompletionCheckDelay) {
-      final liveTranscript = attempt.liveTranscript?.trim() ?? '';
-      if (liveTranscript.isEmpty) {
-        return;
-      }
-      final heuristic = ref.read(speechPracticeCompletionHeuristicProvider);
-      if (heuristic.isLikelyComplete(
+    // ── 通道 2：转录停滞（应对嘈杂环境） ──
+    if (liveTranscript.isNotEmpty && liveTranscript != _lastKnownTranscript) {
+      _lastKnownTranscript = liveTranscript;
+      _resetTranscriptStaleTimer(
+        promptId: promptId,
         referenceText: referenceText,
-        partialTranscript: liveTranscript,
-      )) {
-        _stopForEvaluation(promptId: promptId, referenceText: referenceText);
-      }
+        transcript: liveTranscript,
+      );
     }
+  }
+
+  /// 转录内容停止更新时的定时器。
+  ///
+  /// 阈值与声学静音相同（动态计算）。在嘈杂环境中，
+  /// 声学静音检测失效，此计时器作为备用结束通道。
+  void _resetTranscriptStaleTimer({
+    required String promptId,
+    required String referenceText,
+    required String transcript,
+  }) {
+    _transcriptStaleTimer?.cancel();
+    final heuristic = ref.read(speechPracticeCompletionHeuristicProvider);
+    final threshold = heuristic.computeSilenceThreshold(
+      referenceText: referenceText,
+      partialTranscript: transcript,
+    );
+    _transcriptStaleTimer = Timer(threshold, () {
+      if (state.promptId != promptId || _isStopping) return;
+      if (state.phase != ListenAndRepeatTurnPhase.speaking) return;
+      _stopForEvaluation(promptId: promptId, referenceText: referenceText);
+    });
   }
 
   void _handleAttemptPlaybackChanged({
@@ -687,5 +741,7 @@ class ListenAndRepeatTurnController extends Notifier<ListenAndRepeatTurnState> {
     _maxDurationTimer = null;
     _autoRetryTimer?.cancel();
     _autoRetryTimer = null;
+    _transcriptStaleTimer?.cancel();
+    _transcriptStaleTimer = null;
   }
 }
