@@ -65,10 +65,10 @@ class SpeechPracticePlatform implements SpeechPracticeBackend {
 
   static SpeechPracticePlatform _instance = SpeechPracticePlatform();
   static const MethodChannel _channel = MethodChannel(
-    'top.valuespot.fluency/speech_practice',
+    'top.echo-loop/speech_practice',
   );
   static const EventChannel _eventChannel = EventChannel(
-    'top.valuespot.fluency/speech_practice/events',
+    'top.echo-loop/speech_practice/events',
   );
 
   Stream<SpeechPracticeEvent>? _events;

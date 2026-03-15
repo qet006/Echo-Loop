@@ -27,7 +27,7 @@ import 'services/notification_tap_router_bridge.dart';
 /// 调用 iOS 原生 URLSession 发起请求，确保触发权限弹窗。
 Future<void> _triggerNetworkPermission() async {
   try {
-    const channel = MethodChannel('top.valuespot.fluency/network');
+    const channel = MethodChannel('top.echo-loop/network');
     await channel.invokeMethod('triggerNetworkPermission', {'url': apiBaseUrl});
   } catch (_) {
     // 忽略错误——目的只是触发权限弹窗

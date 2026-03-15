@@ -97,6 +97,11 @@ test/
 ## 常用命令
 
 ```bash
+# 启动 iOS 模拟器
+xcrun simctl boot <DEVICE_UDID>   # 启动模拟器
+open -a Simulator                  # 打开 Simulator 应用
+# 查看可用设备：xcrun simctl list devices available
+
 # 运行, Debug 模式
 flutter run -d macos          # macOS
 flutter run -d chrome          # Web

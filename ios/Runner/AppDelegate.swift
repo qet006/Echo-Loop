@@ -41,11 +41,11 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
 
   init(binaryMessenger: FlutterBinaryMessenger) {
     methodChannel = FlutterMethodChannel(
-      name: "top.valuespot.fluency/speech_practice",
+      name: "top.echo-loop/speech_practice",
       binaryMessenger: binaryMessenger
     )
     eventChannel = FlutterEventChannel(
-      name: "top.valuespot.fluency/speech_practice/events",
+      name: "top.echo-loop/speech_practice/events",
       binaryMessenger: binaryMessenger
     )
     super.init()
@@ -765,7 +765,7 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
 
     let controller = window?.rootViewController as! FlutterViewController
     let networkChannel = FlutterMethodChannel(
-      name: "top.valuespot.fluency/network",
+      name: "top.echo-loop/network",
       binaryMessenger: controller.binaryMessenger
     )
     networkChannel.setMethodCallHandler { (call, result) in

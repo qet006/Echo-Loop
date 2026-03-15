@@ -1,4 +1,4 @@
-package top.valuespot.fluency
+package app.echoloop
 
 import io.flutter.embedding.android.FlutterActivity
 

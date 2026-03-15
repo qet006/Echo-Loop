@@ -40,11 +40,11 @@ final class MacSpeechPracticeHandler: NSObject, FlutterStreamHandler {
 
   init(binaryMessenger: FlutterBinaryMessenger) {
     methodChannel = FlutterMethodChannel(
-      name: "top.valuespot.fluency/speech_practice",
+      name: "top.echo-loop/speech_practice",
       binaryMessenger: binaryMessenger
     )
     eventChannel = FlutterEventChannel(
-      name: "top.valuespot.fluency/speech_practice/events",
+      name: "top.echo-loop/speech_practice/events",
       binaryMessenger: binaryMessenger
     )
     super.init()
