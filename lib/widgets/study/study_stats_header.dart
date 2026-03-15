@@ -8,7 +8,10 @@ import 'learned_word_forms_sheet.dart';
 
 /// 学习统计头部组件
 ///
-/// 包含 2 个统计指标卡片（今日时长、本周时长）和 7 天柱状图。
+/// 分三层信息层次：
+/// 1. 今日卡片：学习时长 + 听/说明细（同一时间维度）
+/// 2. 本周柱状图：标题行含本周累计，柱体双色堆叠
+/// 3. 词汇量 badge：累计量 + 今日增量，可点击展开
 class StudyStatsHeader extends ConsumerWidget {
   const StudyStatsHeader({super.key});
 
@@ -21,10 +24,11 @@ class StudyStatsHeader extends ConsumerWidget {
       error: (_, __) => const SizedBox.shrink(),
       data: (stats) => Column(
         children: [
-          _StatsChips(stats: stats),
+          _TodayCard(stats: stats),
           if (stats.dailySeconds.any((s) => s > 0)) ...[
-            const SizedBox(height: AppSpacing.m),
+            const SizedBox(height: AppSpacing.s),
             _WeeklyBarChart(
+              weekTotalSeconds: stats.weekTotalSeconds,
               dailyInputSeconds: stats.dailyInputSeconds,
               dailyOutputSeconds: stats.dailyOutputSeconds,
               dailyTotalSeconds: stats.dailySeconds,
@@ -36,114 +40,182 @@ class StudyStatsHeader extends ConsumerWidget {
   }
 }
 
-/// 2 个统计指标：今日时长、本周时长
+/// 今日学习卡片
 ///
-/// 使用自定义样式容器替代默认 Chip，增加视觉层次。
-class _StatsChips extends StatelessWidget {
+/// 顶部大字显示今日总时长，下方两列显示听/说明细。
+/// 所有数据均为"今日"维度，视觉上清晰统一。
+class _TodayCard extends StatelessWidget {
   final StudyStats stats;
 
-  const _StatsChips({required this.stats});
+  const _TodayCard({required this.stats});
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
-    return Wrap(
-      spacing: AppSpacing.s,
-      runSpacing: AppSpacing.xs,
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.m,
+          vertical: 12,
+        ),
+        child: Column(
+          children: [
+            // 第一行：今日时长
+            Row(
+              children: [
+                Icon(
+                  Icons.timer_outlined,
+                  size: 16,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  l10n.todayStudyTimeShort,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _formatTime(l10n, stats.todaySeconds),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            // 第二行：听 / 说 / 词汇 三列
+            Row(
+              children: [
+                Expanded(
+                  child: _ListenSpeakItem(
+                    icon: Icons.headphones_outlined,
+                    iconColor: Colors.teal,
+                    timeText: _formatTimeShort(stats.todayInputSeconds),
+                    wordText:
+                        '${_formatWordCount(stats.todayInputWords)}${l10n.localeName == 'zh' ? '词' : 'w'}',
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 24,
+                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+                ),
+                Expanded(
+                  child: _ListenSpeakItem(
+                    icon: Icons.mic_outlined,
+                    iconColor: Colors.deepPurple,
+                    timeText: _formatTimeShort(stats.todayOutputSeconds),
+                    wordText:
+                        '${_formatWordCount(stats.todayOutputWords)}${l10n.localeName == 'zh' ? '词' : 'w'}',
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 24,
+                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+                ),
+                Expanded(
+                  child: _VocabItem(
+                    todayNew: stats.todayNewWordForms,
+                    onTap: () => showLearnedWordFormsSheet(context: context),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 听/说单项指标
+///
+/// 图标 + 时间 · 词数，水平居中排列。
+class _ListenSpeakItem extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String timeText;
+  final String wordText;
+
+  const _ListenSpeakItem({
+    required this.icon,
+    required this.iconColor,
+    required this.timeText,
+    required this.wordText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _StatChip(
-          icon: Icons.timer_outlined,
-          iconColor: theme.colorScheme.primary,
-          label:
-              '${l10n.todayStudyTimeShort}: ${_formatTime(l10n, stats.todaySeconds)}',
-        ),
-        _StatChip(
-          icon: Icons.date_range_outlined,
-          iconColor: theme.colorScheme.tertiary,
-          label:
-              '${l10n.weekStudyTimeShort}: ${_formatTime(l10n, stats.weekTotalSeconds)}',
-        ),
-        _StatChip(
-          icon: Icons.headphones_outlined,
-          iconColor: Colors.teal,
-          label: l10n.listenTimeWords(
-            _formatTimeShort(stats.todayInputSeconds),
-            _formatWordCount(stats.todayInputWords),
+        Icon(icon, size: 14, color: iconColor),
+        const SizedBox(width: 4),
+        Text(
+          timeText,
+          style: theme.textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: theme.colorScheme.onSurface,
           ),
         ),
-        _StatChip(
-          icon: Icons.mic_outlined,
-          iconColor: Colors.deepPurple,
-          label: l10n.speakTimeWords(
-            _formatTimeShort(stats.todayOutputSeconds),
-            _formatWordCount(stats.todayOutputWords),
+        Text(
+          ' · ',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        _StatChip(
-          icon: Icons.spellcheck_rounded,
-          iconColor: Colors.indigo,
-          label:
-              '${l10n.learnedWordFormsShort}: ${_formatWordCount(stats.learnedWordFormCount)} · ${l10n.todayNewShort} +${_formatWordCount(stats.todayNewWordForms)}',
-          onTap: () {
-            showLearnedWordFormsSheet(context: context);
-          },
+        Text(
+          wordText,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );
   }
 }
 
-/// 单个统计指标
+/// 词汇今日新增项（嵌入今日卡片第二行）
 ///
-/// 自定义样式：圆角容器 + 图标 + 文字，比默认 Chip 更精致。
-class _StatChip extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-  final VoidCallback? onTap;
+/// 只显示今日新增词数，点击可打开词汇列表弹窗查看全局数据。
+class _VocabItem extends StatelessWidget {
+  final int todayNew;
+  final VoidCallback onTap;
 
-  const _StatChip({
-    required this.icon,
-    required this.iconColor,
-    required this.label,
-    this.onTap,
-  });
+  const _VocabItem({required this.todayNew, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final content = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: iconColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(20),
-      ),
+    final l10n = AppLocalizations.of(context)!;
+    return GestureDetector(
+      onTap: onTap,
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 15, color: iconColor),
-          const SizedBox(width: 5),
+          Icon(Icons.spellcheck_rounded, size: 14, color: Colors.indigo),
+          const SizedBox(width: 4),
           Text(
-            label,
+            '+${_formatWordCount(todayNew)}',
             style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
               color: theme.colorScheme.onSurface,
-              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Text(
+            l10n.localeName == 'zh' ? '词' : 'w',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],
-      ),
-    );
-
-    if (onTap == null) return content;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: content,
       ),
     );
   }
@@ -151,15 +223,16 @@ class _StatChip extends StatelessWidget {
 
 /// 7 天学习时长柱状图（双色堆叠）
 ///
-/// 底部 teal = 输入时间，顶部 deepPurple = 输出时间。
-/// 柱高 = 输入 + 输出（不含暂停等非听说时间）。
-/// 如果输入/输出时间都为 0，回退到总学习时间单色显示。
+/// 标题行显示"本周"累计时长，柱体底部 teal = 输入，顶部 deepPurple = 输出。
+/// 向前兼容：旧数据无 input/output 时，用 totalSeconds 当输入（teal 单色）。
 class _WeeklyBarChart extends StatelessWidget {
+  final int weekTotalSeconds;
   final List<int> dailyInputSeconds;
   final List<int> dailyOutputSeconds;
   final List<int> dailyTotalSeconds;
 
   const _WeeklyBarChart({
+    required this.weekTotalSeconds,
     required this.dailyInputSeconds,
     required this.dailyOutputSeconds,
     required this.dailyTotalSeconds,
@@ -168,6 +241,7 @@ class _WeeklyBarChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     // 向前兼容：旧数据无 input/output 时，用 totalSeconds 当作输入
     final dailyBarSeconds = List.generate(7, (i) {
@@ -189,86 +263,112 @@ class _WeeklyBarChart extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.m,
-          AppSpacing.m,
+          12,
           AppSpacing.m,
           12,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: List.generate(7, (i) {
-            final isToday = i == 6;
-            final totalSec = dailyBarSeconds[i];
-            final ratio = maxSeconds > 0 ? totalSec / maxSeconds : 0.0;
-            final barHeight = (ratio * maxBarHeight).clamp(3.0, maxBarHeight);
+        child: Column(
+          children: [
+            // 标题行：本周累计
+            Row(
+              children: [
+                Icon(
+                  Icons.date_range_outlined,
+                  size: 15,
+                  color: theme.colorScheme.tertiary,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  '${l10n.weekStudyTimeShort}: ${_formatTime(l10n, weekTotalSeconds)}',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            // 柱状图
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: List.generate(7, (i) {
+                final isToday = i == 6;
+                final totalSec = dailyBarSeconds[i];
+                final ratio = maxSeconds > 0 ? totalSec / maxSeconds : 0.0;
+                final barHeight =
+                    (ratio * maxBarHeight).clamp(3.0, maxBarHeight);
 
-            // 双色比例（旧数据无 input/output 时全部算输入）
-            final hasBreakdown =
-                dailyInputSeconds[i] > 0 || dailyOutputSeconds[i] > 0;
-            final inputSec =
-                hasBreakdown ? dailyInputSeconds[i] : dailyTotalSeconds[i];
-            final outputSec =
-                hasBreakdown ? dailyOutputSeconds[i] : 0;
-            final inputRatio = totalSec > 0 ? inputSec / totalSec : 1.0;
+                // 双色比例（旧数据无 input/output 时全部算输入）
+                final hasBreakdown =
+                    dailyInputSeconds[i] > 0 || dailyOutputSeconds[i] > 0;
+                final inputSec =
+                    hasBreakdown ? dailyInputSeconds[i] : dailyTotalSeconds[i];
+                final outputSec = hasBreakdown ? dailyOutputSeconds[i] : 0;
+                final inputRatio =
+                    totalSec > 0 ? inputSec / totalSec : 1.0;
 
-            return Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 柱顶数值
-                  if (totalSec > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 3),
-                      child: Text(
-                        _formatMinutes(totalSec),
+                return Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 柱顶数值
+                      if (totalSec > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 3),
+                          child: Text(
+                            _formatMinutes(totalSec),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontSize: 9,
+                              fontWeight: isToday
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                              color: isToday
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      // 柱体（双色堆叠或纯输入单色）
+                      if (outputSec > 0)
+                        _buildStackedBar(
+                          barHeight: barHeight,
+                          inputRatio: inputRatio,
+                          isToday: isToday,
+                        )
+                      else
+                        Container(
+                          height: barHeight,
+                          margin: const EdgeInsets.symmetric(horizontal: 5),
+                          decoration: BoxDecoration(
+                            color: isToday
+                                ? Colors.teal
+                                : Colors.teal.withValues(alpha: 0.2),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(4),
+                              bottom: Radius.circular(2),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 5),
+                      // 星期标签
+                      Text(
+                        weekdayLabels[i],
                         style: theme.textTheme.labelSmall?.copyWith(
-                          fontSize: 9,
-                          fontWeight: isToday
-                              ? FontWeight.w600
-                              : FontWeight.normal,
+                          fontSize: 10,
+                          fontWeight:
+                              isToday ? FontWeight.bold : FontWeight.normal,
                           color: isToday
                               ? theme.colorScheme.primary
                               : theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    ),
-                  // 柱体（双色堆叠或纯输入单色）
-                  if (outputSec > 0)
-                    _buildStackedBar(
-                      barHeight: barHeight,
-                      inputRatio: inputRatio,
-                      isToday: isToday,
-                    )
-                  else
-                    Container(
-                      height: barHeight,
-                      margin: const EdgeInsets.symmetric(horizontal: 5),
-                      decoration: BoxDecoration(
-                        color: isToday
-                            ? Colors.teal
-                            : Colors.teal.withValues(alpha: 0.2),
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(4),
-                          bottom: Radius.circular(2),
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 5),
-                  // 星期标签
-                  Text(
-                    weekdayLabels[i],
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      fontSize: 10,
-                      fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                      color: isToday
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurfaceVariant,
-                    ),
+                    ],
                   ),
-                ],
-              ),
-            );
-          }),
+                );
+              }),
+            ),
+          ],
         ),
       ),
     );
@@ -336,9 +436,9 @@ class _WeeklyBarChart extends StatelessWidget {
   }
 }
 
-/// 格式化秒数为简短时间显示（用于 Chip）
+/// 格式化秒数为简短时间显示（用于听/说明细）
 ///
-/// 0 → "0分", < 60 → "< 1分", < 3600 → "N分", >= 3600 → "Nh Mm"
+/// 0 → "0分", < 3600 → "N分", >= 3600 → "Nh Mm"
 String _formatTimeShort(int seconds) {
   if (seconds <= 0) return '0分';
   final totalMinutes = (seconds / 60).ceil();

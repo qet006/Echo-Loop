@@ -1,6 +1,6 @@
 // 学习统计头部组件 Widget 测试
 //
-// 验证统计卡片显示、时间格式化、柱状图条件渲染等 UI 行为。
+// 验证今日卡片、本周柱状图、词汇量 badge 的渲染和交互。
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -61,76 +61,27 @@ void main() {
     );
   }
 
-  group('StudyStatsHeader — 统计卡片', () {
-    late AppDatabase db;
-
-    setUp(() {
-      db = createTestDb();
-    });
-
-    tearDown(() async {
-      await db.close();
-    });
-
-    testWidgets('显示今日和本周时长', (tester) async {
+  group('StudyStatsHeader — 今日卡片', () {
+    testWidgets('显示今日时长', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
           stats: const StudyStats(
             todaySeconds: 1800, // 30 min
-            weekTotalSeconds: 7200, // 2h 0m
-            learnedWordFormCount: 1234,
-            todayNewWordForms: 12,
+            weekTotalSeconds: 7200,
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Today: 30 min'), findsOneWidget);
-      expect(find.text('Week: 2h 0m'), findsOneWidget);
-      expect(find.text('Vocab: 1,234 · Today +12'), findsOneWidget);
+      expect(find.text('Today'), findsOneWidget);
+      expect(find.text('30 min'), findsOneWidget);
     });
 
     testWidgets('零时长显示 0 min', (tester) async {
       await tester.pumpWidget(createTestWidget(stats: const StudyStats()));
       await tester.pumpAndSettle();
 
-      expect(find.text('Today: 0 min'), findsOneWidget);
-      expect(find.text('Week: 0 min'), findsOneWidget);
-    });
-
-    testWidgets('显示计时器和日期图标', (tester) async {
-      await tester.pumpWidget(
-        createTestWidget(stats: const StudyStats(todaySeconds: 60), db: db),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
-      expect(find.byIcon(Icons.date_range_outlined), findsOneWidget);
-      expect(find.byIcon(Icons.spellcheck_rounded), findsOneWidget);
-    });
-
-    testWidgets('点击词汇量 badge 打开底部弹窗', (tester) async {
-      await db.learnedWordFormDao.insertIfAbsentAll({
-        'beta': DateTime(2026, 3, 12, 10),
-      });
-
-      await tester.pumpWidget(
-        createTestWidget(
-          stats: const StudyStats(
-            learnedWordFormCount: 1,
-            todayNewWordForms: 1,
-          ),
-          db: db,
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Vocab: 1 · Today +1'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Vocab'), findsWidgets);
-      expect(find.text('1 words'), findsOneWidget);
-      expect(find.text('beta'), findsOneWidget);
+      expect(find.text('0 min'), findsOneWidget);
     });
 
     testWidgets('大时长格式化为小时分钟', (tester) async {
@@ -138,19 +89,55 @@ void main() {
         createTestWidget(
           stats: const StudyStats(
             todaySeconds: 5400, // 90 min = 1h 30m
-            weekTotalSeconds: 10800, // 180 min = 3h 0m
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Today: 1h 30m'), findsOneWidget);
-      expect(find.text('Week: 3h 0m'), findsOneWidget);
+      expect(find.text('1h 30m'), findsOneWidget);
+    });
+
+    testWidgets('显示听/说/词汇图标', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(stats: const StudyStats(todaySeconds: 60)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.headphones_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.mic_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.spellcheck_rounded), findsOneWidget);
+    });
+
+    testWidgets('词汇今日新增显示在今日卡片内', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          stats: const StudyStats(todayNewWordForms: 42),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('+42'), findsOneWidget);
     });
   });
 
-  group('StudyStatsHeader — 柱状图', () {
-    testWidgets('有学习数据时显示柱状图', (tester) async {
+  group('StudyStatsHeader — 本周柱状图', () {
+    testWidgets('标题行显示本周累计时长', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          stats: const StudyStats(
+            weekTotalSeconds: 7200, // 2h 0m
+            dailySeconds: [0, 0, 0, 0, 0, 0, 600],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Week: 2h 0m'), findsOneWidget);
+      expect(find.byIcon(Icons.date_range_outlined), findsOneWidget);
+    });
+
+    testWidgets('有学习数据时显示柱状图卡片', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
           stats: const StudyStats(dailySeconds: [0, 0, 0, 0, 0, 0, 600]),
@@ -158,11 +145,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Card 存在（柱状图的容器）
-      expect(find.byType(Card), findsOneWidget);
+      // 两张 Card：今日卡片 + 柱状图卡片
+      expect(find.byType(Card), findsNWidgets(2));
     });
 
-    testWidgets('全零数据不显示柱状图', (tester) async {
+    testWidgets('全零数据不显示柱状图卡片', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
           stats: const StudyStats(dailySeconds: [0, 0, 0, 0, 0, 0, 0]),
@@ -170,8 +157,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 无 Card（柱状图不渲染）
-      expect(find.byType(Card), findsNothing);
+      // 仅今日卡片，无柱状图
+      expect(find.byType(Card), findsOneWidget);
     });
 
     testWidgets('柱状图显示星期标签', (tester) async {
@@ -182,9 +169,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 每个星期缩写在图中至少出现一次（由当前日期决定顺序）
-      final weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      // 所有 7 个星期缩写都应在柱状图中出现
+      final weekdayLabels = [
+        'Mon',
+        'Tue',
+        'Wed',
+        'Thu',
+        'Fri',
+        'Sat',
+        'Sun',
+      ];
       for (final label in weekdayLabels) {
         expect(find.text(label), findsAtLeast(1));
       }
@@ -200,8 +193,33 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 柱顶数字（30m）
       expect(find.text('30m'), findsOneWidget);
+    });
+  });
+
+  group('StudyStatsHeader — 词汇量', () {
+    testWidgets('点击词汇区域打开底部弹窗', (tester) async {
+      final db = createTestDb();
+      await db.learnedWordFormDao.insertIfAbsentAll({
+        'beta': DateTime(2026, 3, 12, 10),
+      });
+
+      await tester.pumpWidget(
+        createTestWidget(
+          stats: const StudyStats(todayNewWordForms: 1),
+          db: db,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('+1'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Vocab'), findsWidgets);
+      expect(find.text('1 words'), findsOneWidget);
+      expect(find.text('beta'), findsOneWidget);
+
+      await db.close();
     });
   });
 
@@ -214,15 +232,20 @@ void main() {
             weekTotalSeconds: 3600,
             learnedWordFormCount: 1234,
             todayNewWordForms: 12,
+            dailySeconds: [0, 0, 0, 0, 0, 0, 1800],
           ),
           locale: const Locale('zh'),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('今日: 30 分钟'), findsOneWidget);
+      // 今日卡片
+      expect(find.text('今日'), findsOneWidget);
+      expect(find.text('30 分钟'), findsOneWidget);
+      // 本周柱状图标题
       expect(find.text('本周: 1小时0分钟'), findsOneWidget);
-      expect(find.text('词汇量: 1,234 · 今日 +12'), findsOneWidget);
+      // 词汇今日新增（嵌入今日卡片）
+      expect(find.text('+12'), findsOneWidget);
     });
   });
 }
