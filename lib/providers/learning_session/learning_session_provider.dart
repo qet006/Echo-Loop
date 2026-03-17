@@ -15,6 +15,7 @@ import '../../database/providers.dart';
 import '../../services/study_time_service.dart';
 import '../../utils/word_counter.dart';
 import '../daily_study_time_provider.dart';
+import '../../services/learned_vocabulary_tracker.dart';
 import '../learned_vocabulary_tracker_provider.dart';
 import '../study_stats_provider.dart';
 import '../audio_engine/audio_engine_provider.dart';
@@ -291,10 +292,10 @@ class LearningSession extends _$LearningSession {
   }
 
   /// 测试环境可能未注入数据库，此时跳过词形统计即可。
-  dynamic _readLearnedVocabularyTracker() {
+  LearnedVocabularyTracker? _readLearnedVocabularyTracker() {
     try {
       return ref.read(learnedVocabularyTrackerProvider);
-    } on UnimplementedError {
+    } on Exception {
       return null;
     }
   }

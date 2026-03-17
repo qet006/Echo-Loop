@@ -20,7 +20,7 @@ final learnedVocabularyTrackerProvider = Provider<LearnedVocabularyTracker>((
       ref.read(studyStatsNotifierProvider.notifier).refresh();
     },
     onError: (error, stackTrace) {
-      debugPrint('LearnedVocabularyTracker flush failed: $error');
+      debugPrint('LearnedVocabularyTracker flush failed: $error\n$stackTrace');
     },
   );
 
