@@ -6,6 +6,8 @@ library;
 
 import 'intensive_listen_settings.dart';
 
+// 复用跟读模块的控制模式枚举（ShadowingControlMode）
+
 /// 可见词生成方式
 enum KeywordMethod {
   /// 关闭（不显示可见词提示）
@@ -80,6 +82,12 @@ class RetellSettings {
   /// 可见词比例（默认 1/3）
   final KeywordRatio keywordRatio;
 
+  /// 控制模式（自动/手动，默认 auto）
+  final ShadowingControlMode controlMode;
+
+  /// 是否为手动控制模式
+  bool get isManualMode => controlMode == ShadowingControlMode.manual;
+
   /// 固定间隔可选值（秒）
   static const List<int> fixedPauseOptions = [5, 8, 10, 15, 20, 25, 30];
 
@@ -93,6 +101,7 @@ class RetellSettings {
     this.pauseMultiplier = 0.5,
     this.keywordMethod = KeywordMethod.random,
     this.keywordRatio = KeywordRatio.oneThird,
+    this.controlMode = ShadowingControlMode.auto,
   });
 
   RetellSettings copyWith({
@@ -102,6 +111,7 @@ class RetellSettings {
     double? pauseMultiplier,
     KeywordMethod? keywordMethod,
     KeywordRatio? keywordRatio,
+    ShadowingControlMode? controlMode,
   }) {
     return RetellSettings(
       repeatCount: repeatCount ?? this.repeatCount,
@@ -110,6 +120,7 @@ class RetellSettings {
       pauseMultiplier: pauseMultiplier ?? this.pauseMultiplier,
       keywordMethod: keywordMethod ?? this.keywordMethod,
       keywordRatio: keywordRatio ?? this.keywordRatio,
+      controlMode: controlMode ?? this.controlMode,
     );
   }
 

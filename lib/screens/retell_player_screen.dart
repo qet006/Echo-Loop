@@ -78,6 +78,11 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 同步初始控制模式到录音控制器
+      final settings = ref.read(retellPlayerProvider).settings;
+      ref
+          .read(retellRecordingControllerProvider.notifier)
+          .setManualMode(settings.isManualMode);
       ref.read(retellPlayerProvider.notifier).startPlaying();
     });
   }
@@ -329,8 +334,8 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     AppLocalizations l10n,
     ThemeData theme,
   ) {
-    // listening 阶段：提示文字行为空（耳机图标在中间按钮位置显示）
-    if (state.phase == RetellPhase.listening) {
+    // listening 阶段 / 倒计时阶段：不显示录音提示
+    if (state.phase == RetellPhase.listening || state.isRetellCountdown) {
       return const SizedBox.shrink();
     }
 
@@ -357,7 +362,15 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
           ),
         );
       }
-      // 正常结果（有分数）：不显示文字，结果卡已展示
+      // 正常结果（有分数）且录音空闲：显示"点击录音"引导用户操作
+      if (turnState.phase == ListenAndRepeatTurnPhase.idle) {
+        return Text(
+          l10n.listenAndRepeatTapToRecord,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+          ),
+        );
+      }
       return const SizedBox.shrink();
     }
 
@@ -371,7 +384,7 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
         _ => l10n.listenAndRepeatTapToRecord,
       },
       style: theme.textTheme.bodySmall?.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
+        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
       ),
     );
   }
@@ -499,6 +512,7 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
             next.phase == RetellRecordingPhase.idle) {
           final latestState = ref.read(retellPlayerProvider);
           if (latestState.phase == RetellPhase.retelling &&
+              !latestState.settings.isManualMode &&
               !_manualStoppedThisParagraph) {
             AppLogger.log('RetellScreen', '评估完成 → 启动段间停顿');
             ref.read(retellPlayerProvider.notifier)
@@ -508,9 +522,29 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
       },
     );
 
+    // controlMode 切换 → 同步到录音控制器
+    ref.listen<RetellPlayerState>(retellPlayerProvider, (prev, next) {
+      if (prev?.settings.controlMode != next.settings.controlMode) {
+        final controller =
+            ref.read(retellRecordingControllerProvider.notifier);
+        controller.setManualMode(next.settings.isManualMode);
+        // 切入手动模式时取消正在进行的自动录音和倒计时
+        if (next.settings.isManualMode) {
+          final recState = ref.read(retellRecordingControllerProvider);
+          if (recState.phase == RetellRecordingPhase.recording) {
+            controller.cancelActiveRecording();
+          }
+          if (next.isRetellCountdown) {
+            ref.read(retellPlayerProvider.notifier).cancelCountdown();
+          }
+        }
+      }
+    });
+
     // 自动模式录音触发：
-    // retelling + recording idle + 未超时 + 非倒计时中 + 本段未手动停止过
+    // retelling + 非手动模式 + recording idle + 未超时 + 非倒计时中 + 本段未手动停止过
     if (state.phase == RetellPhase.retelling &&
+        !state.settings.isManualMode &&
         retellRecState.phase == RetellRecordingPhase.idle &&
         !retellRecState.awaitingSpeechTimedOut &&
         !state.isRetellCountdown &&
@@ -766,21 +800,24 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
                 onReplay: _handleReplay,
               ),
 
-              // 遍数
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.m),
-                child: Text(
-                  l10n.retellRepeatInfo(
-                    state.currentRepeatCount,
-                    state.settings.repeatCount,
-                  ),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant.withValues(
-                      alpha: 0.5,
+              // 遍数（手动模式下隐藏）
+              if (!state.settings.isManualMode)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.m),
+                  child: Text(
+                    l10n.retellRepeatInfo(
+                      state.currentRepeatCount,
+                      state.settings.repeatCount,
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.5,
+                      ),
                     ),
                   ),
-                ),
-              ),
+                )
+              else
+                const SizedBox(height: AppSpacing.m),
             ],
           ),
         ),

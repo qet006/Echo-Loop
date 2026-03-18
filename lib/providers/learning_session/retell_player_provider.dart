@@ -236,9 +236,12 @@ class RetellPlayer extends _$RetellPlayer {
   /// 录音评估完成后的推进逻辑。
   ///
   /// 记录输出词数并检查遍数推进。
+  /// 手动模式下视为单遍（忽略 repeatCount），直接推进下一段。
   Future<void> completeRetellingTurn() async {
     _recordParagraphOutputStats();
-    if (state.currentRepeatCount < state.settings.repeatCount) {
+    final effectiveRepeatCount =
+        state.settings.isManualMode ? 1 : state.settings.repeatCount;
+    if (state.currentRepeatCount < effectiveRepeatCount) {
       state = state.copyWith(currentRepeatCount: state.currentRepeatCount + 1);
       await _playCurrentParagraph();
     } else {
@@ -554,9 +557,12 @@ class RetellPlayer extends _$RetellPlayer {
   }
 
   /// 启动评估后段间停顿倒计时（由 screen 层在评估完成后调用）
+  ///
+  /// 手动模式下直接 return，不启动倒计时，由用户手动推进。
   void startPostEvaluationPause() {
     if (state.phase != RetellPhase.retelling) return;
     if (state.isRetellCountdown) return;
+    if (state.settings.isManualMode) return;
 
     final pauseDuration = state.settings.calculatePauseDuration(
       currentParagraphDuration,
@@ -597,8 +603,10 @@ class RetellPlayer extends _$RetellPlayer {
 
     state = state.copyWith(isRetellCountdown: false);
 
-    // 检查遍数
-    if (state.currentRepeatCount < state.settings.repeatCount) {
+    // 检查遍数（手动模式视为单遍）
+    final effectiveRepeatCount =
+        state.settings.isManualMode ? 1 : state.settings.repeatCount;
+    if (state.currentRepeatCount < effectiveRepeatCount) {
       // 还有遍数 → 回到 listening phase
       state = state.copyWith(currentRepeatCount: state.currentRepeatCount + 1);
       await _playCurrentParagraph();
