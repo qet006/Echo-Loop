@@ -154,6 +154,7 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
   bool _hasDetectedSpeech = false;
   String? _lastKnownTranscript;
   String? _cachedReferenceText;
+  String? _lastSilenceLogDesc;
 
   // ── 配置 ──
   bool _isManualMode = false;
@@ -214,6 +215,7 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
     _isStopping = false;
     _hasDetectedSpeech = false;
     _lastKnownTranscript = null;
+    _lastSilenceLogDesc = null;
     _cachedReferenceText = referenceText;
 
     AppLogger.log('RetellRec', '┌ startRecording (manual=$_isManualMode)');
@@ -489,16 +491,41 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
     );
     if (!ctx.hasMatch) return;
 
+    final ruleD = detectRemainingByPosition(
+      ctx,
+      secondsPerWord: 3,
+      baseSeconds: 2,
+    );
     final ruleA = detectTailMatch(ctx);
     final ruleB = detectOverallMatchRate(ctx);
-    for (final rule in [ruleA, ruleB]) {
+    final rules = [ruleD, ruleA, ruleB];
+
+    // 找最短触发阈值用于日志
+    Duration? shortest;
+    String? winnerDesc;
+    for (final rule in rules) {
+      if (rule.triggered) {
+        if (shortest == null || rule.threshold! < shortest) {
+          shortest = rule.threshold;
+          winnerDesc = rule.description;
+        }
+      }
+    }
+    final pct = (ctx.matchRate * 100).toInt();
+    final summary = '匹配${ctx.lcsPairs.length}/${ctx.referenceTokens.length}词'
+        '($pct%)';
+    if (shortest != null && winnerDesc != _lastSilenceLogDesc) {
+      _lastSilenceLogDesc = winnerDesc;
+      AppLogger.log('RetellRec', '静音阈值 ${shortest.inMilliseconds}ms | '
+          '$summary, $winnerDesc');
+    }
+
+    for (final rule in rules) {
       if (rule.triggered && currentSilence >= rule.threshold!) {
-        final pct = (ctx.matchRate * 100).toInt();
         AppLogger.log('RetellRec', '⏹ 静音停止: '
             '${currentSilence.inMilliseconds}ms ≥ '
             '${rule.threshold!.inMilliseconds}ms | '
-            '匹配${ctx.lcsPairs.length}/${ctx.referenceTokens.length}词'
-            '($pct%), ${rule.description}');
+            '$summary, ${rule.description}');
         _stopForEvaluation(promptId: promptId, reason: rule.description);
         return;
       }
@@ -555,10 +582,15 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
     );
     if (!ctx.hasMatch) return;
 
-    // 取规则 A/B 中最短的触发阈值
+    // 取规则 D/A/B 中最短的触发阈值
+    final ruleD = detectRemainingByPosition(
+      ctx,
+      secondsPerWord: 3,
+      baseSeconds: 2,
+    );
     Duration? shortest;
     String? desc;
-    for (final rule in [detectTailMatch(ctx), detectOverallMatchRate(ctx)]) {
+    for (final rule in [ruleD, detectTailMatch(ctx), detectOverallMatchRate(ctx)]) {
       if (rule.triggered) {
         if (shortest == null || rule.threshold! < shortest) {
           shortest = rule.threshold;
@@ -567,8 +599,12 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
       }
     }
     // 无规则触发 → 不设定时器，靠 maxDuration 兜底
-    if (shortest == null) return;
+    if (shortest == null) {
+      AppLogger.log('RetellRec', '转录停滞: 无规则触发, 靠 maxDuration 兜底');
+      return;
+    }
 
+    AppLogger.log('RetellRec', '转录停滞阈值 ${shortest.inMilliseconds}ms | $desc');
     _transcriptStaleTimer = Timer(shortest, () {
       if (state.promptId != promptId || _isStopping) return;
       if (state.phase != RetellRecordingPhase.recording) return;

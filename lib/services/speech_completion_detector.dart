@@ -172,6 +172,97 @@ DetectionResult detectTailHitCount(SpeechMatchContext ctx, {int tailSize = 5}) {
   );
 }
 
+/// 检测 D：剩余词数估算阈值。
+///
+/// 从 transcript 末尾取 1-[maxSubstringLength] 个词，枚举所有连续子串，
+/// 在 reference 中搜索唯一匹配。取最长的唯一匹配定位当前进度，
+/// 根据剩余词数计算等待阈值：`baseSeconds + remaining * secondsPerWord`。
+///
+/// 不触发条件：transcript 为空 / 无唯一匹配 / 剩余 0 词（让规则 A 处理末尾）。
+DetectionResult detectRemainingByPosition(
+  SpeechMatchContext ctx, {
+  int secondsPerWord = 1,
+  int baseSeconds = 1,
+  int maxSubstringLength = 5,
+}) {
+  if (ctx.transcriptTokens.isEmpty) {
+    return const DetectionResult(description: 'D:transcript为空');
+  }
+  if (ctx.referenceTokens.isEmpty) {
+    return const DetectionResult(description: 'D:reference为空');
+  }
+
+  // 从 transcript 末尾枚举长度 1..min(maxSubstringLength, transcriptLen) 的子串，
+  // 优先取最长的唯一匹配。
+  final transcriptLen = ctx.transcriptTokens.length;
+  final maxLen =
+      maxSubstringLength < transcriptLen ? maxSubstringLength : transcriptLen;
+
+  int? bestMatchEndIndex;
+  int bestSubLen = 0;
+
+  for (var subLen = maxLen; subLen >= 1; subLen--) {
+    final start = transcriptLen - subLen;
+    final substring = ctx.transcriptTokens.sublist(start);
+    final endIndex =
+        _findUniqueSubstringEndIndex(ctx.referenceTokens, substring);
+    if (endIndex != null) {
+      bestMatchEndIndex = endIndex;
+      bestSubLen = subLen;
+      break; // 最长优先，找到就停
+    }
+  }
+
+  if (bestMatchEndIndex == null) {
+    return const DetectionResult(description: 'D:无唯一匹配');
+  }
+
+  final remaining = ctx.referenceTokens.length - (bestMatchEndIndex + 1);
+  if (remaining == 0) {
+    return DetectionResult(
+      description: 'D:匹配$bestSubLen词,剩余0词,不触发',
+    );
+  }
+
+  final seconds = baseSeconds + remaining * secondsPerWord;
+  return DetectionResult(
+    threshold: Duration(seconds: seconds),
+    description: 'D:匹配$bestSubLen词,剩余$remaining词→${seconds}s',
+  );
+}
+
+/// 在 [reference] 中搜索 [substring] 是否唯一出现。
+///
+/// 唯一匹配时返回匹配的结束索引（即最后一个词在 reference 中的位置），
+/// 否则返回 null（0 次或 >1 次匹配）。
+int? _findUniqueSubstringEndIndex(
+  List<String> reference,
+  List<String> substring,
+) {
+  final subLen = substring.length;
+  if (subLen == 0 || subLen > reference.length) return null;
+
+  int count = 0;
+  int? endIndex;
+
+  for (var i = 0; i <= reference.length - subLen; i++) {
+    var match = true;
+    for (var j = 0; j < subLen; j++) {
+      if (reference[i + j] != substring[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) {
+      count++;
+      if (count > 1) return null; // 多次出现，非唯一
+      endIndex = i + subLen - 1;
+    }
+  }
+
+  return count == 1 ? endIndex : null;
+}
+
 /// 组合多个检测结果，取最短阈值。
 ///
 /// 返回 [DetectionResult]，包含最终阈值和所有检测器的汇总说明。

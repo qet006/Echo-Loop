@@ -94,6 +94,12 @@ class SpeechPracticeCompletionHeuristic {
   }
 
   /// 与 [computeSilenceThreshold] 逻辑一致，额外返回触发原因（用于调试日志）。
+  ///
+  /// 四条规则取最小值：
+  /// D. [detectRemainingByPosition] — 剩余词数估算阈值
+  /// A. [detectTailMatch] — 连续尾部匹配 + 唯一 → 1s
+  /// B. [detectOverallMatchRate] — 全句匹配率 → 1-3s
+  /// C. [detectTailHitCount] — 末尾 5 词命中数 → 1-5s
   DetectionResult computeSilenceThresholdDetailed({
     required String referenceText,
     required String partialTranscript,
@@ -111,9 +117,10 @@ class SpeechPracticeCompletionHeuristic {
 
     return combineDetections(
       [
-        detectTailMatch(ctx),
-        detectOverallMatchRate(ctx),
-        detectTailHitCount(ctx),
+        detectRemainingByPosition(ctx), // D
+        detectTailMatch(ctx), // A
+        detectOverallMatchRate(ctx), // B
+        detectTailHitCount(ctx), // C
       ],
       ctx,
       fallback: _defaultSilenceThreshold,
@@ -137,6 +144,7 @@ class ListenAndRepeatTurnController extends Notifier<ListenAndRepeatTurnState> {
   Timer? _maxDurationTimer;
   Timer? _transcriptStaleTimer;
   String? _lastKnownTranscript;
+  String? _lastSilenceLogDesc;
   Duration _sentenceDuration = Duration.zero;
   bool _isStopping = false;
 
@@ -188,6 +196,7 @@ class ListenAndRepeatTurnController extends Notifier<ListenAndRepeatTurnState> {
     _cancelAllTimers();
     _isStopping = false;
     _lastKnownTranscript = null;
+    _lastSilenceLogDesc = null;
     _sentenceDuration = sentenceDuration;
     AppLogger.log('Turn', '→ awaitingSpeech (manual=$_isManualMode)');
     state = ListenAndRepeatTurnState(
@@ -490,10 +499,16 @@ class ListenAndRepeatTurnController extends Notifier<ListenAndRepeatTurnState> {
     final currentSilence = attempt.silenceDuration;
     if (currentSilence > Duration.zero && liveTranscript.isNotEmpty) {
       final heuristic = ref.read(speechPracticeCompletionHeuristicProvider);
-      final required = heuristic.computeSilenceThreshold(
+      final detailed = heuristic.computeSilenceThresholdDetailed(
         referenceText: referenceText,
         partialTranscript: liveTranscript,
       );
+      final required = detailed.threshold!;
+      if (detailed.description != _lastSilenceLogDesc) {
+        _lastSilenceLogDesc = detailed.description;
+        AppLogger.log('Turn', '静音阈值 ${required.inMilliseconds}ms | '
+            '${detailed.description}');
+      }
       if (currentSilence >= required) {
         _stopForEvaluation(
           promptId: promptId,
@@ -535,10 +550,13 @@ class ListenAndRepeatTurnController extends Notifier<ListenAndRepeatTurnState> {
   }) {
     _transcriptStaleTimer?.cancel();
     final heuristic = ref.read(speechPracticeCompletionHeuristicProvider);
-    final threshold = heuristic.computeSilenceThreshold(
+    final detailed = heuristic.computeSilenceThresholdDetailed(
       referenceText: referenceText,
       partialTranscript: transcript,
     );
+    final threshold = detailed.threshold!;
+    AppLogger.log('Turn', '转录停滞阈值 ${threshold.inMilliseconds}ms | '
+        '${detailed.description}');
     _transcriptStaleTimer = Timer(threshold, () {
       if (state.promptId != promptId || _isStopping) return;
       if (state.phase != ListenAndRepeatTurnPhase.speaking) return;
