@@ -659,16 +659,22 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
   void _handleAppLifecycleChange(AppLifecycleState appState) {
     if (appState == AppLifecycleState.paused ||
         appState == AppLifecycleState.hidden) {
-      AppLogger.log('RetellRec', 'App 进入后台 → idle');
+      AppLogger.log('RetellRec', 'App 进入后台 → idle (保留 currentAttempt)');
       _cancelAllTimers();
       _isStopping = false;
       _hasDetectedSpeech = false;
       _lastKnownTranscript = null;
+      _lastSilenceLogDesc = null;
       _eventSub?.cancel();
       _eventSub = null;
       // 取消录音但不 await（后台不可靠）
       unawaited(_recordingService.cancelRecording());
-      state = RetellRecordingState(permissions: state.permissions);
+      // 保留 currentAttempt（评级 badge）和 permissions
+      state = RetellRecordingState(
+        permissions: state.permissions,
+        currentAttempt: state.currentAttempt,
+        awaitingSpeechTimedOut: true, // 阻止回前台后自动开始录音
+      );
     }
   }
 

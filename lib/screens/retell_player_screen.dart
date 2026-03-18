@@ -155,7 +155,10 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     );
   }
 
-  /// 处理录音回放按钮点击
+  /// 处理录音回放按钮点击。
+  ///
+  /// 点击播放时取消倒计时、标记本段手动操作过，
+  /// 让用户听完录音后自行决定是否重录或继续。
   Future<void> _handleAttemptPlaybackTap(String promptId) async {
     if (_playingPromptId == promptId) {
       await _stopPlayback();
@@ -166,6 +169,16 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     if (playerState.isPlaying) {
       await ref.read(retellPlayerProvider.notifier).pause();
     }
+
+    // 取消段间停顿倒计时
+    if (playerState.isRetellCountdown) {
+      AppLogger.log('RetellScreen', '播放录音 → 取消倒计时');
+      ref.read(retellPlayerProvider.notifier).cancelCountdown();
+    }
+
+    // 标记本段手动操作过 → 不再自动录音/倒计时
+    AppLogger.log('RetellScreen', '播放录音 → 等待用户操作');
+    _manualStoppedThisParagraph = true;
 
     final recState = ref.read(retellRecordingControllerProvider);
     final attempt = recState.currentAttempt;
@@ -462,13 +475,23 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     await ref.read(retellPlayerProvider.notifier).replayDuringCountdown();
   }
 
-  /// 切段：retelling 阶段走 completeRetellingTurn（记录统计 + 遍数逻辑）
+  /// 切段：retelling 阶段走 completeRetellingTurn（记录统计 + 遍数逻辑）。
+  ///
+  /// 最后一段时保留录音结果（badge）和手动标记，避免完成弹窗期间
+  /// 触发自动录音或 badge 消失。
   Future<void> _goToNextParagraph() async {
-    _manualStoppedThisParagraph = false;
-    AppLogger.log('RetellScreen', '→ 下一段');
-    await _cancelRecordingAndPlayback();
-    ref.read(retellRecordingControllerProvider.notifier).clearRecording();
     final retellState = ref.read(retellPlayerProvider);
+    final isLastParagraph = retellState.currentParagraphIndex >=
+        retellState.totalParagraphs - 1;
+
+    if (!isLastParagraph) {
+      _manualStoppedThisParagraph = false;
+      ref.read(retellRecordingControllerProvider.notifier).clearRecording();
+    }
+
+    AppLogger.log('RetellScreen', '→ 下一段 (last=$isLastParagraph)');
+    await _cancelRecordingAndPlayback();
+
     if (retellState.phase == RetellPhase.retelling) {
       await ref.read(retellPlayerProvider.notifier).completeRetellingTurn();
     } else {
@@ -542,8 +565,9 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     });
 
     // 自动模式录音触发：
-    // retelling + 非手动模式 + recording idle + 未超时 + 非倒计时中 + 本段未手动停止过
+    // retelling + 未完成 + 非手动模式 + recording idle + 未超时 + 非倒计时中 + 本段未手动停止过
     if (state.phase == RetellPhase.retelling &&
+        !state.isCompleted &&
         !state.settings.isManualMode &&
         retellRecState.phase == RetellRecordingPhase.idle &&
         !retellRecState.awaitingSpeechTimedOut &&
@@ -885,7 +909,8 @@ class _BottomControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final canGoPrev = state.currentParagraphIndex > 0;
-    final canGoNext = state.currentParagraphIndex < state.totalParagraphs - 1;
+    final isLastParagraph =
+        state.currentParagraphIndex >= state.totalParagraphs - 1;
 
     final IconData centerIcon;
     final VoidCallback? centerOnPressed;
@@ -937,9 +962,11 @@ class _BottomControls extends StatelessWidget {
           const SizedBox(width: 48),
 
           _NavButton(
-            icon: Icons.skip_next_rounded,
-            enabled: canGoNext,
-            onTap: canGoNext ? onNext : null,
+            icon: isLastParagraph
+                ? Icons.check_circle_rounded
+                : Icons.skip_next_rounded,
+            enabled: true,
+            onTap: onNext,
           ),
         ],
       ),

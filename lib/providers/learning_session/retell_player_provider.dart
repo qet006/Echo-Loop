@@ -10,9 +10,11 @@
 library;
 
 import 'dart:async';
+import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../models/retell_settings.dart';
 import '../../models/sentence.dart';
+import '../../services/app_logger.dart';
 import '../../utils/keyword_extraction.dart';
 import '../../utils/word_counter.dart';
 import '../audio_engine/audio_engine_provider.dart';
@@ -164,11 +166,46 @@ class RetellPlayer extends _$RetellPlayer {
 
   @override
   RetellPlayerState build() {
+    final lifecycleListener = AppLifecycleListener(
+      onStateChange: _handleAppLifecycleChange,
+    );
     ref.onDispose(() {
+      lifecycleListener.dispose();
       _positionSub?.cancel();
       _invalidateRetellCountdown();
     });
     return const RetellPlayerState();
+  }
+
+  /// App 进入后台时取消倒计时和播放，回前台后等待用户操作。
+  void _handleAppLifecycleChange(AppLifecycleState appState) {
+    if (appState == AppLifecycleState.paused ||
+        appState == AppLifecycleState.hidden) {
+      AppLogger.log('RetellPlayer', 'App 进入后台: '
+          'phase=${state.phase.name}, '
+          'countdown=${state.isRetellCountdown}');
+
+      // 停止段落音频播放
+      final engine = ref.read(audioEngineProvider.notifier);
+      _sessionId = engine.newSession();
+      _positionSub?.cancel();
+      engine.stopPlayback();
+
+      // 取消倒计时
+      if (state.isRetellCountdown) {
+        AppLogger.log('RetellPlayer', '取消倒计时');
+        cancelCountdown();
+      }
+
+      // 回到 retelling 阶段等待用户操作
+      if (state.phase == RetellPhase.listening) {
+        AppLogger.log('RetellPlayer', 'listening → retelling (等待用户操作)');
+        state = state.copyWith(
+          phase: RetellPhase.retelling,
+          isPlaying: false,
+        );
+      }
+    }
   }
 
   /// 初始化复述播放器
