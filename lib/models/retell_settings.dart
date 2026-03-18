@@ -80,21 +80,17 @@ class RetellSettings {
   /// 可见词比例（默认 1/3）
   final KeywordRatio keywordRatio;
 
-  /// 固定间隔可选值
-  static const List<int> fixedPauseOptions = [
-    5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60,
-  ];
+  /// 固定间隔可选值（秒）
+  static const List<int> fixedPauseOptions = [5, 8, 10, 15, 20, 25, 30];
 
   /// 倍数可选值
-  static const List<double> multiplierOptions = [
-    1.0, 1.5, 2.0, 2.5, 3.0,
-  ];
+  static const List<double> multiplierOptions = [0.5, 0.8, 1.0, 1.5, 2.0];
 
   const RetellSettings({
     this.repeatCount = 1,
     this.pauseMode = PauseMode.smart,
     this.fixedPauseSeconds = 15,
-    this.pauseMultiplier = 1.5,
+    this.pauseMultiplier = 0.5,
     this.keywordMethod = KeywordMethod.random,
     this.keywordRatio = KeywordRatio.oneThird,
   });
@@ -133,10 +129,11 @@ class RetellSettings {
               .clamp(5000, 300000),
         ),
       PauseMode.fixed => Duration(seconds: fixedPauseSeconds),
-      PauseMode.multiplier => Duration(
-          milliseconds:
-              (paragraphDuration.inMilliseconds * pauseMultiplier).round(),
-        ),
+      PauseMode.multiplier => () {
+          final ms =
+              (paragraphDuration.inMilliseconds * pauseMultiplier).round();
+          return Duration(milliseconds: ms < 3000 ? 3000 : ms);
+        }(),
     };
   }
 }

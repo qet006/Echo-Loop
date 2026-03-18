@@ -2195,7 +2195,7 @@ abstract class AppLocalizations {
   /// No description provided for @retellPauseMode.
   ///
   /// In en, this message translates to:
-  /// **'Retell pause'**
+  /// **'Pause between paragraphs'**
   String get retellPauseMode;
 
   /// No description provided for @retellPassInfo.

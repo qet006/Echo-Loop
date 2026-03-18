@@ -664,7 +664,7 @@
   "retellDisplayHideAll": "Hide All",
   "retellSettingsTitle": "Retell Settings",
   "retellRepeatCount": "Repeat per paragraph",
-  "retellPauseMode": "Retell pause",
+  "retellPauseMode": "Pause between paragraphs",
   "retellPassInfo": "Retell {count}x",
   "@retellPassInfo": {
     "placeholders": {

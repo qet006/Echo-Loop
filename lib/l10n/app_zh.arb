@@ -507,7 +507,7 @@
   "retellDisplayHideAll": "全部隐藏",
   "retellSettingsTitle": "复述设置",
   "retellRepeatCount": "每段重复次数",
-  "retellPauseMode": "复述停顿",
+  "retellPauseMode": "段间停顿",
   "retellPassInfo": "复述 {count} 遍",
   "@retellPassInfo": {
     "placeholders": {

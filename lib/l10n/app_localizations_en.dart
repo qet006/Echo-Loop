@@ -1201,7 +1201,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get retellRepeatCount => 'Repeat per paragraph';
 
   @override
-  String get retellPauseMode => 'Retell pause';
+  String get retellPauseMode => 'Pause between paragraphs';
 
   @override
   String retellPassInfo(int count) {

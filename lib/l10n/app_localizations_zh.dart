@@ -1170,7 +1170,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get retellRepeatCount => '每段重复次数';
 
   @override
-  String get retellPauseMode => '复述停顿';
+  String get retellPauseMode => '段间停顿';
 
   @override
   String retellPassInfo(int count) {
