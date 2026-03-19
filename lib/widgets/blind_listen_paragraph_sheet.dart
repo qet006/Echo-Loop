@@ -121,37 +121,25 @@ class _BlindListenParagraphSheetState
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DropdownButton<int>(
-                      value: _targetSeconds,
-                      underline: const SizedBox.shrink(),
-                      items: _durationOptions.map((s) {
-                        return DropdownMenuItem(
-                          value: s,
-                          child: Text('${s}s'),
-                        );
-                      }).toList(),
-                      onChanged: (v) {
-                        if (v != null) setState(() => _targetSeconds = v);
-                      },
-                    ),
-                    const SizedBox(width: AppSpacing.s),
-                    Text(
-                      l10n.blindListenParagraphCount(_paragraphCount),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ],
+                DropdownButton<int>(
+                  value: _targetSeconds,
+                  underline: const SizedBox.shrink(),
+                  items: _durationOptions.map((s) {
+                    return DropdownMenuItem(
+                      value: s,
+                      child: Text('${s}s'),
+                    );
+                  }).toList(),
+                  onChanged: (v) {
+                    if (v != null) setState(() => _targetSeconds = v);
+                  },
                 ),
               ],
             ),
 
             const SizedBox(height: AppSpacing.s),
 
-            // 段长倍数行
+            // 段间停顿行
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -178,6 +166,17 @@ class _BlindListenParagraphSheetState
                   },
                 ),
               ],
+            ),
+
+            const SizedBox(height: AppSpacing.m),
+
+            // 段落数预览
+            Text(
+              l10n.blindListenParagraphCount(_paragraphCount),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w500,
+              ),
             ),
 
             const SizedBox(height: AppSpacing.l),
