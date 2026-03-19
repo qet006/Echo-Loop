@@ -1879,6 +1879,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get blindListenRecallHint => 'Try to recall what you just heard';
 
   @override
+  String get blindListenNoParagraph => 'No split';
+
+  @override
   String blindListenParagraphCount(int count) {
     return '$count paragraphs';
   }

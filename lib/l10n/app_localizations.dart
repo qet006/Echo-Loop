@@ -3362,6 +3362,12 @@ abstract class AppLocalizations {
   /// **'Try to recall what you just heard'**
   String get blindListenRecallHint;
 
+  /// No description provided for @blindListenNoParagraph.
+  ///
+  /// In en, this message translates to:
+  /// **'No split'**
+  String get blindListenNoParagraph;
+
   /// No description provided for @blindListenParagraphCount.
   ///
   /// In en, this message translates to:

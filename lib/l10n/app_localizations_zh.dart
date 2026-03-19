@@ -1829,6 +1829,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get blindListenRecallHint => '试着回忆刚才听到的内容';
 
   @override
+  String get blindListenNoParagraph => '不分段';
+
+  @override
   String blindListenParagraphCount(int count) {
     return '$count 个段落';
   }

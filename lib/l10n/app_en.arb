@@ -1032,6 +1032,7 @@
   "blindListenDisplayHideAll": "Hide Subtitles",
   "blindListenDisplayShowAll": "Show Subtitles",
   "blindListenRecallHint": "Try to recall what you just heard",
+  "blindListenNoParagraph": "No split",
   "blindListenParagraphCount": "{count} paragraphs",
   "@blindListenParagraphCount": {
     "placeholders": {

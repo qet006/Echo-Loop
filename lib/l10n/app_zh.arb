@@ -764,5 +764,6 @@
   "blindListenDisplayHideAll": "隐藏字幕",
   "blindListenDisplayShowAll": "显示字幕",
   "blindListenRecallHint": "试着回忆刚才听到的内容",
+  "blindListenNoParagraph": "不分段",
   "blindListenParagraphCount": "{count} 个段落"
 }

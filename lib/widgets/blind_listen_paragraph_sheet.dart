@@ -11,7 +11,8 @@ import '../theme/app_theme.dart';
 import '../utils/paragraph_grouping.dart';
 
 /// 目标段落时长选项（秒）
-const _durationOptions = [10, 20, 30, 45, 60, 90];
+/// 0 = 逐句，-1 = 不分段（全文一段）
+const _durationOptions = [0, 10, 20, 30, 45, 60, 90, -1];
 
 /// 显示盲听段落选择弹窗
 Future<void> showBlindListenParagraphSheet({
@@ -52,6 +53,8 @@ class _BlindListenParagraphSheetState
   double _pauseMultiplier = 1.5;
 
   int get _paragraphCount {
+    if (_targetSeconds == 0) return widget.sentences.length;
+    if (_targetSeconds < 0) return 1;
     return groupSentencesIntoParagraphs(
       widget.sentences,
       Duration(seconds: _targetSeconds),
@@ -125,9 +128,14 @@ class _BlindListenParagraphSheetState
                   value: _targetSeconds,
                   underline: const SizedBox.shrink(),
                   items: _durationOptions.map((s) {
+                    final label = switch (s) {
+                      0 => l10n.retellBriefingSentenceLevel,
+                      -1 => l10n.blindListenNoParagraph,
+                      _ => '${s}s',
+                    };
                     return DropdownMenuItem(
                       value: s,
-                      child: Text('${s}s'),
+                      child: Text(label),
                     );
                   }).toList(),
                   onChanged: (v) {
@@ -187,10 +195,11 @@ class _BlindListenParagraphSheetState
               child: FilledButton.icon(
                 onPressed: () {
                   Navigator.of(context).pop();
-                  widget.onStartPractice(
-                    Duration(seconds: _targetSeconds),
-                    _pauseMultiplier,
-                  );
+                  // -1 = 不分段 → 传极大值让全文归为一段
+                  final duration = _targetSeconds < 0
+                      ? const Duration(hours: 24)
+                      : Duration(seconds: _targetSeconds);
+                  widget.onStartPractice(duration, _pauseMultiplier);
                 },
                 icon: const Icon(Icons.play_arrow),
                 label: Text(l10n.startPractice),
