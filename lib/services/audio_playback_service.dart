@@ -74,9 +74,13 @@ class AudioPlaybackService {
 
     final player = AudioPlayer();
     _player = player;
+    // 仅监听自然播完（completed），不监听 idle。
+    // 原因：play() 内部先 stop() 再 play()，stop() 会触发 idle，
+    // 导致 isPlayingStream 先发 false 再发 true，造成 UI 状态闪烁，
+    // 使用户无法在播放中点击停止。
+    // 显式调用 stop() 已直接发送 false，无需依赖 idle。
     _playerStateSub = player.playerStateStream.listen((playerState) {
-      if (playerState.processingState == ProcessingState.completed ||
-          playerState.processingState == ProcessingState.idle) {
+      if (playerState.processingState == ProcessingState.completed) {
         _currentFilePath = null;
         _isPlayingController.add(false);
       }
