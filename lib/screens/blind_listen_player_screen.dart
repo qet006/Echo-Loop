@@ -414,6 +414,18 @@ class _BlindListenPlayerScreenState
     final session = ref.watch(learningSessionProvider);
     final playerState = ref.watch(blindListenPlayerProvider);
 
+    // 监听最后一段播放/倒计时结束 → 自动触发完成弹窗
+    ref.listen(blindListenPlayerProvider, (prev, next) {
+      if (_isExiting || prev == null) return;
+      final isLastParagraph =
+          next.currentParagraphIndex >= next.totalParagraphs - 1;
+      final wasActive = prev.isPlaying || prev.isPauseCountdown;
+      final nowIdle = !next.isPlaying && !next.isPauseCountdown;
+      if (isLastParagraph && wasActive && nowIdle) {
+        _handleCompleted();
+      }
+    });
+
     return _buildParagraphMode(context, l10n, theme, session, playerState);
   }
 
