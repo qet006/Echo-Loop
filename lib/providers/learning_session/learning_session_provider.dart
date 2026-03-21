@@ -13,6 +13,7 @@ import '../../models/blind_listen_settings.dart';
 import '../../models/playback_settings.dart';
 import '../../models/sentence.dart';
 import '../../database/providers.dart';
+import '../../models/study_stage.dart';
 import '../../services/study_time_service.dart';
 import '../daily_study_time_provider.dart';
 import '../../services/learned_vocabulary_tracker.dart';
@@ -194,6 +195,17 @@ class LearningSession extends _$LearningSession {
   /// 单次会话最大计入时长（防止用户睡着等异常场景）
   static const _maxSessionSeconds = 5 * 60; // 5 分钟
 
+  /// 当前学习模式对应的 StudyStage（用于阶段明细双写）
+  StudyStage? get _currentStage => switch (state.learningMode) {
+        LearningMode.blindListen => StudyStage.blindListen,
+        LearningMode.intensiveListen => StudyStage.intensiveListen,
+        LearningMode.listenAndRepeat => StudyStage.listenAndRepeat,
+        LearningMode.retell => StudyStage.retell,
+        LearningMode.reviewDifficultPractice =>
+          StudyStage.reviewDifficultPractice,
+        null => null,
+      };
+
   /// 停止计时并保存已记录的学习时长 + 输入/输出时间
   Future<void> _saveStudyTime() async {
     if (_isSaving) return;
@@ -211,7 +223,7 @@ class LearningSession extends _$LearningSession {
       );
       _studyStopwatch.reset();
       if (seconds > 0) {
-        await _studyTimeService.addStudyTime(seconds);
+        await _studyTimeService.addStudyTime(seconds, stage: _currentStage);
       }
       await _saveInputOutputTime();
     } finally {
@@ -221,6 +233,7 @@ class LearningSession extends _$LearningSession {
 
   /// 保存已累计的输入/输出时间
   Future<void> _saveInputOutputTime() async {
+    final stage = _currentStage;
     _inputStopwatch.stop();
     final inputSeconds = _inputStopwatch.elapsed.inSeconds.clamp(
       0,
@@ -228,7 +241,7 @@ class LearningSession extends _$LearningSession {
     );
     _inputStopwatch.reset();
     if (inputSeconds > 0) {
-      await _studyTimeService.addInputTime(inputSeconds);
+      await _studyTimeService.addInputTime(inputSeconds, stage: stage);
     }
 
     _outputStopwatch.stop();
@@ -238,7 +251,7 @@ class LearningSession extends _$LearningSession {
     );
     _outputStopwatch.reset();
     if (outputSeconds > 0) {
-      await _studyTimeService.addOutputTime(outputSeconds);
+      await _studyTimeService.addOutputTime(outputSeconds, stage: stage);
     }
   }
 

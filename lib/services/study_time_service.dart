@@ -1,13 +1,17 @@
 import '../database/daos/daily_study_record_dao.dart';
+import '../database/daos/daily_stage_study_record_dao.dart';
+import '../models/study_stage.dart';
 
 /// 学习时长存储服务
 ///
 /// 使用 Drift (SQLite) daily_study_records 表按日累计学习统计。
 /// 每天一行，5 个计数器（学习时长、输入/输出词数、输入/输出时间）。
+/// 可选传入 [StudyStage] 实现双写：总量表 + 阶段明细表。
 class StudyTimeService {
   final DailyStudyRecordDao _dao;
+  final DailyStageStudyRecordDao _stageDao;
 
-  StudyTimeService(this._dao);
+  StudyTimeService(this._dao, this._stageDao);
 
   /// 获取指定日期的学习时长（秒）
   Future<int> getStudyTime(DateTime date) async {
@@ -22,9 +26,18 @@ class StudyTimeService {
   ///
   /// [seconds] 必须 > 0，否则忽略。
   /// [date] 默认为今天。
-  Future<void> addStudyTime(int seconds, {DateTime? date}) async {
+  /// [stage] 可选，传入时同时写入阶段明细表。
+  Future<void> addStudyTime(
+    int seconds, {
+    DateTime? date,
+    StudyStage? stage,
+  }) async {
     if (seconds <= 0) return;
-    await _dao.upsertAdd(date ?? DateTime.now(), studyTime: seconds);
+    final d = date ?? DateTime.now();
+    await _dao.upsertAdd(d, studyTime: seconds);
+    if (stage != null) {
+      await _stageDao.upsertAdd(d, stage, studyTime: seconds);
+    }
   }
 
   /// 获取连续学习天数（streak）
@@ -123,9 +136,18 @@ class StudyTimeService {
   /// 累加输入时间（秒）到指定日期
   ///
   /// [seconds] 必须 > 0，否则忽略。
-  Future<void> addInputTime(int seconds, {DateTime? date}) async {
+  /// [stage] 可选，传入时同时写入阶段明细表。
+  Future<void> addInputTime(
+    int seconds, {
+    DateTime? date,
+    StudyStage? stage,
+  }) async {
     if (seconds <= 0) return;
-    await _dao.upsertAdd(date ?? DateTime.now(), inputTime: seconds);
+    final d = date ?? DateTime.now();
+    await _dao.upsertAdd(d, inputTime: seconds);
+    if (stage != null) {
+      await _stageDao.upsertAdd(d, stage, inputTime: seconds);
+    }
   }
 
   /// 获取过去 7 天每天的输入时间（秒）
@@ -163,9 +185,18 @@ class StudyTimeService {
   /// 累加输出时间（秒）到指定日期
   ///
   /// [seconds] 必须 > 0，否则忽略。
-  Future<void> addOutputTime(int seconds, {DateTime? date}) async {
+  /// [stage] 可选，传入时同时写入阶段明细表。
+  Future<void> addOutputTime(
+    int seconds, {
+    DateTime? date,
+    StudyStage? stage,
+  }) async {
     if (seconds <= 0) return;
-    await _dao.upsertAdd(date ?? DateTime.now(), outputTime: seconds);
+    final d = date ?? DateTime.now();
+    await _dao.upsertAdd(d, outputTime: seconds);
+    if (stage != null) {
+      await _stageDao.upsertAdd(d, stage, outputTime: seconds);
+    }
   }
 
   /// 获取过去 7 天每天的输出时间（秒）
@@ -189,9 +220,70 @@ class StudyTimeService {
     return result;
   }
 
+  // ========== 阶段明细查询 ==========
+
+  /// 获取指定日期的阶段明细列表
+  ///
+  /// 返回该日期所有有记录的阶段，按阶段序号排序。
+  /// 无记录时返回空列表。
+  Future<List<DailyStageStudyRecordData>> getStageBreakdown(
+    DateTime date,
+  ) async {
+    final records = await _stageDao.getByDate(date);
+    return records
+        .map(
+          (r) => DailyStageStudyRecordData(
+            stage: r.stage,
+            studyTimeSeconds: r.studyTimeSeconds,
+            inputTimeSeconds: r.inputTimeSeconds,
+            outputTimeSeconds: r.outputTimeSeconds,
+          ),
+        )
+        .toList();
+  }
+
+  /// 获取指定日期的总量记录（用于弹窗回退显示）
+  Future<DailyTotalData?> getDayTotal(DateTime date) async {
+    final record = await _dao.getByDate(date);
+    if (record == null) return null;
+    return DailyTotalData(
+      studyTimeSeconds: record.studyTimeSeconds,
+      inputTimeSeconds: record.inputTimeSeconds,
+      outputTimeSeconds: record.outputTimeSeconds,
+    );
+  }
+
   /// 截断时间部分，只保留日期
   DateTime _dateOnly(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
 
   /// 将日期转换为用于 Map key 的整数（yyyymmdd）
   int _dayKey(DateTime dt) => dt.year * 10000 + dt.month * 100 + dt.day;
+}
+
+/// 阶段明细数据（从 DAO 记录映射的简单值对象）
+class DailyStageStudyRecordData {
+  final StudyStage stage;
+  final int studyTimeSeconds;
+  final int inputTimeSeconds;
+  final int outputTimeSeconds;
+
+  const DailyStageStudyRecordData({
+    required this.stage,
+    required this.studyTimeSeconds,
+    required this.inputTimeSeconds,
+    required this.outputTimeSeconds,
+  });
+}
+
+/// 每日总量数据（用于弹窗回退显示旧数据）
+class DailyTotalData {
+  final int studyTimeSeconds;
+  final int inputTimeSeconds;
+  final int outputTimeSeconds;
+
+  const DailyTotalData({
+    required this.studyTimeSeconds,
+    required this.inputTimeSeconds,
+    required this.outputTimeSeconds,
+  });
 }

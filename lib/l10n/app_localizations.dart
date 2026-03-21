@@ -3475,6 +3475,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{audioName} · Review round {round} is ready'**
   String reviewReminderBody(String audioName, int round);
+
+  /// No description provided for @stageBlindListen.
+  ///
+  /// In en, this message translates to:
+  /// **'Blind Listen'**
+  String get stageBlindListen;
+
+  /// No description provided for @stageIntensiveListen.
+  ///
+  /// In en, this message translates to:
+  /// **'Intensive Listen'**
+  String get stageIntensiveListen;
+
+  /// No description provided for @stageListenAndRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Shadowing'**
+  String get stageListenAndRepeat;
+
+  /// No description provided for @stageRetell.
+  ///
+  /// In en, this message translates to:
+  /// **'Retelling'**
+  String get stageRetell;
+
+  /// No description provided for @stageReviewDifficultPractice.
+  ///
+  /// In en, this message translates to:
+  /// **'Difficult Drill'**
+  String get stageReviewDifficultPractice;
+
+  /// No description provided for @stageBookmarkReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Sentence Review'**
+  String get stageBookmarkReview;
+
+  /// No description provided for @stageFlashcard.
+  ///
+  /// In en, this message translates to:
+  /// **'Word Review'**
+  String get stageFlashcard;
+
+  /// No description provided for @stageBreakdownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{date}'**
+  String stageBreakdownTitle(String date);
+
+  /// No description provided for @stageBreakdownToday.
+  ///
+  /// In en, this message translates to:
+  /// **' (Today)'**
+  String get stageBreakdownToday;
+
+  /// No description provided for @stageBreakdownTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get stageBreakdownTotal;
+
+  /// No description provided for @stageBreakdownLessThanOneMin.
+  ///
+  /// In en, this message translates to:
+  /// **'<1m'**
+  String get stageBreakdownLessThanOneMin;
+
+  /// No description provided for @stageBreakdownListenShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Listen'**
+  String get stageBreakdownListenShort;
+
+  /// No description provided for @stageBreakdownSpeakShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Speak'**
+  String get stageBreakdownSpeakShort;
+
+  /// No description provided for @stageBreakdownNoStageData.
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed breakdown data starts recording from this version'**
+  String get stageBreakdownNoStageData;
 }
 
 class _AppLocalizationsDelegate

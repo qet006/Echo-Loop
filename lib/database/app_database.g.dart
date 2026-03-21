@@ -7236,6 +7236,443 @@ class DailyStudyRecordsCompanion extends UpdateCompanion<DailyStudyRecord> {
   }
 }
 
+class $DailyStageStudyRecordsTable extends DailyStageStudyRecords
+    with TableInfo<$DailyStageStudyRecordsTable, DailyStageStudyRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DailyStageStudyRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
+    'date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<StudyStage, int> stage =
+      GeneratedColumn<int>(
+        'stage',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<StudyStage>($DailyStageStudyRecordsTable.$converterstage);
+  static const VerificationMeta _studyTimeSecondsMeta = const VerificationMeta(
+    'studyTimeSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> studyTimeSeconds = GeneratedColumn<int>(
+    'study_time_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _inputTimeSecondsMeta = const VerificationMeta(
+    'inputTimeSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> inputTimeSeconds = GeneratedColumn<int>(
+    'input_time_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _outputTimeSecondsMeta = const VerificationMeta(
+    'outputTimeSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> outputTimeSeconds = GeneratedColumn<int>(
+    'output_time_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    date,
+    stage,
+    studyTimeSeconds,
+    inputTimeSeconds,
+    outputTimeSeconds,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'daily_stage_study_records';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DailyStageStudyRecord> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+        _dateMeta,
+        date.isAcceptableOrUnknown(data['date']!, _dateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('study_time_seconds')) {
+      context.handle(
+        _studyTimeSecondsMeta,
+        studyTimeSeconds.isAcceptableOrUnknown(
+          data['study_time_seconds']!,
+          _studyTimeSecondsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('input_time_seconds')) {
+      context.handle(
+        _inputTimeSecondsMeta,
+        inputTimeSeconds.isAcceptableOrUnknown(
+          data['input_time_seconds']!,
+          _inputTimeSecondsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('output_time_seconds')) {
+      context.handle(
+        _outputTimeSecondsMeta,
+        outputTimeSeconds.isAcceptableOrUnknown(
+          data['output_time_seconds']!,
+          _outputTimeSecondsMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {date, stage},
+  ];
+  @override
+  DailyStageStudyRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DailyStageStudyRecord(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}date'],
+      )!,
+      stage: $DailyStageStudyRecordsTable.$converterstage.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}stage'],
+        )!,
+      ),
+      studyTimeSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}study_time_seconds'],
+      )!,
+      inputTimeSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}input_time_seconds'],
+      )!,
+      outputTimeSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}output_time_seconds'],
+      )!,
+    );
+  }
+
+  @override
+  $DailyStageStudyRecordsTable createAlias(String alias) {
+    return $DailyStageStudyRecordsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<StudyStage, int, int> $converterstage =
+      const EnumIndexConverter<StudyStage>(StudyStage.values);
+}
+
+class DailyStageStudyRecord extends DataClass
+    implements Insertable<DailyStageStudyRecord> {
+  /// 自增主键
+  final int id;
+
+  /// 日期（只保留年月日）
+  final DateTime date;
+
+  /// 学习阶段（intEnum，按 StudyStage.index 存储）
+  final StudyStage stage;
+
+  /// 当日该阶段累计学习时长（秒）
+  final int studyTimeSeconds;
+
+  /// 当日该阶段输入时间（秒）— 音频播放时间
+  final int inputTimeSeconds;
+
+  /// 当日该阶段输出时间（秒）— 跟读/复述时间
+  final int outputTimeSeconds;
+  const DailyStageStudyRecord({
+    required this.id,
+    required this.date,
+    required this.stage,
+    required this.studyTimeSeconds,
+    required this.inputTimeSeconds,
+    required this.outputTimeSeconds,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['date'] = Variable<DateTime>(date);
+    {
+      map['stage'] = Variable<int>(
+        $DailyStageStudyRecordsTable.$converterstage.toSql(stage),
+      );
+    }
+    map['study_time_seconds'] = Variable<int>(studyTimeSeconds);
+    map['input_time_seconds'] = Variable<int>(inputTimeSeconds);
+    map['output_time_seconds'] = Variable<int>(outputTimeSeconds);
+    return map;
+  }
+
+  DailyStageStudyRecordsCompanion toCompanion(bool nullToAbsent) {
+    return DailyStageStudyRecordsCompanion(
+      id: Value(id),
+      date: Value(date),
+      stage: Value(stage),
+      studyTimeSeconds: Value(studyTimeSeconds),
+      inputTimeSeconds: Value(inputTimeSeconds),
+      outputTimeSeconds: Value(outputTimeSeconds),
+    );
+  }
+
+  factory DailyStageStudyRecord.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DailyStageStudyRecord(
+      id: serializer.fromJson<int>(json['id']),
+      date: serializer.fromJson<DateTime>(json['date']),
+      stage: $DailyStageStudyRecordsTable.$converterstage.fromJson(
+        serializer.fromJson<int>(json['stage']),
+      ),
+      studyTimeSeconds: serializer.fromJson<int>(json['studyTimeSeconds']),
+      inputTimeSeconds: serializer.fromJson<int>(json['inputTimeSeconds']),
+      outputTimeSeconds: serializer.fromJson<int>(json['outputTimeSeconds']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'date': serializer.toJson<DateTime>(date),
+      'stage': serializer.toJson<int>(
+        $DailyStageStudyRecordsTable.$converterstage.toJson(stage),
+      ),
+      'studyTimeSeconds': serializer.toJson<int>(studyTimeSeconds),
+      'inputTimeSeconds': serializer.toJson<int>(inputTimeSeconds),
+      'outputTimeSeconds': serializer.toJson<int>(outputTimeSeconds),
+    };
+  }
+
+  DailyStageStudyRecord copyWith({
+    int? id,
+    DateTime? date,
+    StudyStage? stage,
+    int? studyTimeSeconds,
+    int? inputTimeSeconds,
+    int? outputTimeSeconds,
+  }) => DailyStageStudyRecord(
+    id: id ?? this.id,
+    date: date ?? this.date,
+    stage: stage ?? this.stage,
+    studyTimeSeconds: studyTimeSeconds ?? this.studyTimeSeconds,
+    inputTimeSeconds: inputTimeSeconds ?? this.inputTimeSeconds,
+    outputTimeSeconds: outputTimeSeconds ?? this.outputTimeSeconds,
+  );
+  DailyStageStudyRecord copyWithCompanion(
+    DailyStageStudyRecordsCompanion data,
+  ) {
+    return DailyStageStudyRecord(
+      id: data.id.present ? data.id.value : this.id,
+      date: data.date.present ? data.date.value : this.date,
+      stage: data.stage.present ? data.stage.value : this.stage,
+      studyTimeSeconds: data.studyTimeSeconds.present
+          ? data.studyTimeSeconds.value
+          : this.studyTimeSeconds,
+      inputTimeSeconds: data.inputTimeSeconds.present
+          ? data.inputTimeSeconds.value
+          : this.inputTimeSeconds,
+      outputTimeSeconds: data.outputTimeSeconds.present
+          ? data.outputTimeSeconds.value
+          : this.outputTimeSeconds,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DailyStageStudyRecord(')
+          ..write('id: $id, ')
+          ..write('date: $date, ')
+          ..write('stage: $stage, ')
+          ..write('studyTimeSeconds: $studyTimeSeconds, ')
+          ..write('inputTimeSeconds: $inputTimeSeconds, ')
+          ..write('outputTimeSeconds: $outputTimeSeconds')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    date,
+    stage,
+    studyTimeSeconds,
+    inputTimeSeconds,
+    outputTimeSeconds,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DailyStageStudyRecord &&
+          other.id == this.id &&
+          other.date == this.date &&
+          other.stage == this.stage &&
+          other.studyTimeSeconds == this.studyTimeSeconds &&
+          other.inputTimeSeconds == this.inputTimeSeconds &&
+          other.outputTimeSeconds == this.outputTimeSeconds);
+}
+
+class DailyStageStudyRecordsCompanion
+    extends UpdateCompanion<DailyStageStudyRecord> {
+  final Value<int> id;
+  final Value<DateTime> date;
+  final Value<StudyStage> stage;
+  final Value<int> studyTimeSeconds;
+  final Value<int> inputTimeSeconds;
+  final Value<int> outputTimeSeconds;
+  const DailyStageStudyRecordsCompanion({
+    this.id = const Value.absent(),
+    this.date = const Value.absent(),
+    this.stage = const Value.absent(),
+    this.studyTimeSeconds = const Value.absent(),
+    this.inputTimeSeconds = const Value.absent(),
+    this.outputTimeSeconds = const Value.absent(),
+  });
+  DailyStageStudyRecordsCompanion.insert({
+    this.id = const Value.absent(),
+    required DateTime date,
+    required StudyStage stage,
+    this.studyTimeSeconds = const Value.absent(),
+    this.inputTimeSeconds = const Value.absent(),
+    this.outputTimeSeconds = const Value.absent(),
+  }) : date = Value(date),
+       stage = Value(stage);
+  static Insertable<DailyStageStudyRecord> custom({
+    Expression<int>? id,
+    Expression<DateTime>? date,
+    Expression<int>? stage,
+    Expression<int>? studyTimeSeconds,
+    Expression<int>? inputTimeSeconds,
+    Expression<int>? outputTimeSeconds,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (date != null) 'date': date,
+      if (stage != null) 'stage': stage,
+      if (studyTimeSeconds != null) 'study_time_seconds': studyTimeSeconds,
+      if (inputTimeSeconds != null) 'input_time_seconds': inputTimeSeconds,
+      if (outputTimeSeconds != null) 'output_time_seconds': outputTimeSeconds,
+    });
+  }
+
+  DailyStageStudyRecordsCompanion copyWith({
+    Value<int>? id,
+    Value<DateTime>? date,
+    Value<StudyStage>? stage,
+    Value<int>? studyTimeSeconds,
+    Value<int>? inputTimeSeconds,
+    Value<int>? outputTimeSeconds,
+  }) {
+    return DailyStageStudyRecordsCompanion(
+      id: id ?? this.id,
+      date: date ?? this.date,
+      stage: stage ?? this.stage,
+      studyTimeSeconds: studyTimeSeconds ?? this.studyTimeSeconds,
+      inputTimeSeconds: inputTimeSeconds ?? this.inputTimeSeconds,
+      outputTimeSeconds: outputTimeSeconds ?? this.outputTimeSeconds,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<DateTime>(date.value);
+    }
+    if (stage.present) {
+      map['stage'] = Variable<int>(
+        $DailyStageStudyRecordsTable.$converterstage.toSql(stage.value),
+      );
+    }
+    if (studyTimeSeconds.present) {
+      map['study_time_seconds'] = Variable<int>(studyTimeSeconds.value);
+    }
+    if (inputTimeSeconds.present) {
+      map['input_time_seconds'] = Variable<int>(inputTimeSeconds.value);
+    }
+    if (outputTimeSeconds.present) {
+      map['output_time_seconds'] = Variable<int>(outputTimeSeconds.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DailyStageStudyRecordsCompanion(')
+          ..write('id: $id, ')
+          ..write('date: $date, ')
+          ..write('stage: $stage, ')
+          ..write('studyTimeSeconds: $studyTimeSeconds, ')
+          ..write('inputTimeSeconds: $inputTimeSeconds, ')
+          ..write('outputTimeSeconds: $outputTimeSeconds')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -7261,6 +7698,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $DailyStudyRecordsTable dailyStudyRecords =
       $DailyStudyRecordsTable(this);
+  late final $DailyStageStudyRecordsTable dailyStageStudyRecords =
+      $DailyStageStudyRecordsTable(this);
   late final AudioItemDao audioItemDao = AudioItemDao(this as AppDatabase);
   late final CollectionDao collectionDao = CollectionDao(this as AppDatabase);
   late final BookmarkDao bookmarkDao = BookmarkDao(this as AppDatabase);
@@ -7284,6 +7723,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final DailyStudyRecordDao dailyStudyRecordDao = DailyStudyRecordDao(
     this as AppDatabase,
   );
+  late final DailyStageStudyRecordDao dailyStageStudyRecordDao =
+      DailyStageStudyRecordDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -7302,6 +7743,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     savedWords,
     learnedWordForms,
     dailyStudyRecords,
+    dailyStageStudyRecords,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -12817,6 +13259,245 @@ typedef $$DailyStudyRecordsTableProcessedTableManager =
       DailyStudyRecord,
       PrefetchHooks Function()
     >;
+typedef $$DailyStageStudyRecordsTableCreateCompanionBuilder =
+    DailyStageStudyRecordsCompanion Function({
+      Value<int> id,
+      required DateTime date,
+      required StudyStage stage,
+      Value<int> studyTimeSeconds,
+      Value<int> inputTimeSeconds,
+      Value<int> outputTimeSeconds,
+    });
+typedef $$DailyStageStudyRecordsTableUpdateCompanionBuilder =
+    DailyStageStudyRecordsCompanion Function({
+      Value<int> id,
+      Value<DateTime> date,
+      Value<StudyStage> stage,
+      Value<int> studyTimeSeconds,
+      Value<int> inputTimeSeconds,
+      Value<int> outputTimeSeconds,
+    });
+
+class $$DailyStageStudyRecordsTableFilterComposer
+    extends Composer<_$AppDatabase, $DailyStageStudyRecordsTable> {
+  $$DailyStageStudyRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<StudyStage, StudyStage, int> get stage =>
+      $composableBuilder(
+        column: $table.stage,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<int> get studyTimeSeconds => $composableBuilder(
+    column: $table.studyTimeSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get inputTimeSeconds => $composableBuilder(
+    column: $table.inputTimeSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get outputTimeSeconds => $composableBuilder(
+    column: $table.outputTimeSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DailyStageStudyRecordsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DailyStageStudyRecordsTable> {
+  $$DailyStageStudyRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get stage => $composableBuilder(
+    column: $table.stage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get studyTimeSeconds => $composableBuilder(
+    column: $table.studyTimeSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get inputTimeSeconds => $composableBuilder(
+    column: $table.inputTimeSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get outputTimeSeconds => $composableBuilder(
+    column: $table.outputTimeSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DailyStageStudyRecordsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DailyStageStudyRecordsTable> {
+  $$DailyStageStudyRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<StudyStage, int> get stage =>
+      $composableBuilder(column: $table.stage, builder: (column) => column);
+
+  GeneratedColumn<int> get studyTimeSeconds => $composableBuilder(
+    column: $table.studyTimeSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get inputTimeSeconds => $composableBuilder(
+    column: $table.inputTimeSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get outputTimeSeconds => $composableBuilder(
+    column: $table.outputTimeSeconds,
+    builder: (column) => column,
+  );
+}
+
+class $$DailyStageStudyRecordsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DailyStageStudyRecordsTable,
+          DailyStageStudyRecord,
+          $$DailyStageStudyRecordsTableFilterComposer,
+          $$DailyStageStudyRecordsTableOrderingComposer,
+          $$DailyStageStudyRecordsTableAnnotationComposer,
+          $$DailyStageStudyRecordsTableCreateCompanionBuilder,
+          $$DailyStageStudyRecordsTableUpdateCompanionBuilder,
+          (
+            DailyStageStudyRecord,
+            BaseReferences<
+              _$AppDatabase,
+              $DailyStageStudyRecordsTable,
+              DailyStageStudyRecord
+            >,
+          ),
+          DailyStageStudyRecord,
+          PrefetchHooks Function()
+        > {
+  $$DailyStageStudyRecordsTableTableManager(
+    _$AppDatabase db,
+    $DailyStageStudyRecordsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DailyStageStudyRecordsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$DailyStageStudyRecordsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$DailyStageStudyRecordsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<DateTime> date = const Value.absent(),
+                Value<StudyStage> stage = const Value.absent(),
+                Value<int> studyTimeSeconds = const Value.absent(),
+                Value<int> inputTimeSeconds = const Value.absent(),
+                Value<int> outputTimeSeconds = const Value.absent(),
+              }) => DailyStageStudyRecordsCompanion(
+                id: id,
+                date: date,
+                stage: stage,
+                studyTimeSeconds: studyTimeSeconds,
+                inputTimeSeconds: inputTimeSeconds,
+                outputTimeSeconds: outputTimeSeconds,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required DateTime date,
+                required StudyStage stage,
+                Value<int> studyTimeSeconds = const Value.absent(),
+                Value<int> inputTimeSeconds = const Value.absent(),
+                Value<int> outputTimeSeconds = const Value.absent(),
+              }) => DailyStageStudyRecordsCompanion.insert(
+                id: id,
+                date: date,
+                stage: stage,
+                studyTimeSeconds: studyTimeSeconds,
+                inputTimeSeconds: inputTimeSeconds,
+                outputTimeSeconds: outputTimeSeconds,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DailyStageStudyRecordsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DailyStageStudyRecordsTable,
+      DailyStageStudyRecord,
+      $$DailyStageStudyRecordsTableFilterComposer,
+      $$DailyStageStudyRecordsTableOrderingComposer,
+      $$DailyStageStudyRecordsTableAnnotationComposer,
+      $$DailyStageStudyRecordsTableCreateCompanionBuilder,
+      $$DailyStageStudyRecordsTableUpdateCompanionBuilder,
+      (
+        DailyStageStudyRecord,
+        BaseReferences<
+          _$AppDatabase,
+          $DailyStageStudyRecordsTable,
+          DailyStageStudyRecord
+        >,
+      ),
+      DailyStageStudyRecord,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -12846,4 +13527,9 @@ class $AppDatabaseManager {
       $$LearnedWordFormsTableTableManager(_db, _db.learnedWordForms);
   $$DailyStudyRecordsTableTableManager get dailyStudyRecords =>
       $$DailyStudyRecordsTableTableManager(_db, _db.dailyStudyRecords);
+  $$DailyStageStudyRecordsTableTableManager get dailyStageStudyRecords =>
+      $$DailyStageStudyRecordsTableTableManager(
+        _db,
+        _db.dailyStageStudyRecords,
+      );
 }

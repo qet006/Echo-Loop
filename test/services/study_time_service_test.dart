@@ -17,7 +17,7 @@ void main() {
 
   setUp(() async {
     db = _createTestDb();
-    service = StudyTimeService(db.dailyStudyRecordDao);
+    service = StudyTimeService(db.dailyStudyRecordDao, db.dailyStageStudyRecordDao);
   });
 
   tearDown(() async {

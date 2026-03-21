@@ -12,6 +12,7 @@ import 'daos/sentence_ai_cache_dao.dart';
 import 'daos/saved_word_dao.dart';
 import 'daos/learned_word_form_dao.dart';
 import 'daos/daily_study_record_dao.dart';
+import 'daos/daily_stage_study_record_dao.dart';
 import '../services/study_time_service.dart';
 import '../providers/audio_library_provider.dart';
 import '../providers/collection_provider.dart';
@@ -160,6 +161,12 @@ final dailyStudyRecordDaoProvider = Provider<DailyStudyRecordDao>((ref) {
   return ref.watch(appDatabaseProvider).dailyStudyRecordDao;
 });
 
+/// DailyStageStudyRecord DAO Provider
+final dailyStageStudyRecordDaoProvider =
+    Provider<DailyStageStudyRecordDao>((ref) {
+  return ref.watch(appDatabaseProvider).dailyStageStudyRecordDao;
+});
+
 /// 收藏句子列表 Provider（流式，keepAlive）
 ///
 /// 监听所有收藏书签的变化（含音频名称），按音频分组。
@@ -171,5 +178,8 @@ final bookmarkListProvider = StreamProvider<List<BookmarkWithAudio>>((ref) {
 
 /// StudyTimeService Provider
 final studyTimeServiceProvider = Provider<StudyTimeService>((ref) {
-  return StudyTimeService(ref.watch(dailyStudyRecordDaoProvider));
+  return StudyTimeService(
+    ref.watch(dailyStudyRecordDaoProvider),
+    ref.watch(dailyStageStudyRecordDaoProvider),
+  );
 });

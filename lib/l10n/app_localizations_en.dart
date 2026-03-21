@@ -1943,4 +1943,49 @@ class AppLocalizationsEn extends AppLocalizations {
   String reviewReminderBody(String audioName, int round) {
     return '$audioName · Review round $round is ready';
   }
+
+  @override
+  String get stageBlindListen => 'Blind Listen';
+
+  @override
+  String get stageIntensiveListen => 'Intensive Listen';
+
+  @override
+  String get stageListenAndRepeat => 'Shadowing';
+
+  @override
+  String get stageRetell => 'Retelling';
+
+  @override
+  String get stageReviewDifficultPractice => 'Difficult Drill';
+
+  @override
+  String get stageBookmarkReview => 'Sentence Review';
+
+  @override
+  String get stageFlashcard => 'Word Review';
+
+  @override
+  String stageBreakdownTitle(String date) {
+    return '$date';
+  }
+
+  @override
+  String get stageBreakdownToday => ' (Today)';
+
+  @override
+  String get stageBreakdownTotal => 'Total';
+
+  @override
+  String get stageBreakdownLessThanOneMin => '<1m';
+
+  @override
+  String get stageBreakdownListenShort => 'Listen';
+
+  @override
+  String get stageBreakdownSpeakShort => 'Speak';
+
+  @override
+  String get stageBreakdownNoStageData =>
+      'Detailed breakdown data starts recording from this version';
 }

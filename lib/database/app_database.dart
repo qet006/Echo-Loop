@@ -19,6 +19,8 @@ import 'tables/sentence_ai_cache.dart';
 import 'tables/saved_words.dart';
 import 'tables/learned_word_forms.dart';
 import 'tables/daily_study_records.dart';
+import 'tables/daily_stage_study_records.dart';
+import '../models/study_stage.dart';
 import 'daos/audio_item_dao.dart';
 import 'daos/collection_dao.dart';
 import 'daos/bookmark_dao.dart';
@@ -30,13 +32,15 @@ import 'daos/sentence_ai_cache_dao.dart';
 import 'daos/saved_word_dao.dart';
 import 'daos/learned_word_form_dao.dart';
 import 'daos/daily_study_record_dao.dart';
+import 'daos/daily_stage_study_record_dao.dart';
 
 part 'app_database.g.dart';
 
 /// Fluency 应用数据库
-/// 包含 13 张表：audio_items, collections, collection_audio_items, bookmarks,
+/// 包含 14 张表：audio_items, collections, collection_audio_items, bookmarks,
 /// playback_states, learning_progresses, stage_completions, tags, audio_item_tags,
-/// sentence_ai_cache, saved_words, learned_word_forms, daily_study_records
+/// sentence_ai_cache, saved_words, learned_word_forms, daily_study_records,
+/// daily_stage_study_records
 @DriftDatabase(
   tables: [
     AudioItems,
@@ -52,6 +56,7 @@ part 'app_database.g.dart';
     SavedWords,
     LearnedWordForms,
     DailyStudyRecords,
+    DailyStageStudyRecords,
   ],
   daos: [
     AudioItemDao,
@@ -65,13 +70,14 @@ part 'app_database.g.dart';
     SavedWordDao,
     LearnedWordFormDao,
     DailyStudyRecordDao,
+    DailyStageStudyRecordDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 19;
+  int get schemaVersion => 20;
 
   @override
   MigrationStrategy get migration {
@@ -164,6 +170,10 @@ class AppDatabase extends _$AppDatabase {
         if (from < 19) {
           await m.createTable(dailyStudyRecords);
           await _migrateStudyDataFromSP();
+        }
+        // v19→v20：新增 daily_stage_study_records 表（按阶段统计每日听说时长）
+        if (from < 20) {
+          await m.createTable(dailyStageStudyRecords);
         }
         // v12→v13：audio_items 新增 transcript_source, audio_sha256, transcript_language 列
         if (from < 13) {

@@ -452,6 +452,28 @@
 
 ---
 
+## 已完成：按学习阶段分开统计听说时长 + 柱状图点击查看详情
+
+- [x] 新建 `StudyStage` 枚举（7 个学习阶段，intEnum 存储）
+- [x] 新建 `DailyStageStudyRecords` Drift 表（date + stage 唯一组合键）
+- [x] 新建 `DailyStageStudyRecordDao`（upsertAdd 累加 + getByDate 查询）
+- [x] 数据库注册新表 + 新 DAO，`schemaVersion` 19 → 20，迁移 createTable
+- [x] `StudyTimeService` 扩展：构造函数注入新 DAO，`addStudyTime/addInputTime/addOutputTime` 加可选 `stage` 参数实现双写
+- [x] `StudyTimeService` 新增 `getStageBreakdown(date)` + `getDayTotal(date)` 查询方法
+- [x] `LearningSessionProvider._saveStudyTime/_saveInputOutputTime` 传递 `_currentStage`（LearningMode → StudyStage 映射）
+- [x] `BookmarkReviewProvider._saveAndRefreshStudyTime` 传递 `StudyStage.bookmarkReview`
+- [x] `FlashcardNotifier._saveAndRefreshStudyTime` 传递 `StudyStage.flashcard`
+- [x] `_WeeklyBarChart` 改为 StatefulWidget，新增 `onBarTap` 回调 + 点击高亮（150ms opacity）
+- [x] 新建 `DayStageBreakdownSheet` 底部弹窗（阶段列表 + 图标 + 听说明细 + 合计行 + 旧数据回退提示）
+- [x] 国际化新增 14 个 key（7 阶段名 + 弹窗标题/今天/合计/不足1分/听/说/无数据提示，en + zh）
+- [x] 代码生成（build_runner + gen-l10n）通过
+- [x] `flutter analyze` 无错误
+- [x] 现有 1301 个测试全部通过（26 个失败为预存问题）
+
+  **完成时间**: 2026-03-21
+
+---
+
 ## 任务完成记录模板
 
 <!--

@@ -1890,4 +1890,48 @@ class AppLocalizationsZh extends AppLocalizations {
   String reviewReminderBody(String audioName, int round) {
     return '$audioName · 第$round轮复习时间到了';
   }
+
+  @override
+  String get stageBlindListen => '盲听';
+
+  @override
+  String get stageIntensiveListen => '精听';
+
+  @override
+  String get stageListenAndRepeat => '跟读';
+
+  @override
+  String get stageRetell => '复述';
+
+  @override
+  String get stageReviewDifficultPractice => '难句补练';
+
+  @override
+  String get stageBookmarkReview => '句子复习';
+
+  @override
+  String get stageFlashcard => '单词复习';
+
+  @override
+  String stageBreakdownTitle(String date) {
+    return '$date';
+  }
+
+  @override
+  String get stageBreakdownToday => '（今天）';
+
+  @override
+  String get stageBreakdownTotal => '合计';
+
+  @override
+  String get stageBreakdownLessThanOneMin => '<1分';
+
+  @override
+  String get stageBreakdownListenShort => '听';
+
+  @override
+  String get stageBreakdownSpeakShort => '说';
+
+  @override
+  String get stageBreakdownNoStageData => '详细分布数据从此版本开始记录';
 }

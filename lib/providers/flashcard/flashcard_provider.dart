@@ -18,6 +18,7 @@ import '../../models/dict_entry.dart';
 import '../../models/flashcard_settings.dart';
 import '../../providers/audio_engine/audio_engine_provider.dart';
 import '../../services/dictionary_service.dart';
+import '../../models/study_stage.dart';
 import '../../services/study_time_service.dart';
 import '../../services/tts_service.dart';
 import '../daily_study_time_provider.dart';
@@ -637,12 +638,13 @@ class FlashcardNotifier extends _$FlashcardNotifier {
 
   /// 停止计时并保存已记录的学习时长 + 输入时间，刷新统计 UI
   Future<void> _saveAndRefreshStudyTime() async {
+    const stage = StudyStage.flashcard;
     // 保存输入时间
     _inputStopwatch.stop();
     final inputSecs = _inputStopwatch.elapsed.inSeconds;
     _inputStopwatch.reset();
     if (inputSecs > 0) {
-      await _studyTimeService.addInputTime(inputSecs);
+      await _studyTimeService.addInputTime(inputSecs, stage: stage);
     }
 
     if (!_studyStopwatch.isRunning &&
@@ -657,7 +659,7 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     final seconds = _studyStopwatch.elapsed.inSeconds;
     _studyStopwatch.reset();
     if (seconds > 0) {
-      await _studyTimeService.addStudyTime(seconds);
+      await _studyTimeService.addStudyTime(seconds, stage: stage);
     }
     ref.read(dailyStudyTimeProvider.notifier).refresh();
     ref.read(studyStatsNotifierProvider.notifier).refresh();

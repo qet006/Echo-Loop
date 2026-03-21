@@ -1068,5 +1068,26 @@
       "audioName": { "type": "String" },
       "round": { "type": "int" }
     }
-  }
+  },
+
+  "stageBlindListen": "Blind Listen",
+  "stageIntensiveListen": "Intensive Listen",
+  "stageListenAndRepeat": "Shadowing",
+  "stageRetell": "Retelling",
+  "stageReviewDifficultPractice": "Difficult Drill",
+  "stageBookmarkReview": "Sentence Review",
+  "stageFlashcard": "Word Review",
+
+  "stageBreakdownTitle": "{date}",
+  "@stageBreakdownTitle": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "stageBreakdownToday": " (Today)",
+  "stageBreakdownTotal": "Total",
+  "stageBreakdownLessThanOneMin": "<1m",
+  "stageBreakdownListenShort": "Listen",
+  "stageBreakdownSpeakShort": "Speak",
+  "stageBreakdownNoStageData": "Detailed breakdown data starts recording from this version"
 }

@@ -790,5 +790,26 @@
       "audioName": { "type": "String" },
       "round": { "type": "int" }
     }
-  }
+  },
+
+  "stageBlindListen": "盲听",
+  "stageIntensiveListen": "精听",
+  "stageListenAndRepeat": "跟读",
+  "stageRetell": "复述",
+  "stageReviewDifficultPractice": "难句补练",
+  "stageBookmarkReview": "句子复习",
+  "stageFlashcard": "单词复习",
+
+  "stageBreakdownTitle": "{date}",
+  "@stageBreakdownTitle": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "stageBreakdownToday": "（今天）",
+  "stageBreakdownTotal": "合计",
+  "stageBreakdownLessThanOneMin": "<1分",
+  "stageBreakdownListenShort": "听",
+  "stageBreakdownSpeakShort": "说",
+  "stageBreakdownNoStageData": "详细分布数据从此版本开始记录"
 }
