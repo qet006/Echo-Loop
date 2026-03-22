@@ -492,6 +492,8 @@ class _BookmarkSentenceTileState extends ConsumerState<_BookmarkSentenceTile> {
               audioItemId: widget.audioId,
               sentenceIndex: widget.bookmark.sentenceIndex,
               sentenceText: widget.bookmark.sentenceText,
+              sentenceStartMs: (widget.bookmark.startTime * 1000).round(),
+              sentenceEndMs: (widget.bookmark.endTime * 1000).round(),
             );
           }
         };

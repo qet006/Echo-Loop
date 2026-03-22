@@ -18,6 +18,7 @@ import '../../models/dict_entry.dart';
 import '../../providers/audio_engine/audio_engine_provider.dart';
 import '../../providers/flashcard/flashcard_provider.dart';
 import '../../router/app_router.dart';
+import '../../services/app_logger.dart';
 import '../../services/tts_service.dart';
 import '../../theme/app_theme.dart';
 import '../common/text_context_menu.dart';
@@ -274,6 +275,9 @@ class _BackContent extends ConsumerStatefulWidget {
 class _BackContentState extends ConsumerState<_BackContent> {
   bool _isPlaying = false;
 
+  /// 用户手动点击播放时置 true，阻止自动播放覆盖
+  bool _autoPlayCancelled = false;
+
   /// 源音频名称（异步加载）
   String? _audioName;
 
@@ -312,7 +316,7 @@ class _BackContentState extends ConsumerState<_BackContent> {
     // 自动播放来源例句
     if (widget.autoPlaySentence && widget.item.savedWord.sentenceText != null) {
       await Future<void>.delayed(const Duration(milliseconds: 600));
-      if (!mounted) return;
+      if (!mounted || _autoPlayCancelled) return;
       await _playSentence();
       if (!mounted) return;
     }
@@ -499,7 +503,7 @@ class _BackContentState extends ConsumerState<_BackContent> {
     // 长按/右键弹出复制菜单
     if (canPlay) {
       return GestureDetector(
-        onTap: _playSentence,
+        onTap: () => _playSentence(isUserTap: true),
         onLongPressStart: (details) => TextContextMenu.show(
           context,
           details.globalPosition,
@@ -531,7 +535,11 @@ class _BackContentState extends ConsumerState<_BackContent> {
   }
 
   /// 播放来源句子的原声片段
-  Future<void> _playSentence() async {
+  ///
+  /// [isUserTap] 为 true 表示用户手动点击，会取消自动播放。
+  Future<void> _playSentence({bool isUserTap = false}) async {
+    if (isUserTap) _autoPlayCancelled = true;
+
     final word = widget.item.savedWord;
     if (word.audioItemId == null) return;
 
@@ -617,10 +625,10 @@ class _BackContentState extends ConsumerState<_BackContent> {
             .read(flashcardNotifierProvider.notifier)
             .onSentencePlayed(word.sentenceText!);
       }
-    } catch (_) {
-      // 忽略播放错误（音频文件不存在等）
+    } catch (e) {
+      AppLogger.log('Flashcard', '⚠ _playSentence error: $e');
     } finally {
-      if (mounted) {
+      if (mounted && _isPlaying) {
         setState(() => _isPlaying = false);
         notifier.onSentencePlaybackEnded();
       }
