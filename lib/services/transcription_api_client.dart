@@ -5,7 +5,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' show Ref;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_io/io.dart';
+import '../analytics/geo_interceptor.dart';
 import '../config/api_config.dart';
 import '../utils/srt_generator.dart';
 
@@ -133,6 +135,9 @@ class TranscriptionApiClient {
           receiveTimeout: const Duration(seconds: 30),
         ),
       ) {
+    SharedPreferences.getInstance().then(
+      (prefs) => _dio.interceptors.add(GeoInterceptor(prefs)),
+    );
     _dio.interceptors.add(
       LogInterceptor(
         requestBody: false,

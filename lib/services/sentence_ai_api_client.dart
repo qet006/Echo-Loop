@@ -7,7 +7,9 @@ library;
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' show Ref;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../analytics/geo_interceptor.dart';
 import '../config/api_config.dart';
 import '../models/sentence_ai_result.dart';
 import '../models/word_analysis.dart';
@@ -26,6 +28,10 @@ class SentenceAiApiClient {
           receiveTimeout: const Duration(seconds: 60),
         ),
       ) {
+    // 异步添加 GeoInterceptor（SharedPreferences 在 main() 中已初始化，几乎同步返回）
+    SharedPreferences.getInstance().then(
+      (prefs) => _dio.interceptors.add(GeoInterceptor(prefs)),
+    );
     _dio.interceptors.add(
       LogInterceptor(
         requestBody: false,
