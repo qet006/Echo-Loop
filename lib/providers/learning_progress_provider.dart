@@ -177,6 +177,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
 
     // 完成当前子步骤时，清除该步骤对应的断点索引
     final completedSubStage = progress.currentSubStage;
+    final clearBlindListen = completedSubStage == SubStageType.blindListen;
     final clearIntensive = completedSubStage == SubStageType.intensiveListen;
     final clearShadowing = completedSubStage == SubStageType.listenAndRepeat;
     final clearDifficult =
@@ -195,6 +196,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
         currentStageStartedAt: now,
         totalStudyDurationMs: newTotalDuration,
         updatedAt: now,
+        clearBlindListenParagraphIndex: clearBlindListen,
         clearIntensiveListenSentenceIndex: clearIntensive,
         clearShadowingSentenceIndex: clearShadowing,
         clearDifficultPracticeSentenceIndex: clearDifficult,
@@ -215,6 +217,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
         firstLearnCompletedAt: stage == LearningStage.firstLearn
             ? now
             : progress.firstLearnCompletedAt,
+        clearBlindListenParagraphIndex: clearBlindListen,
         clearIntensiveListenSentenceIndex: clearIntensive,
         clearShadowingSentenceIndex: clearShadowing,
         clearDifficultPracticeSentenceIndex: clearDifficult,
@@ -418,6 +421,40 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
   }
 
   /// 保存复述断点段落索引
+  /// 保存盲听断点段落索引（双轨：新学习 / 自由练习）
+  Future<void> saveBlindListenParagraphIndex(
+    String audioItemId,
+    int? paragraphIndex, {
+    required bool isFreePlay,
+  }) async {
+    final progress = await ensureProgress(audioItemId);
+    final now = DateTime.now();
+
+    LearningProgress updated;
+    if (isFreePlay) {
+      updated = progress.copyWith(
+        freePlayBlindListenParagraphIndex: paragraphIndex,
+        clearFreePlayBlindListenParagraphIndex: paragraphIndex == null,
+        freePlayBreakpointSavedAt: now,
+        updatedAt: now,
+      );
+    } else {
+      updated = progress.copyWith(
+        blindListenParagraphIndex: paragraphIndex,
+        clearBlindListenParagraphIndex: paragraphIndex == null,
+        newLearningBreakpointSavedAt: now,
+        updatedAt: now,
+      );
+    }
+
+    await _persistProgress(updated);
+
+    final newMap = Map<String, LearningProgress>.from(state.progressMap);
+    newMap[audioItemId] = updated;
+    state = state.copyWith(progressMap: newMap);
+  }
+
+  /// 保存复述断点段落索引（双轨：新学习 / 自由练习）
   Future<void> saveRetellParagraphIndex(
     String audioItemId,
     int? paragraphIndex, {
@@ -519,6 +556,10 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
         ),
         intensiveListenPassCount: Value(progress.intensiveListenPassCount),
         shadowingPassCount: Value(progress.shadowingPassCount),
+        blindListenParagraphIndex: Value(progress.blindListenParagraphIndex),
+        freePlayBlindListenParagraphIndex: Value(
+          progress.freePlayBlindListenParagraphIndex,
+        ),
         intensiveListenSentenceIndex: Value(
           progress.intensiveListenSentenceIndex,
         ),
@@ -570,11 +611,13 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
       intensiveListenDifficultCount: row.intensiveListenDifficultCount,
       intensiveListenPassCount: row.intensiveListenPassCount,
       shadowingPassCount: row.shadowingPassCount,
+      blindListenParagraphIndex: row.blindListenParagraphIndex,
       intensiveListenSentenceIndex: row.intensiveListenSentenceIndex,
       shadowingSentenceIndex: row.shadowingSentenceIndex,
       difficultPracticeSentenceIndex: row.difficultPracticeSentenceIndex,
       retellParagraphIndex: row.retellParagraphIndex,
       retellPassCount: row.retellPassCount,
+      freePlayBlindListenParagraphIndex: row.freePlayBlindListenParagraphIndex,
       freePlayIntensiveListenSentenceIndex:
           row.freePlayIntensiveListenSentenceIndex,
       freePlayShadowingSentenceIndex: row.freePlayShadowingSentenceIndex,

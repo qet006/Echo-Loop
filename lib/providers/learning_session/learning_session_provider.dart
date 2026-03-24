@@ -414,11 +414,23 @@ class LearningSession extends _$LearningSession {
     final practice = ref.read(listeningPracticeProvider.notifier);
     final currentSettings = ref.read(listeningPracticeProvider).settings;
 
-    // 从数据库读取已完成遍数
-    final progress = ref
-        .read(learningProgressNotifierProvider)
-        .progressMap[audioItemId];
-    final dbPassCount = progress?.blindListenPassCount ?? 0;
+    // 从数据库读取已完成遍数 + 断点段落索引
+    final progressNotifier = ref.read(
+      learningProgressNotifierProvider.notifier,
+    );
+    final progress = await progressNotifier.getLatestOrEnsureProgress(
+      audioItemId,
+    );
+    final dbPassCount = progress.blindListenPassCount;
+
+    // 读取断点续学索引：各自读取独立字段 + 校验过期时间
+    int startParagraphIndex = 0;
+    if (isFreePlay && _isBreakpointValid(progress.freePlayBreakpointSavedAt)) {
+      startParagraphIndex = progress.freePlayBlindListenParagraphIndex ?? 0;
+    } else if (!isFreePlay &&
+        _isBreakpointValid(progress.newLearningBreakpointSavedAt)) {
+      startParagraphIndex = progress.blindListenParagraphIndex ?? 0;
+    }
 
     state = state.copyWith(
       learningMode: LearningMode.blindListen,
@@ -436,6 +448,7 @@ class LearningSession extends _$LearningSession {
     blindPlayer.initializeParagraphs(
       paragraphs,
       settings ?? const BlindListenSettings(),
+      startParagraphIndex: startParagraphIndex,
     );
     _trackSessionStart();
   }

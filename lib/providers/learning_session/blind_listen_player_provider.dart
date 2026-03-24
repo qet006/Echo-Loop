@@ -18,6 +18,7 @@ import '../../models/blind_listen_settings.dart';
 import '../../models/sentence.dart';
 import '../../utils/word_counter.dart';
 import '../audio_engine/audio_engine_provider.dart';
+import '../learning_progress_provider.dart';
 import 'countdown_controller.dart';
 import 'learning_session_provider.dart';
 
@@ -159,30 +160,38 @@ class BlindListenPlayer extends _$BlindListenPlayer {
   }
 
   /// 初始化段落播放
+  ///
+  /// [startParagraphIndex] 断点续学段落索引，自动 clamp 到有效范围。
   void initializeParagraphs(
     List<List<Sentence>> paragraphs,
-    BlindListenSettings settings,
-  ) {
+    BlindListenSettings settings, {
+    int startParagraphIndex = 0,
+  }) {
     _cleanup();
     _paragraphs = paragraphs;
 
+    final safeIndex = paragraphs.isEmpty
+        ? 0
+        : startParagraphIndex.clamp(0, paragraphs.length - 1);
+
     state = BlindListenPlayerState(
-      currentParagraphIndex: 0,
+      currentParagraphIndex: safeIndex,
       totalParagraphs: paragraphs.length,
       settings: settings,
     );
     ref.read(analyticsServiceProvider).track(Events.blindListenStart, {
       EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
-      EventParams.passNumber: ref.read(learningSessionProvider).blindListenPassCount,
+      EventParams.passNumber: ref
+          .read(learningSessionProvider)
+          .blindListenPassCount,
     });
   }
 
   /// 获取当前段落的句子列表
   List<Sentence> get currentParagraphSentences =>
-      _paragraphs.isNotEmpty &&
-              state.currentParagraphIndex < _paragraphs.length
-          ? _paragraphs[state.currentParagraphIndex]
-          : [];
+      _paragraphs.isNotEmpty && state.currentParagraphIndex < _paragraphs.length
+      ? _paragraphs[state.currentParagraphIndex]
+      : [];
 
   /// 获取当前段落时长
   Duration get currentParagraphDuration {
@@ -278,8 +287,8 @@ class BlindListenPlayer extends _$BlindListenPlayer {
   ///
   /// 切换到手动模式时，停在当前段落，取消一切异步操作。
   void updateSettings(BlindListenSettings newSettings) {
-    final switchedToManual = newSettings.isManualMode &&
-        !state.settings.isManualMode;
+    final switchedToManual =
+        newSettings.isManualMode && !state.settings.isManualMode;
 
     state = state.copyWith(settings: newSettings);
 
@@ -312,10 +321,7 @@ class BlindListenPlayer extends _$BlindListenPlayer {
   /// 取消倒计时
   void cancelCountdown() {
     _invalidateCountdown();
-    state = state.copyWith(
-      isPauseCountdown: false,
-      isCountdownPaused: false,
-    );
+    state = state.copyWith(isPauseCountdown: false, isCountdownPaused: false);
   }
 
   /// 释放资源
@@ -327,8 +333,26 @@ class BlindListenPlayer extends _$BlindListenPlayer {
 
   // ========== 内部方法 ==========
 
+  /// 异步保存盲听断点段落索引，不阻塞播放流程
+  void _persistCurrentParagraphIndexAsync() {
+    final session = ref.read(learningSessionProvider);
+    final audioItemId = session.audioItemId;
+    if (audioItemId == null) return;
+
+    unawaited(
+      ref
+          .read(learningProgressNotifierProvider.notifier)
+          .saveBlindListenParagraphIndex(
+            audioItemId,
+            state.currentParagraphIndex,
+            isFreePlay: session.isFreePlay,
+          ),
+    );
+  }
+
   /// 播放当前段落
   Future<void> _playCurrentParagraph() async {
+    _persistCurrentParagraphIndexAsync();
     final sentences = currentParagraphSentences;
     if (sentences.isEmpty) return;
 
@@ -442,9 +466,7 @@ class BlindListenPlayer extends _$BlindListenPlayer {
   Future<void> _onPauseCountdownFinished() async {
     if (state.currentRepeatCount < state.settings.repeatCount) {
       // 当前段还有遍数 → 直接继续播放，不经过 isPauseCountdown=false 中间状态
-      state = state.copyWith(
-        currentRepeatCount: state.currentRepeatCount + 1,
-      );
+      state = state.copyWith(currentRepeatCount: state.currentRepeatCount + 1);
       await _playCurrentParagraph();
     } else if (state.currentParagraphIndex < state.totalParagraphs - 1) {
       // 还有下一段 → 推进
@@ -458,7 +480,8 @@ class BlindListenPlayer extends _$BlindListenPlayer {
         stepFinished: true,
       );
       ref.read(analyticsServiceProvider).track(Events.blindListenComplete, {
-        EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
+        EventParams.audioId:
+            ref.read(learningSessionProvider).audioItemId ?? '',
         EventParams.passNumber: state.currentRepeatCount,
       });
     }
