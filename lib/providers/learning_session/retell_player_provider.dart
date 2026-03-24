@@ -183,9 +183,12 @@ class RetellPlayer extends _$RetellPlayer {
   void _handleAppLifecycleChange(AppLifecycleState appState) {
     if (appState == AppLifecycleState.paused ||
         appState == AppLifecycleState.hidden) {
-      AppLogger.log('RetellPlayer', 'App 进入后台: '
-          'phase=${state.phase.name}, '
-          'countdown=${state.isRetellCountdown}');
+      AppLogger.log(
+        'RetellPlayer',
+        'App 进入后台: '
+            'phase=${state.phase.name}, '
+            'countdown=${state.isRetellCountdown}',
+      );
 
       // 停止段落音频播放
       final engine = ref.read(audioEngineProvider.notifier);
@@ -202,10 +205,7 @@ class RetellPlayer extends _$RetellPlayer {
       // 回到 retelling 阶段等待用户操作
       if (state.phase == RetellPhase.listening) {
         AppLogger.log('RetellPlayer', 'listening → retelling (等待用户操作)');
-        state = state.copyWith(
-          phase: RetellPhase.retelling,
-          isPlaying: false,
-        );
+        state = state.copyWith(phase: RetellPhase.retelling, isPlaying: false);
       }
     }
   }
@@ -282,8 +282,9 @@ class RetellPlayer extends _$RetellPlayer {
   /// 手动模式下视为单遍（忽略 repeatCount），直接推进下一段。
   Future<void> completeRetellingTurn() async {
     _recordParagraphOutputStats();
-    final effectiveRepeatCount =
-        state.settings.isManualMode ? 1 : state.settings.repeatCount;
+    final effectiveRepeatCount = state.settings.isManualMode
+        ? 1
+        : state.settings.repeatCount;
     if (state.currentRepeatCount < effectiveRepeatCount) {
       state = state.copyWith(currentRepeatCount: state.currentRepeatCount + 1);
       await _playCurrentParagraph();
@@ -358,7 +359,9 @@ class RetellPlayer extends _$RetellPlayer {
     _sessionId = engine.newSession();
     _positionSub?.cancel();
     _invalidateRetellCountdown();
-    try { ref.read(learningSessionProvider.notifier).stopOutputTimer(); } catch (_) {}
+    try {
+      ref.read(learningSessionProvider.notifier).stopOutputTimer();
+    } catch (_) {}
     await engine.stopPlayback();
     state = state.copyWith(
       isPlaying: false,
@@ -389,7 +392,8 @@ class RetellPlayer extends _$RetellPlayer {
         stepFinished: true,
       );
       ref.read(analyticsServiceProvider).track(Events.retellComplete, {
-        EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
+        EventParams.audioId:
+            ref.read(learningSessionProvider).audioItemId ?? '',
         EventParams.totalParagraphs: state.totalParagraphs,
       });
       return;
@@ -520,7 +524,9 @@ class RetellPlayer extends _$RetellPlayer {
   /// 使用局部变量 `sid` 捕获 sessionId，防止 pause/其他操作
   /// 覆写实例变量 `_sessionId` 后导致 guard 失效。
   Future<void> _playCurrentParagraph() async {
-    try { ref.read(learningSessionProvider.notifier).stopOutputTimer(); } catch (_) {}
+    try {
+      ref.read(learningSessionProvider.notifier).stopOutputTimer();
+    } catch (_) {}
     final sentences = currentParagraphSentences;
     if (sentences.isEmpty) return;
 
@@ -619,14 +625,16 @@ class RetellPlayer extends _$RetellPlayer {
 
   /// 启动评估后段间停顿倒计时（由 screen 层在评估完成后调用）
   ///
+  /// [score] 评估分数（0.0~1.0），Smart 模式下用于缩短倒计时。
   /// 手动模式下直接 return，不启动倒计时，由用户手动推进。
-  void startPostEvaluationPause() {
+  void startPostEvaluationPause({double? score}) {
     if (state.phase != RetellPhase.retelling) return;
     if (state.isRetellCountdown) return;
     if (state.settings.isManualMode) return;
 
     final pauseDuration = state.settings.calculatePauseDuration(
       currentParagraphDuration,
+      score: score,
     );
     _startRetellCountdown(pauseDuration);
   }
@@ -663,13 +671,12 @@ class RetellPlayer extends _$RetellPlayer {
     session.stopOutputTimer();
 
     // 检查遍数（手动模式视为单遍）
-    final effectiveRepeatCount =
-        state.settings.isManualMode ? 1 : state.settings.repeatCount;
+    final effectiveRepeatCount = state.settings.isManualMode
+        ? 1
+        : state.settings.repeatCount;
     if (state.currentRepeatCount < effectiveRepeatCount) {
       // 还有遍数 → 直接回到 listening phase，不经过 isRetellCountdown=false 中间状态
-      state = state.copyWith(
-        currentRepeatCount: state.currentRepeatCount + 1,
-      );
+      state = state.copyWith(currentRepeatCount: state.currentRepeatCount + 1);
       await _playCurrentParagraph();
     } else {
       // 推进下一段（goToNextParagraph 内部会设 isRetellCountdown: false）

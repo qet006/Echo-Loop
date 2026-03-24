@@ -48,25 +48,58 @@ void main() {
   });
 
   group('RetellSettings.calculatePauseDuration', () {
-    test('smart 模式：2秒 + 2倍段落时长', () {
+    test('smart 模式无评分：2秒 + 2倍段落时长', () {
       const settings = RetellSettings(pauseMode: PauseMode.smart);
-      // 段落 10 秒 → 2 + 20 = 22 秒
+      // 段落 10 秒，无评分 → 2 + 20 = 22 秒
       final result = settings.calculatePauseDuration(
         const Duration(seconds: 10),
       );
       expect(result, const Duration(seconds: 22));
     });
 
+    test('smart 模式 perfect：2秒 + 0.5倍段落时长', () {
+      const settings = RetellSettings(pauseMode: PauseMode.smart);
+      // 段落 10 秒，score=0.95 (perfect) → 2 + 5 = 7 秒
+      final result = settings.calculatePauseDuration(
+        const Duration(seconds: 10),
+        score: 0.95,
+      );
+      expect(result, const Duration(seconds: 7));
+    });
+
+    test('smart 模式 excellent：2秒 + 1倍段落时长', () {
+      const settings = RetellSettings(pauseMode: PauseMode.smart);
+      // 段落 10 秒，score=0.80 (excellent) → 2 + 10 = 12 秒
+      final result = settings.calculatePauseDuration(
+        const Duration(seconds: 10),
+        score: 0.80,
+      );
+      expect(result, const Duration(seconds: 12));
+    });
+
+    test('smart 模式 good：2秒 + 1.5倍段落时长', () {
+      const settings = RetellSettings(pauseMode: PauseMode.smart);
+      // 段落 10 秒，score=0.55 (good) → 2 + 15 = 17 秒
+      final result = settings.calculatePauseDuration(
+        const Duration(seconds: 10),
+        score: 0.55,
+      );
+      expect(result, const Duration(seconds: 17));
+    });
+
     test('smart 模式：最短 3 秒', () {
       const settings = RetellSettings(pauseMode: PauseMode.smart);
-      // 段落 0 秒 → 2 + 0 = 2 秒，clamp 到 3 秒
-      final result = settings.calculatePauseDuration(Duration.zero);
+      // 段落 0 秒，perfect → 2 + 0 = 2 秒，clamp 到 3 秒
+      final result = settings.calculatePauseDuration(
+        Duration.zero,
+        score: 1.0,
+      );
       expect(result, const Duration(seconds: 3));
     });
 
     test('smart 模式：最长 60 秒', () {
       const settings = RetellSettings(pauseMode: PauseMode.smart);
-      // 段落 120 秒 → 2 + 240 = 242 秒，clamp 到 60 秒
+      // 段落 120 秒，无评分 → 2 + 240 = 242 秒，clamp 到 60 秒
       final result = settings.calculatePauseDuration(
         const Duration(seconds: 120),
       );

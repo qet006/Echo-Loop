@@ -6,45 +6,11 @@ library;
 
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
+import '../../models/rating_thresholds.dart';
 import '../../models/speech_practice_models.dart';
 
-/// 评分阈值配置。
-class RatingThresholds {
-  /// Perfect 阈值。
-  final double perfect;
-
-  /// Excellent 阈值。
-  final double excellent;
-
-  /// Good 阈值。
-  final double good;
-
-  /// Fair 阈值。
-  final double fair;
-
-  const RatingThresholds({
-    required this.perfect,
-    required this.excellent,
-    required this.good,
-    required this.fair,
-  });
-
-  /// 跟读场景默认阈值。
-  static const listenAndRepeat = RatingThresholds(
-    perfect: 0.95,
-    excellent: 0.80,
-    good: 0.60,
-    fair: 0.40,
-  );
-
-  /// 复述场景阈值（比跟读宽松）。
-  static const retell = RatingThresholds(
-    perfect: 0.90,
-    excellent: 0.75,
-    good: 0.50,
-    fair: 0.20,
-  );
-}
+// 重导出 RatingThresholds，保持现有 import 兼容
+export '../../models/rating_thresholds.dart';
 
 /// 语音练习评级 Badge。
 ///

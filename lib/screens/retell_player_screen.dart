@@ -646,8 +646,11 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
         if (latestState.phase == RetellPhase.retelling &&
             !latestState.settings.isManualMode &&
             !_manualStoppedThisParagraph) {
+          final recState = ref.read(retellRecordingControllerProvider);
           AppLogger.log('RetellScreen', '评估完成 → 启动段间停顿');
-          ref.read(retellPlayerProvider.notifier).startPostEvaluationPause();
+          ref
+              .read(retellPlayerProvider.notifier)
+              .startPostEvaluationPause(score: recState.currentAttempt?.score);
         }
       }
     });
@@ -669,6 +672,16 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
         }
       }
     });
+
+    // 段落切换时清除上一段的录音状态（评级 badge 等）
+    ref.listen<int>(
+      retellPlayerProvider.select((s) => s.currentParagraphIndex),
+      (prev, next) {
+        if (prev != null && prev != next) {
+          ref.read(retellRecordingControllerProvider.notifier).clearRecording();
+        }
+      },
+    );
 
     // 自动模式录音触发：
     // retelling + 未完成 + 非手动模式 + recording idle + 未超时 + 非倒计时中 + 本段未手动停止过

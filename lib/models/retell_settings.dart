@@ -5,6 +5,7 @@
 library;
 
 import 'intensive_listen_settings.dart';
+import 'rating_thresholds.dart';
 
 // 复用跟读模块的控制模式枚举（ShadowingControlMode）
 
@@ -92,7 +93,16 @@ class RetellSettings {
   static const List<int> fixedPauseOptions = [10, 20, 30, 45, 60, 90, 120, 180];
 
   /// 倍数可选值
-  static const List<double> multiplierOptions = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0];
+  static const List<double> multiplierOptions = [
+    0.5,
+    1.0,
+    1.5,
+    2.0,
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+  ];
 
   const RetellSettings({
     this.repeatCount = 1,
@@ -132,19 +142,32 @@ class RetellSettings {
     return Duration(milliseconds: computed < 30000 ? 30000 : computed);
   }
 
-  /// 根据段落时长计算复述停顿时间
-  Duration calculatePauseDuration(Duration paragraphDuration) {
+  /// 根据段落时长和评估分数计算复述停顿时间
+  ///
+  /// Smart 模式下评估越好倒计时越短：
+  /// - perfect (≥0.90): 2s + 段落×0.5
+  /// - excellent (≥0.75): 2s + 段落×1.0
+  /// - good (≥0.50): 2s + 段落×1.5
+  /// - 其它/无评分: 2s + 段落×2.0
+  Duration calculatePauseDuration(Duration paragraphDuration, {double? score}) {
     return switch (pauseMode) {
-      PauseMode.smart => Duration(
-          milliseconds: (2000 + paragraphDuration.inMilliseconds * 2)
-              .clamp(3000, 60000),
-        ),
+      PauseMode.smart => () {
+        const t = RatingThresholds.retell;
+        final multiplier = switch (score) {
+          double s when s >= t.perfect => 0.5,
+          double s when s >= t.excellent => 1.0,
+          double s when s >= t.good => 1.5,
+          _ => 2.0,
+        };
+        final ms = (2000 + paragraphDuration.inMilliseconds * multiplier)
+            .round();
+        return Duration(milliseconds: ms.clamp(3000, 60000));
+      }(),
       PauseMode.fixed => Duration(seconds: fixedPauseSeconds),
       PauseMode.multiplier => () {
-          final ms =
-              (paragraphDuration.inMilliseconds * pauseMultiplier).round();
-          return Duration(milliseconds: ms < 3000 ? 3000 : ms);
-        }(),
+        final ms = (paragraphDuration.inMilliseconds * pauseMultiplier).round();
+        return Duration(milliseconds: ms < 3000 ? 3000 : ms);
+      }(),
     };
   }
 }
