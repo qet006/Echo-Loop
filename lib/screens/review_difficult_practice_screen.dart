@@ -479,6 +479,8 @@ class _ReviewDifficultPracticeScreenState
       // 监听自然完成信号 → 触发完成弹窗
       if (prev != null && !_isExiting) {
         if (!prev.stepFinished && next.stepFinished) {
+          ref.read(learningSessionProvider.notifier).pauseStudyTimer();
+          shortenIdleTimeout(5);
           _handleCompleted();
         }
       }
@@ -597,170 +599,175 @@ class _ReviewDifficultPracticeScreenState
             ),
           )
         : null;
-    return LearningHotkeyScope(
-      onPlayPause: () {
-        unawaited(_cancelRecordingAndPlayback());
-        if (playerState.isPauseBetweenPlays) {
+    return wakelockBody(
+      child: LearningHotkeyScope(
+        onPlayPause: () {
+          unawaited(_cancelRecordingAndPlayback());
+          if (playerState.isPauseBetweenPlays) {
+            _manualStoppedThisSentence = false;
+            ref
+                .read(shadowingRecordingControllerProvider.notifier)
+                .clearRecording();
+            player.replayDuringCountdown();
+          } else if (playerState.isPlaying) {
+            player.pause();
+          } else {
+            player.resume();
+          }
+        },
+        onPrevious: () {
           _manualStoppedThisSentence = false;
+          unawaited(_cancelRecordingAndPlayback());
           ref
               .read(shadowingRecordingControllerProvider.notifier)
               .clearRecording();
-          player.replayDuringCountdown();
-        } else if (playerState.isPlaying) {
-          player.pause();
-        } else {
-          player.resume();
-        }
-      },
-      onPrevious: () {
-        _manualStoppedThisSentence = false;
-        unawaited(_cancelRecordingAndPlayback());
-        ref
-            .read(shadowingRecordingControllerProvider.notifier)
-            .clearRecording();
-        player.goToPrevious();
-      },
-      onNext: () {
-        _manualStoppedThisSentence = false;
-        unawaited(_cancelRecordingAndPlayback());
-        ref
-            .read(shadowingRecordingControllerProvider.notifier)
-            .clearRecording();
-        player.goToNext();
-      },
-      child: PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, _) {
-          if (didPop) return;
-          _handleExit();
+          player.goToPrevious();
         },
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(l10n.reviewDifficultPracticeTitle),
-            centerTitle: true,
-            leading: IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: _handleExit,
+        onNext: () {
+          _manualStoppedThisSentence = false;
+          unawaited(_cancelRecordingAndPlayback());
+          ref
+              .read(shadowingRecordingControllerProvider.notifier)
+              .clearRecording();
+          player.goToNext();
+        },
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop) return;
+            _handleExit();
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              title: Text(l10n.reviewDifficultPracticeTitle),
+              centerTitle: true,
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: _handleExit,
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.tune),
+                  tooltip: l10n.difficultPracticeSettings,
+                  onPressed: () =>
+                      showDifficultPracticeSettingsSheet(context: context),
+                ),
+              ],
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.tune),
-                tooltip: l10n.difficultPracticeSettings,
-                onPressed: () =>
-                    showDifficultPracticeSettingsSheet(context: context),
-              ),
-            ],
-          ),
-          body: Column(
-            children: [
-              // 进度区域
-              PracticeProgressSection(
-                playerState: playerState,
-                l10n: l10n,
-                durationText: durationText,
-              ),
+            body: Column(
+              children: [
+                // 进度区域
+                PracticeProgressSection(
+                  playerState: playerState,
+                  l10n: l10n,
+                  durationText: durationText,
+                ),
 
-              // 主体内容：盲听/跟读 双态切换
-              Expanded(
-                child: playerState.isAnnotationMode
-                    ? PracticeShadowReadingView(
-                        text: currentSentence?.text ?? '',
-                        playerState: playerState,
-                        l10n: l10n,
-                        onRemoveMark: _handleRemoveDifficult,
-                        aiNotifier: ref.read(sentenceAiNotifierProvider),
-                        audioItemId: widget.audioItemId,
-                        sentenceIndex: player.currentIndex,
-                        recording: RecordingConfig(
-                          turnState: turnState,
-                          currentPromptId: currentPromptId,
-                          currentAttempt: currentAttempt,
-                          isRecordingCurrent: isRecordingCurrent,
-                          isPlayingAttempt: _playingPromptId == currentPromptId,
-                          onRecordTap: _handleRecordTap,
-                          onAttemptPlaybackTap: _handleAttemptPlaybackTap,
-                          pauseRemaining: playerState.pauseRemaining,
-                          pauseDuration: playerState.pauseDuration,
-                          isCountdownPaused: playerState.isCountdownPaused,
-                          isPostEvalCountdown: playerState.isPostEvalCountdown,
-                          onFastForward: () => ref
-                              .read(reviewDifficultPracticeProvider.notifier)
-                              .completePausedTurn(),
-                          onCountdownTap: () {
-                            final p = ref.read(
-                              reviewDifficultPracticeProvider.notifier,
-                            );
-                            playerState.isCountdownPaused
-                                ? p.resumePostEvalCountdown()
-                                : p.pausePostEvalCountdown();
-                          },
+                // 主体内容：盲听/跟读 双态切换
+                Expanded(
+                  child: playerState.isAnnotationMode
+                      ? PracticeShadowReadingView(
+                          text: currentSentence?.text ?? '',
+                          playerState: playerState,
+                          l10n: l10n,
+                          onRemoveMark: _handleRemoveDifficult,
+                          aiNotifier: ref.read(sentenceAiNotifierProvider),
+                          audioItemId: widget.audioItemId,
+                          sentenceIndex: player.currentIndex,
+                          recording: RecordingConfig(
+                            turnState: turnState,
+                            currentPromptId: currentPromptId,
+                            currentAttempt: currentAttempt,
+                            isRecordingCurrent: isRecordingCurrent,
+                            isPlayingAttempt:
+                                _playingPromptId == currentPromptId,
+                            onRecordTap: _handleRecordTap,
+                            onAttemptPlaybackTap: _handleAttemptPlaybackTap,
+                            pauseRemaining: playerState.pauseRemaining,
+                            pauseDuration: playerState.pauseDuration,
+                            isCountdownPaused: playerState.isCountdownPaused,
+                            isPostEvalCountdown:
+                                playerState.isPostEvalCountdown,
+                            onFastForward: () => ref
+                                .read(reviewDifficultPracticeProvider.notifier)
+                                .completePausedTurn(),
+                            onCountdownTap: () {
+                              final p = ref.read(
+                                reviewDifficultPracticeProvider.notifier,
+                              );
+                              playerState.isCountdownPaused
+                                  ? p.resumePostEvalCountdown()
+                                  : p.pausePostEvalCountdown();
+                            },
+                          ),
+                        )
+                      : PracticeNormalModeView(
+                          playerState: playerState,
+                          l10n: l10n,
+                          theme: theme,
+                          onPeekToggle: () => player.setTextRevealed(
+                            !playerState.isTextRevealed,
+                          ),
+                          onCantUnderstand: () => player.enterAnnotationMode(),
+                          onRemoveMark: _handleRemoveDifficult,
+                          onPauseCountdown: () => playerState.isCountdownPaused
+                              ? player.resumeCountdown()
+                              : player.pauseCountdown(),
+                          sentenceText: currentSentence?.text,
                         ),
-                      )
-                    : PracticeNormalModeView(
-                        playerState: playerState,
-                        l10n: l10n,
-                        theme: theme,
-                        onPeekToggle: () =>
-                            player.setTextRevealed(!playerState.isTextRevealed),
-                        onCantUnderstand: () => player.enterAnnotationMode(),
-                        onRemoveMark: _handleRemoveDifficult,
-                        onPauseCountdown: () => playerState.isCountdownPaused
-                            ? player.resumeCountdown()
-                            : player.pauseCountdown(),
-                        sentenceText: currentSentence?.text,
-                      ),
-              ),
+                ),
 
-              // 底部播放控制
-              PracticePlaybackControls(
-                playerState: playerState,
-                onPrevious: () {
-                  _manualStoppedThisSentence = false;
-                  unawaited(_cancelRecordingAndPlayback());
-                  ref
-                      .read(shadowingRecordingControllerProvider.notifier)
-                      .clearRecording();
-                  player.goToPrevious();
-                },
-                onNext: () {
-                  _manualStoppedThisSentence = false;
-                  unawaited(_cancelRecordingAndPlayback());
-                  ref
-                      .read(shadowingRecordingControllerProvider.notifier)
-                      .clearRecording();
-                  final isLast =
-                      playerState.currentSentenceIndex >=
-                      playerState.totalSentences - 1;
-                  if (isLast) {
-                    player.stopPlayback();
-                    _handleCompleted();
-                  } else {
-                    unawaited(player.goToNext());
-                  }
-                },
-                onPlayPause: () {
-                  unawaited(_cancelRecordingAndPlayback());
-                  if (playerState.isPauseBetweenPlays) {
+                // 底部播放控制
+                PracticePlaybackControls(
+                  playerState: playerState,
+                  onPrevious: () {
                     _manualStoppedThisSentence = false;
+                    unawaited(_cancelRecordingAndPlayback());
                     ref
                         .read(shadowingRecordingControllerProvider.notifier)
                         .clearRecording();
-                    player.replayDuringCountdown();
-                  } else if (playerState.isPlaying) {
-                    player.pause();
-                  } else {
-                    player.resume();
-                  }
-                },
-              ),
+                    player.goToPrevious();
+                  },
+                  onNext: () {
+                    _manualStoppedThisSentence = false;
+                    unawaited(_cancelRecordingAndPlayback());
+                    ref
+                        .read(shadowingRecordingControllerProvider.notifier)
+                        .clearRecording();
+                    final isLast =
+                        playerState.currentSentenceIndex >=
+                        playerState.totalSentences - 1;
+                    if (isLast) {
+                      player.stopPlayback();
+                      _handleCompleted();
+                    } else {
+                      unawaited(player.goToNext());
+                    }
+                  },
+                  onPlayPause: () {
+                    unawaited(_cancelRecordingAndPlayback());
+                    if (playerState.isPauseBetweenPlays) {
+                      _manualStoppedThisSentence = false;
+                      ref
+                          .read(shadowingRecordingControllerProvider.notifier)
+                          .clearRecording();
+                      player.replayDuringCountdown();
+                    } else if (playerState.isPlaying) {
+                      player.pause();
+                    } else {
+                      player.resume();
+                    }
+                  },
+                ),
 
-              // 遍数
-              PracticePlayCountLabel(
-                playerState: playerState,
-                l10n: l10n,
-                theme: theme,
-              ),
-            ],
+                // 遍数
+                PracticePlayCountLabel(
+                  playerState: playerState,
+                  l10n: l10n,
+                  theme: theme,
+                ),
+              ],
+            ),
           ),
         ),
       ),

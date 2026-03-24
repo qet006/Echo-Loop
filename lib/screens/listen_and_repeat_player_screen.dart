@@ -564,6 +564,8 @@ class _ListenAndRepeatPlayerScreenState
       // 监听自然完成信号 → 触发完成弹窗
       if (prev != null && !_isExiting) {
         if (!prev.stepFinished && next.stepFinished) {
+          ref.read(learningSessionProvider.notifier).pauseStudyTimer();
+          shortenIdleTimeout(5);
           _handleCompleted();
         }
       }
@@ -669,212 +671,223 @@ class _ListenAndRepeatPlayerScreenState
           )
         : null;
 
-    return LearningHotkeyScope(
-      onPlayPause: () {
-        unawaited(_cancelRecordingAndPlayback());
-        if (playerState.isPauseBetweenPlays) {
+    return wakelockBody(
+      child: LearningHotkeyScope(
+        onPlayPause: () {
+          unawaited(_cancelRecordingAndPlayback());
+          if (playerState.isPauseBetweenPlays) {
+            _manualStoppedThisSentence = false;
+            ref
+                .read(shadowingRecordingControllerProvider.notifier)
+                .clearRecording();
+            player.replayDuringCountdown();
+          } else if (playerState.isPlaying) {
+            player.pause();
+          } else {
+            player.resume();
+          }
+        },
+        onPrevious: () {
           _manualStoppedThisSentence = false;
+          unawaited(_cancelRecordingAndPlayback());
           ref
               .read(shadowingRecordingControllerProvider.notifier)
               .clearRecording();
-          player.replayDuringCountdown();
-        } else if (playerState.isPlaying) {
-          player.pause();
-        } else {
-          player.resume();
-        }
-      },
-      onPrevious: () {
-        _manualStoppedThisSentence = false;
-        unawaited(_cancelRecordingAndPlayback());
-        ref
-            .read(shadowingRecordingControllerProvider.notifier)
-            .clearRecording();
-        unawaited(player.goToPrevious());
-      },
-      onNext: () {
-        _manualStoppedThisSentence = false;
-        unawaited(_cancelRecordingAndPlayback());
-        ref
-            .read(shadowingRecordingControllerProvider.notifier)
-            .clearRecording();
-        unawaited(player.goToNext());
-      },
-      child: PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, _) {
-          if (didPop) return;
-          _handleExit();
+          unawaited(player.goToPrevious());
         },
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(l10n.listenAndRepeatAppBarTitle),
-            centerTitle: true,
-            leading: IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: _handleExit,
+        onNext: () {
+          _manualStoppedThisSentence = false;
+          unawaited(_cancelRecordingAndPlayback());
+          ref
+              .read(shadowingRecordingControllerProvider.notifier)
+              .clearRecording();
+          unawaited(player.goToNext());
+        },
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop) return;
+            _handleExit();
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              title: Text(l10n.listenAndRepeatAppBarTitle),
+              centerTitle: true,
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: _handleExit,
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.tune),
+                  onPressed: () =>
+                      showListenAndRepeatSettingsSheet(context: context),
+                ),
+              ],
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.tune),
-                onPressed: () =>
-                    showListenAndRepeatSettingsSheet(context: context),
-              ),
-            ],
-          ),
-          body: Column(
-            children: [
-              // 进度条
-              _ProgressSection(
-                playerState: playerState,
-                l10n: l10n,
-                durationText: durationText,
-              ),
+            body: Column(
+              children: [
+                // 进度条
+                _ProgressSection(
+                  playerState: playerState,
+                  l10n: l10n,
+                  durationText: durationText,
+                ),
 
-              // 主体内容：句子卡片
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
-                  child: SingleChildScrollView(
-                    child: currentSentence != null
-                        ? _buildAnnotationCard(
-                            currentSentence.text,
-                            player.currentIndex,
-                            highlightedSegments:
-                                currentAttempt?.referenceSegments,
-                          )
-                        : const SizedBox.shrink(),
+                // 主体内容：句子卡片
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.l,
+                    ),
+                    child: SingleChildScrollView(
+                      child: currentSentence != null
+                          ? _buildAnnotationCard(
+                              currentSentence.text,
+                              player.currentIndex,
+                              highlightedSegments:
+                                  currentAttempt?.referenceSegments,
+                            )
+                          : const SizedBox.shrink(),
+                    ),
                   ),
                 ),
-              ),
 
-              // 底部区域：录音/提示 + 播放控制 + 遍数
-              Padding(
-                padding: const EdgeInsets.only(
-                  left: AppSpacing.l,
-                  right: AppSpacing.l,
-                  bottom: AppSpacing.m,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 评级 badge（点击播放录音），和复述页面同位置
-                    if (currentAttempt != null && currentAttempt.score != null)
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          top: AppSpacing.s,
-                          bottom: AppSpacing.xs,
-                        ),
-                        child: Center(
-                          child: SpeechRatingBadge(
-                            l10n: l10n,
-                            attempt: currentAttempt,
-                            isPlaying: _playingPromptId == currentPromptId,
-                            onTap: currentAttempt.hasRecording
-                                ? () =>
-                                      _handleAttemptPlaybackTap(currentPromptId)
-                                : null,
+                // 底部区域：录音/提示 + 播放控制 + 遍数
+                Padding(
+                  padding: const EdgeInsets.only(
+                    left: AppSpacing.l,
+                    right: AppSpacing.l,
+                    bottom: AppSpacing.m,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 评级 badge（点击播放录音），和复述页面同位置
+                      if (currentAttempt != null &&
+                          currentAttempt.score != null)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            top: AppSpacing.s,
+                            bottom: AppSpacing.xs,
+                          ),
+                          child: Center(
+                            child: SpeechRatingBadge(
+                              l10n: l10n,
+                              attempt: currentAttempt,
+                              isPlaying: _playingPromptId == currentPromptId,
+                              onTap: currentAttempt.hasRecording
+                                  ? () => _handleAttemptPlaybackTap(
+                                      currentPromptId,
+                                    )
+                                  : null,
+                            ),
                           ),
                         ),
+                      // 评估后倒计时 / 录音面板（和复述页面同构）
+                      // 固定高度，避免倒计时消失后 badge 位置跳动
+                      SizedBox(
+                        height: _kTurnAreaHeight,
+                        child: _isPostEvalCountdown(playerState)
+                            ? _PostEvalCountdown(
+                                playerState: playerState,
+                                onFastForward: () => ref
+                                    .read(
+                                      listenAndRepeatPlayerProvider.notifier,
+                                    )
+                                    .completePausedTurn(),
+                                onCountdownTap: () {
+                                  final p = ref.read(
+                                    listenAndRepeatPlayerProvider.notifier,
+                                  );
+                                  playerState.isCountdownPaused
+                                      ? p.resumePostEvalCountdown()
+                                      : p.pausePostEvalCountdown();
+                                },
+                              )
+                            : playerState.isPauseBetweenPlays
+                            ? Padding(
+                                padding: const EdgeInsets.only(
+                                  bottom: AppSpacing.m,
+                                ),
+                                child: SpeechPracticeTurnPanel(
+                                  l10n: l10n,
+                                  turnState: turnState,
+                                  isRecordingCurrent: isRecordingCurrent,
+                                  onRecordTap: _handleRecordTap,
+                                  currentAttempt: currentAttempt,
+                                ),
+                              )
+                            : const SizedBox.shrink(),
                       ),
-                    // 评估后倒计时 / 录音面板（和复述页面同构）
-                    // 固定高度，避免倒计时消失后 badge 位置跳动
-                    SizedBox(
-                      height: _kTurnAreaHeight,
-                      child: _isPostEvalCountdown(playerState)
-                          ? _PostEvalCountdown(
-                              playerState: playerState,
-                              onFastForward: () => ref
-                                  .read(listenAndRepeatPlayerProvider.notifier)
-                                  .completePausedTurn(),
-                              onCountdownTap: () {
-                                final p = ref.read(
-                                  listenAndRepeatPlayerProvider.notifier,
-                                );
-                                playerState.isCountdownPaused
-                                    ? p.resumePostEvalCountdown()
-                                    : p.pausePostEvalCountdown();
-                              },
-                            )
-                          : playerState.isPauseBetweenPlays
-                              ? Padding(
-                                  padding: const EdgeInsets.only(
-                                    bottom: AppSpacing.m,
-                                  ),
-                                  child: SpeechPracticeTurnPanel(
-                                    l10n: l10n,
-                                    turnState: turnState,
-                                    isRecordingCurrent: isRecordingCurrent,
-                                    onRecordTap: _handleRecordTap,
-                                    currentAttempt: currentAttempt,
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
-                    ),
-                    // 播放控制
-                    _PlaybackControls(
-                      playerState: playerState,
-                      onPrevious: () {
-                        _manualStoppedThisSentence = false;
-                        unawaited(_cancelRecordingAndPlayback());
-                        ref
-                            .read(shadowingRecordingControllerProvider.notifier)
-                            .clearRecording();
-                        unawaited(player.goToPrevious());
-                      },
-                      onNext: () {
-                        _manualStoppedThisSentence = false;
-                        unawaited(_cancelRecordingAndPlayback());
-                        ref
-                            .read(shadowingRecordingControllerProvider.notifier)
-                            .clearRecording();
-                        final isLast =
-                            playerState.currentSentenceIndex >=
-                            playerState.totalSentences - 1;
-                        if (isLast) {
-                          // 最后一句：停止播放，直接弹窗
-                          player.stopPlayback();
-                          _handleCompleted();
-                        } else {
-                          unawaited(player.goToNext());
-                        }
-                      },
-                      onPlayPause: () {
-                        unawaited(_cancelRecordingAndPlayback());
-                        if (playerState.isPauseBetweenPlays) {
+                      // 播放控制
+                      _PlaybackControls(
+                        playerState: playerState,
+                        onPrevious: () {
                           _manualStoppedThisSentence = false;
+                          unawaited(_cancelRecordingAndPlayback());
                           ref
                               .read(
                                 shadowingRecordingControllerProvider.notifier,
                               )
                               .clearRecording();
-                          player.replayDuringCountdown();
-                        } else if (playerState.isPlaying) {
-                          player.pause();
-                        } else {
-                          player.resume();
-                        }
-                      },
-                    ),
-                    // 遍数（手动模式下隐藏文字但保留占位）
-                    Opacity(
-                      opacity: playerState.settings.isManualMode ? 0 : 1,
-                      child: Text(
-                        l10n.listenAndRepeatPlayCount(
-                          playerState.currentPlayCount,
-                          playerState.settings.repeatCount,
-                        ),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant.withValues(
-                            alpha: 0.5,
+                          unawaited(player.goToPrevious());
+                        },
+                        onNext: () {
+                          _manualStoppedThisSentence = false;
+                          unawaited(_cancelRecordingAndPlayback());
+                          ref
+                              .read(
+                                shadowingRecordingControllerProvider.notifier,
+                              )
+                              .clearRecording();
+                          final isLast =
+                              playerState.currentSentenceIndex >=
+                              playerState.totalSentences - 1;
+                          if (isLast) {
+                            // 最后一句：停止播放，直接弹窗
+                            player.stopPlayback();
+                            _handleCompleted();
+                          } else {
+                            unawaited(player.goToNext());
+                          }
+                        },
+                        onPlayPause: () {
+                          unawaited(_cancelRecordingAndPlayback());
+                          if (playerState.isPauseBetweenPlays) {
+                            _manualStoppedThisSentence = false;
+                            ref
+                                .read(
+                                  shadowingRecordingControllerProvider.notifier,
+                                )
+                                .clearRecording();
+                            player.replayDuringCountdown();
+                          } else if (playerState.isPlaying) {
+                            player.pause();
+                          } else {
+                            player.resume();
+                          }
+                        },
+                      ),
+                      // 遍数（手动模式下隐藏文字但保留占位）
+                      Opacity(
+                        opacity: playerState.settings.isManualMode ? 0 : 1,
+                        child: Text(
+                          l10n.listenAndRepeatPlayCount(
+                            playerState.currentPlayCount,
+                            playerState.settings.repeatCount,
+                          ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.5),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

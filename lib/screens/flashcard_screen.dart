@@ -6,7 +6,6 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../l10n/app_localizations.dart';
 import '../providers/flashcard/flashcard_provider.dart';
@@ -54,16 +53,15 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen>
   Widget build(BuildContext context) {
     // 监听完成状态变化，控制屏幕常亮：
     // 完成 → 关闭常亮；「再来一遍」→ 恢复常亮
-    ref.listen(
-      flashcardNotifierProvider.select((s) => s.isCompleted),
-      (prev, next) {
-        if (next) {
-          WakelockPlus.disable();
-        } else if (prev == true && !next) {
-          WakelockPlus.enable();
-        }
-      },
-    );
+    // 完成 → 缩短空闲超时加速关屏；「再来一遍」→ 恢复默认超时
+    ref.listen(flashcardNotifierProvider.select((s) => s.isCompleted), (
+      prev,
+      next,
+    ) {
+      if (next) {
+        shortenIdleTimeout(5);
+      }
+    });
 
     // 只监听影响卡片/AppBar 的字段，排除倒计时相关字段，
     // 避免倒计时每 100ms tick 导致整个页面（含 3D 变换卡片）重建
@@ -82,9 +80,11 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen>
     final l10n = AppLocalizations.of(context)!;
 
     if (state.isCompleted) {
-      return _CompletedView(
-        totalReviewed: state.words.length + state.removedCount,
-        removedCount: state.removedCount,
+      return wakelockBody(
+        child: _CompletedView(
+          totalReviewed: state.words.length + state.removedCount,
+          removedCount: state.removedCount,
+        ),
       );
     }
 
@@ -93,99 +93,103 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen>
         ? state.words[state.currentIndex]
         : null;
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _handleExit();
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: _handleExit,
-          ),
-          title: Text(
-            state.words.isNotEmpty
-                ? l10n.flashcardProgress(
-                    state.currentIndex + 1,
-                    state.words.length,
-                  )
-                : l10n.flashcardTitle,
-          ),
-          centerTitle: true,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.tune),
-              onPressed: () => _showSettings(context),
+    return wakelockBody(
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _handleExit();
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: _handleExit,
             ),
-            const SizedBox(width: 4),
-          ],
-        ),
-        body: Column(
-          children: [
-            // 卡片区域
-            Expanded(
-              child: GestureDetector(
-                onHorizontalDragEnd: (details) {
-                  final velocity = details.primaryVelocity ?? 0;
-                  if (velocity < -200) {
-                    // 左滑 → 下一张
-                    ref.read(flashcardNotifierProvider.notifier).nextCard();
-                  } else if (velocity > 200) {
-                    // 右滑 → 上一张
-                    ref.read(flashcardNotifierProvider.notifier).previousCard();
-                  }
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.l,
-                    vertical: AppSpacing.m,
+            title: Text(
+              state.words.isNotEmpty
+                  ? l10n.flashcardProgress(
+                      state.currentIndex + 1,
+                      state.words.length,
+                    )
+                  : l10n.flashcardTitle,
+            ),
+            centerTitle: true,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.tune),
+                onPressed: () => _showSettings(context),
+              ),
+              const SizedBox(width: 4),
+            ],
+          ),
+          body: Column(
+            children: [
+              // 卡片区域
+              Expanded(
+                child: GestureDetector(
+                  onHorizontalDragEnd: (details) {
+                    final velocity = details.primaryVelocity ?? 0;
+                    if (velocity < -200) {
+                      // 左滑 → 下一张
+                      ref.read(flashcardNotifierProvider.notifier).nextCard();
+                    } else if (velocity > 200) {
+                      // 右滑 → 上一张
+                      ref
+                          .read(flashcardNotifierProvider.notifier)
+                          .previousCard();
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.l,
+                      vertical: AppSpacing.m,
+                    ),
+                    child: currentWord != null
+                        ? FlashcardCard(
+                            key: ValueKey(currentWord.savedWord.word),
+                            item: currentWord,
+                            isShowingBack: state.isShowingBack,
+                            onFlip: () => ref
+                                .read(flashcardNotifierProvider.notifier)
+                                .flipCard(),
+                            onUnsave: () => _handleUnsave(context),
+                            autoPlaySentence: state.settings.autoPlaySentence,
+                            autoPlayWord: state.settings.autoPlayWord,
+                          )
+                        : const SizedBox.shrink(),
                   ),
-                  child: currentWord != null
-                      ? FlashcardCard(
-                          key: ValueKey(currentWord.savedWord.word),
-                          item: currentWord,
-                          isShowingBack: state.isShowingBack,
-                          onFlip: () => ref
-                              .read(flashcardNotifierProvider.notifier)
-                              .flipCard(),
-                          onUnsave: () => _handleUnsave(context),
-                          autoPlaySentence: state.settings.autoPlaySentence,
-                          autoPlayWord: state.settings.autoPlayWord,
-                        )
-                      : const SizedBox.shrink(),
                 ),
               ),
-            ),
 
-            // 底部控制栏：用 Consumer 隔离倒计时重建，
-            // 避免倒计时 tick 触发卡片区域重建
-            Consumer(
-              builder: (context, ref, _) {
-                final s = ref.watch(flashcardNotifierProvider);
-                return _BottomControls(
-                  currentIndex: s.currentIndex,
-                  totalCount: s.words.length,
-                  countdownRemaining: s.countdownRemaining,
-                  countdownTotal: s.countdownTotal,
-                  isPaused: s.isPaused,
-                  showCountdown:
-                      !s.settings.isManualMode &&
-                      s.countdownTotal > Duration.zero,
-                  onPrevious: s.currentIndex > 0
-                      ? () => ref
-                            .read(flashcardNotifierProvider.notifier)
-                            .previousCard()
-                      : null,
-                  onNext: () =>
-                      ref.read(flashcardNotifierProvider.notifier).nextCard(),
-                  onTogglePause: () => ref
-                      .read(flashcardNotifierProvider.notifier)
-                      .togglePause(),
-                );
-              },
-            ),
-          ],
+              // 底部控制栏：用 Consumer 隔离倒计时重建，
+              // 避免倒计时 tick 触发卡片区域重建
+              Consumer(
+                builder: (context, ref, _) {
+                  final s = ref.watch(flashcardNotifierProvider);
+                  return _BottomControls(
+                    currentIndex: s.currentIndex,
+                    totalCount: s.words.length,
+                    countdownRemaining: s.countdownRemaining,
+                    countdownTotal: s.countdownTotal,
+                    isPaused: s.isPaused,
+                    showCountdown:
+                        !s.settings.isManualMode &&
+                        s.countdownTotal > Duration.zero,
+                    onPrevious: s.currentIndex > 0
+                        ? () => ref
+                              .read(flashcardNotifierProvider.notifier)
+                              .previousCard()
+                        : null,
+                    onNext: () =>
+                        ref.read(flashcardNotifierProvider.notifier).nextCard(),
+                    onTogglePause: () => ref
+                        .read(flashcardNotifierProvider.notifier)
+                        .togglePause(),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

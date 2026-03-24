@@ -292,11 +292,15 @@ class _BlindListenPlayerScreenState
     ref.listen(blindListenPlayerProvider, (prev, next) {
       if (_isExiting || prev == null) return;
       if (!prev.stepFinished && next.stepFinished) {
+        ref.read(learningSessionProvider.notifier).pauseStudyTimer();
+        shortenIdleTimeout(5);
         _handleCompleted();
       }
     });
 
-    return _buildParagraphMode(context, l10n, theme, session, playerState);
+    return wakelockBody(
+      child: _buildParagraphMode(context, l10n, theme, session, playerState),
+    );
   }
 
   /// 手动模式下播放完成后的空闲状态（非播放、非倒计时）

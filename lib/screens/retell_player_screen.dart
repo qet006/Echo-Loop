@@ -609,6 +609,8 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     ref.listen(retellPlayerProvider, (prev, next) {
       if (_isExiting || prev == null) return;
       if (!prev.stepFinished && next.stepFinished) {
+        ref.read(learningSessionProvider.notifier).pauseStudyTimer();
+        shortenIdleTimeout(5);
         _handleCompleted();
       }
     });
@@ -718,226 +720,240 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
       currentPromptId,
     );
 
-    return LearningHotkeyScope(
-      onPlayPause: () {
-        if (state.phase == RetellPhase.listening) {
-          state.isPlaying ? player.pause() : player.resume();
-        } else if (state.isRetellCountdown) {
-          _handleReplay();
-        } else {
-          _handleReplay();
-        }
-      },
-      onPrevious: _goToPreviousParagraph,
-      onNext: _goToNextParagraph,
-      child: PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, _) async {
-          if (didPop) return;
-          await _handleExit();
+    return wakelockBody(
+      child: LearningHotkeyScope(
+        onPlayPause: () {
+          if (state.phase == RetellPhase.listening) {
+            state.isPlaying ? player.pause() : player.resume();
+          } else if (state.isRetellCountdown) {
+            _handleReplay();
+          } else {
+            _handleReplay();
+          }
         },
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(l10n.retellTitle),
-            leading: IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: _handleExit,
+        onPrevious: _goToPreviousParagraph,
+        onNext: _goToNextParagraph,
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (didPop) return;
+            await _handleExit();
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              title: Text(l10n.retellTitle),
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: _handleExit,
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.tune),
+                  onPressed: () => showRetellSettingsSheet(context),
+                ),
+              ],
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.tune),
-                onPressed: () => showRetellSettingsSheet(context),
-              ),
-            ],
-          ),
-          body: Column(
-            children: [
-              // 进度条
-              LinearProgressIndicator(value: progress),
+            body: Column(
+              children: [
+                // 进度条
+                LinearProgressIndicator(value: progress),
 
-              // 段落进度文字
-              ParagraphProgressHeader(
-                currentIndex: state.currentParagraphIndex,
-                totalParagraphs: state.totalParagraphs,
-                paragraphDuration: paragraphDuration,
-              ),
+                // 段落进度文字
+                ParagraphProgressHeader(
+                  currentIndex: state.currentParagraphIndex,
+                  totalParagraphs: state.totalParagraphs,
+                  paragraphDuration: paragraphDuration,
+                ),
 
-              // 句子列表
-              Expanded(
-                child: Card(
-                  margin: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.s),
-                    itemCount: sentences.length,
-                    separatorBuilder: (_, __) => Divider(
-                      height: 1,
-                      indent: AppSpacing.m,
-                      endIndent: AppSpacing.m,
-                      color: theme.colorScheme.outlineVariant.withValues(
-                        alpha: 0.3,
-                      ),
+                // 句子列表
+                Expanded(
+                  child: Card(
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.m,
                     ),
-                    itemBuilder: (context, index) {
-                      final sentence = sentences[index];
-                      final sentenceKeywords =
-                          keywords[sentence.index] ?? const {};
-
-                      return RetellSentenceTile(
-                        sentence: sentence,
-                        phase: state.phase,
-                        displayMode:
-                            state.settings.keywordMethod != KeywordMethod.off
-                            ? state.displayMode
-                            : RetellDisplayMode.hideAll,
-                        keywordIndices: sentenceKeywords,
-                        isPlayingSentence:
-                            state.phase == RetellPhase.listening &&
-                            index == state.playingSentenceIndex,
-                        onWordTap: (word) => showWordDictionarySheet(
-                          context: context,
-                          word: word,
-                          audioItemId: widget.audioItemId,
-                          sentenceIndex: index,
-                          sentenceText: sentence.text,
-                          sentenceStartMs: sentence.startTime.inMilliseconds,
-                          sentenceEndMs: sentence.endTime.inMilliseconds,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.s,
+                      ),
+                      itemCount: sentences.length,
+                      separatorBuilder: (_, __) => Divider(
+                        height: 1,
+                        indent: AppSpacing.m,
+                        endIndent: AppSpacing.m,
+                        color: theme.colorScheme.outlineVariant.withValues(
+                          alpha: 0.3,
                         ),
-                      );
-                    },
-                  ),
-                ),
-              ),
+                      ),
+                      itemBuilder: (context, index) {
+                        final sentence = sentences[index];
+                        final sentenceKeywords =
+                            keywords[sentence.index] ?? const {};
 
-              // 评级 badge（点击播放录音）
-              if (currentAttempt != null && currentAttempt.score != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.xs),
-                  child: Center(
-                    child: SpeechRatingBadge(
-                      l10n: l10n,
-                      attempt: currentAttempt,
-                      isPlaying: _playingPromptId == currentPromptId,
-                      onTap: () => _handleAttemptPlaybackTap(currentPromptId),
-                      thresholds: RatingThresholds.retell,
+                        return RetellSentenceTile(
+                          sentence: sentence,
+                          phase: state.phase,
+                          displayMode:
+                              state.settings.keywordMethod != KeywordMethod.off
+                              ? state.displayMode
+                              : RetellDisplayMode.hideAll,
+                          keywordIndices: sentenceKeywords,
+                          isPlayingSentence:
+                              state.phase == RetellPhase.listening &&
+                              index == state.playingSentenceIndex,
+                          onWordTap: (word) => showWordDictionarySheet(
+                            context: context,
+                            word: word,
+                            audioItemId: widget.audioItemId,
+                            sentenceIndex: index,
+                            sentenceText: sentence.text,
+                            sentenceStartMs: sentence.startTime.inMilliseconds,
+                            sentenceEndMs: sentence.endTime.inMilliseconds,
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
 
-              const SizedBox(height: AppSpacing.s),
-
-              // 显示模式切换
-              if (state.settings.keywordMethod != KeywordMethod.off)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isCompact = constraints.maxWidth < 360;
-                      final keywordsOnlyLabel = _displayModeLabel(
-                        context,
-                        regularText: l10n.retellDisplayKeywordsOnly,
-                        compactEnglishText: 'Visible',
-                        isCompact: isCompact,
-                      );
-                      final showAllLabel = _displayModeLabel(
-                        context,
-                        regularText: l10n.retellDisplayShowAll,
-                        compactEnglishText: 'Show',
-                        isCompact: isCompact,
-                      );
-                      final hideAllLabel = _displayModeLabel(
-                        context,
-                        regularText: l10n.retellDisplayHideAll,
-                        compactEnglishText: 'Hide',
-                        isCompact: isCompact,
-                      );
-                      return SegmentedButton<RetellDisplayMode>(
-                        direction: isCompact ? Axis.vertical : Axis.horizontal,
-                        showSelectedIcon: false,
-                        segments: [
-                          ButtonSegment(
-                            value: RetellDisplayMode.hideAll,
-                            label: _DisplayModeSegmentLabel(text: hideAllLabel),
-                          ),
-                          ButtonSegment(
-                            value: RetellDisplayMode.keywordsOnly,
-                            label: _DisplayModeSegmentLabel(
-                              text: keywordsOnlyLabel,
-                            ),
-                          ),
-                          ButtonSegment(
-                            value: RetellDisplayMode.showAll,
-                            label: _DisplayModeSegmentLabel(text: showAllLabel),
-                          ),
-                        ],
-                        selected: {state.displayMode},
-                        onSelectionChanged: (selected) =>
-                            player.setDisplayMode(selected.first),
-                      );
-                    },
-                  ),
-                ),
-
-              // 提示文字行（固定高度，颜色区分状态）
-              SizedBox(
-                height: 32,
-                child: Center(
-                  child: _buildStatusText(
-                    state,
-                    turnState,
-                    currentAttempt,
-                    l10n,
-                    theme,
-                  ),
-                ),
-              ),
-
-              // 录音按钮 或 段间停顿倒计时（固定位置）
-              _buildCenterButton(
-                state,
-                turnState,
-                isRecordingCurrent,
-                l10n,
-                ref,
-              ),
-
-              const SizedBox(height: AppSpacing.m),
-
-              // 播放控制栏
-              ParagraphBottomControls(
-                canGoPrev: state.currentParagraphIndex > 0,
-                isLastParagraph:
-                    state.currentParagraphIndex >= state.totalParagraphs - 1,
-                centerIcon: state.phase == RetellPhase.listening
-                    ? (state.isPlaying
-                          ? Icons.pause_rounded
-                          : Icons.play_arrow_rounded)
-                    : Icons.play_arrow_rounded,
-                onCenter: state.phase == RetellPhase.listening
-                    ? (state.isPlaying ? player.pause : player.resume)
-                    : _handleReplay,
-                onPrevious: _goToPreviousParagraph,
-                onNext: _goToNextParagraph,
-              ),
-
-              // 遍数（手动模式下隐藏）
-              if (!state.settings.isManualMode)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.m),
-                  child: Text(
-                    l10n.retellRepeatInfo(
-                      state.currentRepeatCount,
-                      state.settings.repeatCount,
-                    ),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant.withValues(
-                        alpha: 0.5,
+                // 评级 badge（点击播放录音）
+                if (currentAttempt != null && currentAttempt.score != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.xs),
+                    child: Center(
+                      child: SpeechRatingBadge(
+                        l10n: l10n,
+                        attempt: currentAttempt,
+                        isPlaying: _playingPromptId == currentPromptId,
+                        onTap: () => _handleAttemptPlaybackTap(currentPromptId),
+                        thresholds: RatingThresholds.retell,
                       ),
                     ),
                   ),
-                )
-              else
+
+                const SizedBox(height: AppSpacing.s),
+
+                // 显示模式切换
+                if (state.settings.keywordMethod != KeywordMethod.off)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.m,
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isCompact = constraints.maxWidth < 360;
+                        final keywordsOnlyLabel = _displayModeLabel(
+                          context,
+                          regularText: l10n.retellDisplayKeywordsOnly,
+                          compactEnglishText: 'Visible',
+                          isCompact: isCompact,
+                        );
+                        final showAllLabel = _displayModeLabel(
+                          context,
+                          regularText: l10n.retellDisplayShowAll,
+                          compactEnglishText: 'Show',
+                          isCompact: isCompact,
+                        );
+                        final hideAllLabel = _displayModeLabel(
+                          context,
+                          regularText: l10n.retellDisplayHideAll,
+                          compactEnglishText: 'Hide',
+                          isCompact: isCompact,
+                        );
+                        return SegmentedButton<RetellDisplayMode>(
+                          direction: isCompact
+                              ? Axis.vertical
+                              : Axis.horizontal,
+                          showSelectedIcon: false,
+                          segments: [
+                            ButtonSegment(
+                              value: RetellDisplayMode.hideAll,
+                              label: _DisplayModeSegmentLabel(
+                                text: hideAllLabel,
+                              ),
+                            ),
+                            ButtonSegment(
+                              value: RetellDisplayMode.keywordsOnly,
+                              label: _DisplayModeSegmentLabel(
+                                text: keywordsOnlyLabel,
+                              ),
+                            ),
+                            ButtonSegment(
+                              value: RetellDisplayMode.showAll,
+                              label: _DisplayModeSegmentLabel(
+                                text: showAllLabel,
+                              ),
+                            ),
+                          ],
+                          selected: {state.displayMode},
+                          onSelectionChanged: (selected) =>
+                              player.setDisplayMode(selected.first),
+                        );
+                      },
+                    ),
+                  ),
+
+                // 提示文字行（固定高度，颜色区分状态）
+                SizedBox(
+                  height: 32,
+                  child: Center(
+                    child: _buildStatusText(
+                      state,
+                      turnState,
+                      currentAttempt,
+                      l10n,
+                      theme,
+                    ),
+                  ),
+                ),
+
+                // 录音按钮 或 段间停顿倒计时（固定位置）
+                _buildCenterButton(
+                  state,
+                  turnState,
+                  isRecordingCurrent,
+                  l10n,
+                  ref,
+                ),
+
                 const SizedBox(height: AppSpacing.m),
-            ],
+
+                // 播放控制栏
+                ParagraphBottomControls(
+                  canGoPrev: state.currentParagraphIndex > 0,
+                  isLastParagraph:
+                      state.currentParagraphIndex >= state.totalParagraphs - 1,
+                  centerIcon: state.phase == RetellPhase.listening
+                      ? (state.isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded)
+                      : Icons.play_arrow_rounded,
+                  onCenter: state.phase == RetellPhase.listening
+                      ? (state.isPlaying ? player.pause : player.resume)
+                      : _handleReplay,
+                  onPrevious: _goToPreviousParagraph,
+                  onNext: _goToNextParagraph,
+                ),
+
+                // 遍数（手动模式下隐藏）
+                if (!state.settings.isManualMode)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.m),
+                    child: Text(
+                      l10n.retellRepeatInfo(
+                        state.currentRepeatCount,
+                        state.settings.repeatCount,
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.5,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  const SizedBox(height: AppSpacing.m),
+              ],
+            ),
           ),
         ),
       ),
