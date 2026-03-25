@@ -9,6 +9,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../router/app_router.dart';
 import '../database/enums.dart';
 import '../utils/wakelock_mixin.dart';
 import '../database/providers.dart';
@@ -17,7 +18,6 @@ import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/intensive_listen_player_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/listening_practice/bookmark_manager.dart';
-import '../router/app_router.dart';
 import '../theme/app_theme.dart';
 import '../widgets/intensive_listen/intensive_listen_settings_sheet.dart';
 import '../providers/sentence_ai_provider.dart';
@@ -242,6 +242,9 @@ class _IntensiveListenPlayerScreenState
   /// 精听完成后调用，读取难句书签并进入跟读。
   /// 0 个难句时显示 SnackBar 提示并 pop 回计划页。
   /// 返回学习计划页并自动启动下一个任务
+  ///
+  /// 先 go 回学习 Tab 清空导航栈，再 push 新的学习计划页（autoStart=true），
+  /// 效果等同于用户在学习列表点击"继续学习"。
   void _navigateBackToPlanAndAutoStart() {
     if (!mounted) return;
     final route = widget.collectionId != null
@@ -251,7 +254,8 @@ class _IntensiveListenPlayerScreenState
             autoStart: true,
           )
         : AppRoutes.audioLearningPlan(widget.audioItemId, autoStart: true);
-    context.pushReplacement(route);
+    GoRouter.of(context).go(AppRoutes.study);
+    GoRouter.of(context).push(route);
   }
 
   /// 获取当前步骤的上下文信息

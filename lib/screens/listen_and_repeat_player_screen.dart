@@ -15,6 +15,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../router/app_router.dart';
 import '../database/enums.dart';
 import '../database/providers.dart';
 import '../utils/wakelock_mixin.dart';
@@ -23,7 +24,6 @@ import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/learning_session/listen_and_repeat_player_provider.dart';
 import '../providers/listen_and_repeat_turn_controller_provider.dart';
-import '../router/app_router.dart';
 import '../services/app_logger.dart';
 import '../services/audio_playback_service.dart';
 import '../theme/app_theme.dart';
@@ -499,6 +499,9 @@ class _ListenAndRepeatPlayerScreenState
   }
 
   /// 返回学习计划页并自动启动下一个任务
+  ///
+  /// 先 go 回学习 Tab 清空导航栈，再 push 新的学习计划页（autoStart=true），
+  /// 效果等同于用户在学习列表点击"继续学习"。
   void _navigateBackToPlanAndAutoStart() {
     if (!mounted) return;
     final route = widget.collectionId != null
@@ -508,7 +511,8 @@ class _ListenAndRepeatPlayerScreenState
             autoStart: true,
           )
         : AppRoutes.audioLearningPlan(widget.audioItemId, autoStart: true);
-    context.pushReplacement(route);
+    GoRouter.of(context).go(AppRoutes.study);
+    GoRouter.of(context).push(route);
   }
 
   @override
