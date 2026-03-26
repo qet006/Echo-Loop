@@ -76,8 +76,11 @@ part 'app_database.g.dart';
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
+  /// 当前 schema 版本（静态访问，用于导入前版本检查）
+  static const currentSchemaVersion = 23;
+
   @override
-  int get schemaVersion => 23;
+  int get schemaVersion => currentSchemaVersion;
 
   @override
   MigrationStrategy get migration {

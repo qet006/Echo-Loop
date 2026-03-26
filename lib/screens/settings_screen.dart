@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +10,7 @@ import '../database/providers.dart';
 import '../l10n/app_localizations.dart';
 import '../models/app_update_info.dart';
 import '../providers/app_update_provider.dart';
+import '../providers/backup_provider.dart';
 import '../providers/developer_options_provider.dart';
 import '../providers/package_info_provider.dart';
 import '../providers/reminder_settings_provider.dart';
@@ -18,6 +22,8 @@ import '../providers/collection_provider.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/tag_provider.dart';
 import '../analytics/analytics_providers.dart';
+import '../services/backup/backup_manifest.dart';
+import '../services/backup/backup_service.dart';
 import '../services/demo_data_seeder.dart';
 import '../theme/app_theme.dart';
 import 'log_viewer_screen.dart';
@@ -56,7 +62,12 @@ class SettingsScreen extends ConsumerWidget {
           if (showDeveloperOptions) ...[
             const SizedBox(height: AppSpacing.m),
             _buildDeveloperSection(
-                context, ref, l10n, settings, settingsController),
+              context,
+              ref,
+              l10n,
+              settings,
+              settingsController,
+            ),
           ],
         ],
       ),
@@ -243,8 +254,7 @@ class SettingsScreen extends ConsumerWidget {
               leading: _emojiIcon('✉️'),
               title: Text(l10n.writeFeedback),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () =>
-                  launchUrl(Uri.parse('mailto:support@echo-loop.top')),
+              onTap: () => launchUrl(Uri.parse('mailto:support@echo-loop.top')),
             ),
           ],
         ),
@@ -329,9 +339,7 @@ class SettingsScreen extends ConsumerWidget {
           subtitle: const Text('查看应用内运行日志'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const LogViewerScreen(),
-            ),
+            MaterialPageRoute<void>(builder: (_) => const LogViewerScreen()),
           ),
         ),
         ListTile(
@@ -367,6 +375,20 @@ class SettingsScreen extends ConsumerWidget {
                       _toggleDemoMode(context, ref, controller, value),
                 ),
         ),
+        ListTile(
+          leading: _emojiIcon('📤'),
+          title: Text(l10n.exportData),
+          subtitle: Text(l10n.exportDataSubtitle),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _handleExport(context, ref),
+        ),
+        ListTile(
+          leading: _emojiIcon('📥'),
+          title: Text(l10n.importData),
+          subtitle: Text(l10n.importDataSubtitle),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _handleImport(context, ref),
+        ),
       ],
     );
   }
@@ -384,8 +406,7 @@ class SettingsScreen extends ConsumerWidget {
     controller.setDemoModeLoading(true);
 
     // 记住当前数据库名称，异常时用于恢复连接
-    final currentDbName =
-        enabled ? 'echo_loop.db' : 'echo_loop_demo.db';
+    final currentDbName = enabled ? 'echo_loop.db' : 'echo_loop_demo.db';
 
     try {
       // Step 1: 关闭旧数据库（避免 Drift "multiple databases" 警告）
@@ -424,9 +445,252 @@ class SettingsScreen extends ConsumerWidget {
 
       controller.setDemoModeLoading(false);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Demo mode error: $e')),
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Demo mode error: $e')));
+    }
+  }
+
+  /// 处理导出数据操作
+  Future<void> _handleExport(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context)!;
+    var progressStage = l10n.exporting;
+
+    // 显示进度对话框
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(width: AppSpacing.l),
+              Expanded(
+                child: StatefulBuilder(
+                  builder: (context, setState) {
+                    // 进度文字通过外部更新
+                    return Text(progressStage);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    var dialogOpen = true;
+    try {
+      debugPrint('[Backup] Starting export...');
+      final zipPath = await performExport(
+        ref,
+        onProgress: (p) {
+          debugPrint('[Backup] Progress: ${p.stage} ${p.progress}');
+          progressStage = _localizeProgress(l10n, p.stage);
+        },
       );
+      debugPrint('[Backup] Export done: $zipPath');
+
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      dialogOpen = false;
+
+      // 保存文件：弹出保存对话框让用户选择位置和文件名
+      final fileName = zipPath.split('/').last;
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: l10n.exportData,
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['zip'],
+      );
+      if (savePath != null) {
+        await File(zipPath).copy(savePath);
+        debugPrint('[Backup] Saved to: $savePath');
+        if (context.mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.exportSuccess)));
+        }
+      }
+      // 清理临时文件
+      try {
+        await File(zipPath).delete();
+      } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('[Backup] Export error: $e');
+      debugPrint('[Backup] Stack: $stack');
+      if (!context.mounted) return;
+      if (dialogOpen) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${l10n.exportData} error: $e')));
+    }
+  }
+
+  /// 处理导入数据操作
+  Future<void> _handleImport(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context)!;
+
+    // Step 1: 选择文件
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['zip'],
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final filePath = result.files.first.path;
+    if (filePath == null) return;
+
+    // Step 2: 读取 manifest 预览
+    BackupManifest manifest;
+    try {
+      manifest = await readBackupManifest(ref, filePath);
+    } on BackupException {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.importInvalidFile)));
+      return;
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.importInvalidFile)));
+      return;
+    }
+
+    if (!context.mounted) return;
+
+    // Step 3: 确认对话框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.importConfirmTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildManifestRow(
+              l10n.backupTime,
+              DateFormat.yMd().add_Hm().format(manifest.createdAt.toLocal()),
+            ),
+            _buildManifestRow(l10n.backupVersion, manifest.appVersion),
+            _buildManifestRow(
+              l10n.backupFileCount,
+              '${manifest.mediaFileCount}',
+            ),
+            _buildManifestRow(l10n.backupSize, manifest.formattedSize),
+            const SizedBox(height: AppSpacing.m),
+            Text(
+              l10n.importConfirmMessage,
+              style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                color: Theme.of(ctx).colorScheme.error,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.importData),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    // Step 4: 检查版本兼容性
+    if (manifest.schemaVersion > AppDatabase.currentSchemaVersion) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.importIncompatible)));
+      return;
+    }
+
+    // Step 5: 执行导入（带进度）
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(width: AppSpacing.l),
+              Text(l10n.importing),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      await performImport(ref, filePath);
+
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop(); // 关闭进度对话框
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.importSuccess)));
+    } catch (e) {
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop(); // 关闭进度对话框
+
+      final message = e is BackupException && e.message == 'incompatibleVersion'
+          ? l10n.importIncompatible
+          : '${l10n.importData} error: $e';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  /// 构建 manifest 预览行
+  Widget _buildManifestRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  /// 将进度阶段 key 转为本地化文字
+  String _localizeProgress(AppLocalizations l10n, String stage) {
+    switch (stage) {
+      case 'exportingDatabase':
+        return l10n.exportingDatabase;
+      case 'exportingPreferences':
+        return l10n.exportingPreferences;
+      case 'exportingMedia':
+        return l10n.exportingMedia;
+      case 'exportingPacking':
+        return l10n.exportingPacking;
+      case 'importingExtracting':
+        return l10n.importingExtracting;
+      case 'importingMedia':
+        return l10n.importingMedia;
+      case 'importingDatabase':
+        return l10n.importingDatabase;
+      case 'importingPreferences':
+        return l10n.importingPreferences;
+      default:
+        return stage;
     }
   }
 

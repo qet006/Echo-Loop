@@ -227,6 +227,22 @@
   **完成时间**: 2026-03-24
 ---
 
+## 已完成：数据导入/导出功能（开发者选项）
+
+- [x] 添加 `archive` + `share_plus` 依赖
+- [x] 创建 `lib/services/backup/backup_manifest.dart` — manifest 模型
+- [x] 创建 `lib/services/backup/backup_progress.dart` — 进度模型
+- [x] 创建 `lib/services/backup/backup_service.dart` — 核心导出/导入逻辑（ZIP + SQLite 文件直拷）
+- [x] 创建 `lib/providers/backup_provider.dart` — Provider 桥接 UI 和 Service
+- [x] 修改 `lib/screens/settings_screen.dart` — 开发者选项新增导出/导入入口
+- [x] 修改 `lib/database/app_database.dart` — 新增 `currentSchemaVersion` 静态常量
+- [x] 国际化：新增 22 个 i18n key（en + zh）
+- [x] 创建 `test/services/backup/backup_service_test.dart` — 单元测试
+
+  **完成时间**: 2026-03-26
+
+---
+
 ## 录音+识别功能（进行中）
 
 - [ ] 段落复述页面复用同一模块接入录音识别能力。

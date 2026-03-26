@@ -3643,6 +3643,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{hours}h ago'**
   String timeAgoHours(int hours);
+
+  /// No description provided for @exportData.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Data'**
+  String get exportData;
+
+  /// No description provided for @exportDataSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export all data to a ZIP file'**
+  String get exportDataSubtitle;
+
+  /// No description provided for @importData.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Data'**
+  String get importData;
+
+  /// No description provided for @importDataSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore data from a backup file'**
+  String get importDataSubtitle;
+
+  /// No description provided for @exporting.
+  ///
+  /// In en, this message translates to:
+  /// **'Exporting...'**
+  String get exporting;
+
+  /// No description provided for @importing.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing...'**
+  String get importing;
+
+  /// No description provided for @exportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Export complete'**
+  String get exportSuccess;
+
+  /// No description provided for @importSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Import complete'**
+  String get importSuccess;
+
+  /// No description provided for @importConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Import'**
+  String get importConfirmTitle;
+
+  /// No description provided for @importConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This will replace all current data including learning progress, favorites, and audio files. This action cannot be undone.'**
+  String get importConfirmMessage;
+
+  /// No description provided for @backupTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup time'**
+  String get backupTime;
+
+  /// No description provided for @backupVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'App version'**
+  String get backupVersion;
+
+  /// No description provided for @backupFileCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Media files'**
+  String get backupFileCount;
+
+  /// No description provided for @backupSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Total size'**
+  String get backupSize;
+
+  /// No description provided for @importIncompatible.
+  ///
+  /// In en, this message translates to:
+  /// **'This backup was created with a newer version of the app. Please update the app first.'**
+  String get importIncompatible;
+
+  /// No description provided for @importInvalidFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid backup file'**
+  String get importInvalidFile;
+
+  /// No description provided for @exportingDatabase.
+  ///
+  /// In en, this message translates to:
+  /// **'Exporting database...'**
+  String get exportingDatabase;
+
+  /// No description provided for @exportingPreferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Exporting preferences...'**
+  String get exportingPreferences;
+
+  /// No description provided for @exportingMedia.
+  ///
+  /// In en, this message translates to:
+  /// **'Exporting media files...'**
+  String get exportingMedia;
+
+  /// No description provided for @exportingPacking.
+  ///
+  /// In en, this message translates to:
+  /// **'Packing backup file...'**
+  String get exportingPacking;
+
+  /// No description provided for @importingExtracting.
+  ///
+  /// In en, this message translates to:
+  /// **'Extracting backup...'**
+  String get importingExtracting;
+
+  /// No description provided for @importingMedia.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring media files...'**
+  String get importingMedia;
+
+  /// No description provided for @importingDatabase.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring database...'**
+  String get importingDatabase;
+
+  /// No description provided for @importingPreferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring preferences...'**
+  String get importingPreferences;
 }
 
 class _AppLocalizationsDelegate

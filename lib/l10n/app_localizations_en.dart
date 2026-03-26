@@ -2038,4 +2038,78 @@ class AppLocalizationsEn extends AppLocalizations {
   String timeAgoHours(int hours) {
     return '${hours}h ago';
   }
+
+  @override
+  String get exportData => 'Export Data';
+
+  @override
+  String get exportDataSubtitle => 'Export all data to a ZIP file';
+
+  @override
+  String get importData => 'Import Data';
+
+  @override
+  String get importDataSubtitle => 'Restore data from a backup file';
+
+  @override
+  String get exporting => 'Exporting...';
+
+  @override
+  String get importing => 'Importing...';
+
+  @override
+  String get exportSuccess => 'Export complete';
+
+  @override
+  String get importSuccess => 'Import complete';
+
+  @override
+  String get importConfirmTitle => 'Confirm Import';
+
+  @override
+  String get importConfirmMessage =>
+      'This will replace all current data including learning progress, favorites, and audio files. This action cannot be undone.';
+
+  @override
+  String get backupTime => 'Backup time';
+
+  @override
+  String get backupVersion => 'App version';
+
+  @override
+  String get backupFileCount => 'Media files';
+
+  @override
+  String get backupSize => 'Total size';
+
+  @override
+  String get importIncompatible =>
+      'This backup was created with a newer version of the app. Please update the app first.';
+
+  @override
+  String get importInvalidFile => 'Invalid backup file';
+
+  @override
+  String get exportingDatabase => 'Exporting database...';
+
+  @override
+  String get exportingPreferences => 'Exporting preferences...';
+
+  @override
+  String get exportingMedia => 'Exporting media files...';
+
+  @override
+  String get exportingPacking => 'Packing backup file...';
+
+  @override
+  String get importingExtracting => 'Extracting backup...';
+
+  @override
+  String get importingMedia => 'Restoring media files...';
+
+  @override
+  String get importingDatabase => 'Restoring database...';
+
+  @override
+  String get importingPreferences => 'Restoring preferences...';
 }

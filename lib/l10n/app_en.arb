@@ -1120,5 +1120,30 @@
     "placeholders": {
       "hours": { "type": "int" }
     }
-  }
+  },
+
+  "exportData": "Export Data",
+  "exportDataSubtitle": "Export all data to a ZIP file",
+  "importData": "Import Data",
+  "importDataSubtitle": "Restore data from a backup file",
+  "exporting": "Exporting...",
+  "importing": "Importing...",
+  "exportSuccess": "Export complete",
+  "importSuccess": "Import complete",
+  "importConfirmTitle": "Confirm Import",
+  "importConfirmMessage": "This will replace all current data including learning progress, favorites, and audio files. This action cannot be undone.",
+  "backupTime": "Backup time",
+  "backupVersion": "App version",
+  "backupFileCount": "Media files",
+  "backupSize": "Total size",
+  "importIncompatible": "This backup was created with a newer version of the app. Please update the app first.",
+  "importInvalidFile": "Invalid backup file",
+  "exportingDatabase": "Exporting database...",
+  "exportingPreferences": "Exporting preferences...",
+  "exportingMedia": "Exporting media files...",
+  "exportingPacking": "Packing backup file...",
+  "importingExtracting": "Extracting backup...",
+  "importingMedia": "Restoring media files...",
+  "importingDatabase": "Restoring database...",
+  "importingPreferences": "Restoring preferences..."
 }

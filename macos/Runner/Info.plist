@@ -34,5 +34,7 @@
 	<string>This app needs speech recognition access to compare your spoken English with the target sentence.</string>
 	<key>FirebaseAutomaticScreenReportingEnabled</key>
 	<false/>
+	<key>FLTEnableMergedPlatformUIThread</key>
+	<false/>
 </dict>
 </plist>

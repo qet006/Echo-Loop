@@ -1982,4 +1982,76 @@ class AppLocalizationsZh extends AppLocalizations {
   String timeAgoHours(int hours) {
     return '$hours小时前';
   }
+
+  @override
+  String get exportData => '导出数据';
+
+  @override
+  String get exportDataSubtitle => '导出全部数据到 ZIP 文件';
+
+  @override
+  String get importData => '导入数据';
+
+  @override
+  String get importDataSubtitle => '从备份文件恢复数据';
+
+  @override
+  String get exporting => '正在导出...';
+
+  @override
+  String get importing => '正在导入...';
+
+  @override
+  String get exportSuccess => '导出完成';
+
+  @override
+  String get importSuccess => '导入完成';
+
+  @override
+  String get importConfirmTitle => '确认导入';
+
+  @override
+  String get importConfirmMessage => '这将替换当前所有数据，包括学习进度、收藏和音频文件。此操作不可撤销。';
+
+  @override
+  String get backupTime => '备份时间';
+
+  @override
+  String get backupVersion => '应用版本';
+
+  @override
+  String get backupFileCount => '媒体文件';
+
+  @override
+  String get backupSize => '总大小';
+
+  @override
+  String get importIncompatible => '此备份由更新版本的应用创建，请先更新应用。';
+
+  @override
+  String get importInvalidFile => '无效的备份文件';
+
+  @override
+  String get exportingDatabase => '正在导出数据库...';
+
+  @override
+  String get exportingPreferences => '正在导出设置...';
+
+  @override
+  String get exportingMedia => '正在导出媒体文件...';
+
+  @override
+  String get exportingPacking => '正在打包备份文件...';
+
+  @override
+  String get importingExtracting => '正在解压备份...';
+
+  @override
+  String get importingMedia => '正在恢复媒体文件...';
+
+  @override
+  String get importingDatabase => '正在恢复数据库...';
+
+  @override
+  String get importingPreferences => '正在恢复设置...';
 }
