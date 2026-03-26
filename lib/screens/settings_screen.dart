@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -497,21 +498,25 @@ class SettingsScreen extends ConsumerWidget {
       Navigator.of(context, rootNavigator: true).pop();
       dialogOpen = false;
 
-      // 保存文件：弹出保存对话框让用户选择位置和文件名
+      // 保存文件：移动端用分享面板，桌面端用保存对话框
       final fileName = zipPath.split('/').last;
-      final savePath = await FilePicker.platform.saveFile(
-        dialogTitle: l10n.exportData,
-        fileName: fileName,
-        type: FileType.custom,
-        allowedExtensions: ['zip'],
-      );
-      if (savePath != null) {
-        await File(zipPath).copy(savePath);
-        debugPrint('[Backup] Saved to: $savePath');
-        if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(l10n.exportSuccess)));
+      if (Platform.isIOS || Platform.isAndroid) {
+        await Share.shareXFiles([XFile(zipPath)], subject: fileName);
+      } else {
+        final savePath = await FilePicker.platform.saveFile(
+          dialogTitle: l10n.exportData,
+          fileName: fileName,
+          type: FileType.custom,
+          allowedExtensions: ['zip'],
+        );
+        if (savePath != null) {
+          await File(zipPath).copy(savePath);
+          debugPrint('[Backup] Saved to: $savePath');
+          if (context.mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(l10n.exportSuccess)));
+          }
         }
       }
       // 清理临时文件
