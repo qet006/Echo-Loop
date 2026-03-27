@@ -1671,7 +1671,7 @@ class TestShadowingRecordingController extends ShadowingRecordingController {
   Future<void> cancelActiveRecording() async {}
 
   @override
-  void clearRecording() {
+  Future<void> clearRecording() async {
     state = const ListenAndRepeatTurnState();
   }
 

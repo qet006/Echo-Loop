@@ -375,8 +375,8 @@ class ShadowingRecordingController extends Notifier<ListenAndRepeatTurnState> {
 
   // ========== 清理方法 ==========
 
-  /// 清除当前回合状态（保留配置）
-  void clearRecording() {
+  /// 清除当前回合状态（保留配置），并删除已完成录音的临时文件。
+  Future<void> clearRecording() async {
     AppLogger.log('ShadowRec', '● clearRecording → idle');
     _cancelAllTimers();
     _isStopping = false;
@@ -384,13 +384,18 @@ class ShadowingRecordingController extends Notifier<ListenAndRepeatTurnState> {
     _lastKnownTranscript = null;
     _eventSub?.cancel();
     _eventSub = null;
+    // 删除已完成录音的临时文件
+    final filePath = state.currentAttempt?.filePath;
+    if (filePath != null && filePath.isNotEmpty) {
+      await _recordingService.deleteRecording(filePath);
+    }
     state = ListenAndRepeatTurnState(permissions: state.permissions);
   }
 
   /// 完全重置（页面 dispose 时调用）
   Future<void> fullReset() async {
     await cancelActiveRecording();
-    clearRecording();
+    await clearRecording();
     _isManualMode = false;
     _cachedReferenceText = null;
     _maxRecordingDuration = _defaultMaxRecordingDuration;
