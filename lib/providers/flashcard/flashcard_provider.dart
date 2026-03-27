@@ -149,6 +149,15 @@ const _settingsKey = 'flashcard_settings';
 class FlashcardNotifier extends _$FlashcardNotifier {
   final CountdownController _countdown = CountdownController();
 
+  /// 本轮已取消收藏的单词（用于 toggle 和防重复）
+  final Set<String> _unsavedWords = {};
+
+  /// 当前单词是否已取消收藏
+  bool get isCurrentWordUnsaved {
+    final word = state.currentWord?.savedWord.word;
+    return word != null && _unsavedWords.contains(word);
+  }
+
   /// 学习时长存储服务
   late StudyTimeService _studyTimeService;
 
@@ -190,11 +199,15 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     // 构建卡片列表并一次性加载全部词典
     final allWords = sorted.map((w) => w.word).toList();
     final allEntries = await DictionaryService.instance.lookupAll(allWords);
-    final items = sorted.map((w) => FlashcardWordItem(
-      savedWord: w,
-      dictEntry: allEntries[w.word],
-      dictLoaded: true,
-    )).toList();
+    final items = sorted
+        .map(
+          (w) => FlashcardWordItem(
+            savedWord: w,
+            dictEntry: allEntries[w.word],
+            dictLoaded: true,
+          ),
+        )
+        .toList();
 
     state = FlashcardState(
       words: items,
@@ -339,45 +352,35 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     });
   }
 
-  /// 取消收藏当前单词
-  Future<void> unsaveCurrentWord() async {
+  /// 切换当前单词的收藏状态
+  ///
+  /// 仅写 DB（软删除/恢复），不从列表移除卡片，保持正常复习流程。
+  /// 退出复习后单词自然从收藏列表消失。
+  Future<void> toggleCurrentWordSave() async {
     if (state.words.isEmpty) return;
 
-    _stopAllPlayback();
-    final word = state.words[state.currentIndex];
-    _countdown.cancel();
-
-    // 从 DAO 中删除
+    final word = state.words[state.currentIndex].savedWord;
     final dao = ref.read(savedWordDaoProvider);
-    await dao.removeWord(word.savedWord.word);
+    final wasUnsaved = _unsavedWords.contains(word.word);
 
-    // 从列表中移除
-    final newWords = List<FlashcardWordItem>.from(state.words)
-      ..removeAt(state.currentIndex);
-
-    if (newWords.isEmpty) {
-      state = state.copyWith(
-        words: newWords,
-        isCompleted: true,
-        removedCount: state.removedCount + 1,
+    if (wasUnsaved) {
+      // 恢复收藏
+      await dao.saveWord(
+        word: word.word,
+        audioItemId: word.audioItemId,
+        sentenceIndex: word.sentenceIndex,
+        sentenceText: word.sentenceText,
+        sentenceStartMs: word.sentenceStartMs,
+        sentenceEndMs: word.sentenceEndMs,
       );
-      return;
+      _unsavedWords.remove(word.word);
+      state = state.copyWith(removedCount: state.removedCount - 1);
+    } else {
+      // 取消收藏
+      await dao.removeWord(word.word);
+      _unsavedWords.add(word.word);
+      state = state.copyWith(removedCount: state.removedCount + 1);
     }
-
-    final newIndex = state.currentIndex >= newWords.length
-        ? newWords.length - 1
-        : state.currentIndex;
-
-    state = state.copyWith(
-      words: newWords,
-      currentIndex: newIndex,
-      isShowingBack: false,
-      removedCount: state.removedCount + 1,
-      cardStartTime: DateTime.now(),
-    );
-
-    _speakCurrentWord();
-    _startCountdown();
   }
 
   /// 更新设置并持久化
@@ -393,11 +396,15 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       };
       final savedWords = state.words.map((w) => w.savedWord).toList();
       final sorted = _sortWords(savedWords, newSettings.sortMode);
-      final items = sorted.map((w) => FlashcardWordItem(
-        savedWord: w,
-        dictEntry: dictMap[w.word],
-        dictLoaded: dictMap.containsKey(w.word),
-      )).toList();
+      final items = sorted
+          .map(
+            (w) => FlashcardWordItem(
+              savedWord: w,
+              dictEntry: dictMap[w.word],
+              dictLoaded: dictMap.containsKey(w.word),
+            ),
+          )
+          .toList();
 
       state = state.copyWith(
         settings: newSettings,
@@ -752,5 +759,4 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       await _studyTimeService.addInputWords(count);
     }
   }
-
 }

@@ -34,8 +34,11 @@ class FlashcardCard extends StatefulWidget {
   /// 翻转回调
   final VoidCallback onFlip;
 
-  /// 取消收藏回调
+  /// 切换收藏状态回调
   final VoidCallback onUnsave;
+
+  /// 当前单词是否已取消收藏
+  final bool isUnsaved;
 
   /// 是否自动播放来源例句
   final bool autoPlaySentence;
@@ -52,6 +55,7 @@ class FlashcardCard extends StatefulWidget {
     required this.isShowingBack,
     required this.onFlip,
     required this.onUnsave,
+    this.isUnsaved = false,
     this.autoPlaySentence = true,
     this.autoPlayWord = true,
     this.onPlayWord,
@@ -142,6 +146,7 @@ class _FlashcardCardState extends State<FlashcardCard>
                 ? _FrontContent(
                     item: widget.item,
                     onUnsave: widget.onUnsave,
+                    isUnsaved: widget.isUnsaved,
                     onPlayWord: widget.onPlayWord,
                   )
                 : Transform(
@@ -150,6 +155,7 @@ class _FlashcardCardState extends State<FlashcardCard>
                     child: _BackContent(
                       item: widget.item,
                       onUnsave: widget.onUnsave,
+                      isUnsaved: widget.isUnsaved,
                       autoPlaySentence: widget.autoPlaySentence,
                       autoPlayWord: widget.autoPlayWord,
                     ),
@@ -165,11 +171,13 @@ class _FlashcardCardState extends State<FlashcardCard>
 class _FrontContent extends StatelessWidget {
   final FlashcardWordItem item;
   final VoidCallback onUnsave;
+  final bool isUnsaved;
   final VoidCallback? onPlayWord;
 
   const _FrontContent({
     required this.item,
     required this.onUnsave,
+    this.isUnsaved = false,
     this.onPlayWord,
   });
 
@@ -192,7 +200,7 @@ class _FrontContent extends StatelessWidget {
             // 右上角取消收藏
             Align(
               alignment: Alignment.topRight,
-              child: _UnsaveButton(onUnsave: onUnsave),
+              child: _UnsaveButton(onUnsave: onUnsave, isUnsaved: isUnsaved),
             ),
 
             const Spacer(),
@@ -239,7 +247,8 @@ class _FrontContent extends StatelessWidget {
             // 发音按钮
             const SizedBox(height: AppSpacing.m),
             IconButton.filled(
-              onPressed: onPlayWord ?? () => TtsService.instance.speak(word.word),
+              onPressed:
+                  onPlayWord ?? () => TtsService.instance.speak(word.word),
               icon: const Icon(Icons.volume_up),
               style: IconButton.styleFrom(
                 backgroundColor: theme.colorScheme.primaryContainer.withValues(
@@ -271,12 +280,14 @@ class _FrontContent extends StatelessWidget {
 class _BackContent extends ConsumerStatefulWidget {
   final FlashcardWordItem item;
   final VoidCallback onUnsave;
+  final bool isUnsaved;
   final bool autoPlaySentence;
   final bool autoPlayWord;
 
   const _BackContent({
     required this.item,
     required this.onUnsave,
+    this.isUnsaved = false,
     this.autoPlaySentence = true,
     this.autoPlayWord = true,
   });
@@ -356,7 +367,10 @@ class _BackContentState extends ConsumerState<_BackContent> {
             // 右上角取消收藏
             Align(
               alignment: Alignment.topRight,
-              child: _UnsaveButton(onUnsave: widget.onUnsave),
+              child: _UnsaveButton(
+                onUnsave: widget.onUnsave,
+                isUnsaved: widget.isUnsaved,
+              ),
             ),
 
             // 主体内容整体居中（单词+释义+例句作为一个块）
@@ -370,18 +384,17 @@ class _BackContentState extends ConsumerState<_BackContent> {
                       Row(
                         children: [
                           GestureDetector(
-                            onLongPressStart: (details) =>
-                                TextContextMenu.show(
+                            onLongPressStart: (details) => TextContextMenu.show(
                               context,
                               details.globalPosition,
                               word.word,
                             ),
                             onSecondaryTapDown: (details) =>
                                 TextContextMenu.show(
-                              context,
-                              details.globalPosition,
-                              word.word,
-                            ),
+                                  context,
+                                  details.globalPosition,
+                                  word.word,
+                                ),
                             child: Text(
                               word.word,
                               style: theme.textTheme.titleLarge?.copyWith(
@@ -448,8 +461,7 @@ class _BackContentState extends ConsumerState<_BackContent> {
                       ],
 
                       // 源音频引用
-                      if (_audioName != null &&
-                          word.audioItemId != null) ...[
+                      if (_audioName != null && word.audioItemId != null) ...[
                         const SizedBox(height: AppSpacing.s),
                         _AudioSourceLink(
                           audioName: _audioName!,
@@ -742,11 +754,12 @@ class _BackContentState extends ConsumerState<_BackContent> {
   }
 }
 
-/// 取消收藏按钮 + 提示
+/// 收藏状态切换按钮 + 提示
 class _UnsaveButton extends StatelessWidget {
   final VoidCallback onUnsave;
+  final bool isUnsaved;
 
-  const _UnsaveButton({required this.onUnsave});
+  const _UnsaveButton({required this.onUnsave, this.isUnsaved = false});
 
   @override
   Widget build(BuildContext context) {
@@ -757,16 +770,21 @@ class _UnsaveButton extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          l10n.flashcardUnsaveHint,
+          isUnsaved ? l10n.favoritesWordRemoved : l10n.flashcardUnsaveHint,
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.outline.withValues(alpha: 0.6),
           ),
         ),
         IconButton(
           onPressed: onUnsave,
-          icon: const Icon(Icons.bookmark, size: 20),
-          color: Colors.amber,
-          tooltip: l10n.flashcardUnsaveHint,
+          icon: Icon(
+            isUnsaved ? Icons.bookmark_border : Icons.bookmark,
+            size: 20,
+          ),
+          color: isUnsaved ? Colors.grey : Colors.amber,
+          tooltip: isUnsaved
+              ? l10n.favoritesSaveWord
+              : l10n.flashcardUnsaveHint,
         ),
       ],
     );
@@ -778,10 +796,7 @@ class _AudioSourceLink extends StatelessWidget {
   final String audioName;
   final String audioItemId;
 
-  const _AudioSourceLink({
-    required this.audioName,
-    required this.audioItemId,
-  });
+  const _AudioSourceLink({required this.audioName, required this.audioItemId});
 
   @override
   Widget build(BuildContext context) {

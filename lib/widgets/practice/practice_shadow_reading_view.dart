@@ -87,8 +87,11 @@ class PracticeShadowReadingView extends StatelessWidget {
   /// 本地化
   final AppLocalizations l10n;
 
-  /// 取消标记（难句/收藏）
-  final VoidCallback onRemoveMark;
+  /// 切换标记（难句/收藏）
+  final VoidCallback onToggleMark;
+
+  /// 当前句子是否已标记为难句/收藏
+  final bool isDifficult;
 
   /// AI 翻译/解析 Notifier
   final SentenceAiNotifier? aiNotifier;
@@ -107,7 +110,8 @@ class PracticeShadowReadingView extends StatelessWidget {
     required this.text,
     required this.playerState,
     required this.l10n,
-    required this.onRemoveMark,
+    required this.onToggleMark,
+    this.isDifficult = true,
     this.aiNotifier,
     this.audioItemId,
     this.sentenceIndex,
@@ -143,8 +147,8 @@ class PracticeShadowReadingView extends StatelessWidget {
               child: SentenceAnnotationCard(
                 key: ValueKey(text),
                 text: text,
-                isDifficult: true,
-                onToggle: onRemoveMark,
+                isDifficult: isDifficult,
+                onToggle: onToggleMark,
                 audioItemId: audioItemId,
                 sentenceIndex: sentenceIndex,
                 highlightedSegments: rec?.currentAttempt?.referenceSegments,

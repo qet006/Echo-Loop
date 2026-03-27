@@ -328,6 +328,18 @@ class BookmarkReview extends _$BookmarkReview {
     return removed;
   }
 
+  /// 切换当前句子的收藏标记（不从列表移除）
+  ///
+  /// 仅更新内存中的 isBookmarked 状态并触发 UI 重建，
+  /// DB 操作由 Screen 层负责。
+  void toggleCurrentBookmark() {
+    if (_sentences.isEmpty) return;
+    final idx = state.currentSentenceIndex;
+    final s = _sentences[idx];
+    _sentences[idx] = s.copyWithBookmark(!s.sentence.isBookmarked);
+    state = state.copyWith(bookmarkVersion: state.bookmarkVersion + 1);
+  }
+
   /// 跳到下一句
   Future<void> goToNext() async {
     if (state.currentSentenceIndex >= state.totalSentences - 1) return;
@@ -570,9 +582,7 @@ class BookmarkReview extends _$BookmarkReview {
 
   /// 释放资源
   void disposePlayer() {
-    ref
-        .read(shadowingRecordingControllerProvider.notifier)
-        .setRecorder(null);
+    ref.read(shadowingRecordingControllerProvider.notifier).setRecorder(null);
     _stopPeriodicSaveTimer();
     _saveAndRefreshStudyTime();
     _engine.cleanup();
@@ -637,7 +647,10 @@ class BookmarkReview extends _$BookmarkReview {
     final loaded = await _ensureAudioLoaded(bookmarkSentence);
     if (!loaded) {
       // 音频加载失败，跳过该句
-      AppLogger.log('Player', '⚠ 收藏复习跳过句子（音频不可用）: ${bookmarkSentence.audioName}');
+      AppLogger.log(
+        'Player',
+        '⚠ 收藏复习跳过句子（音频不可用）: ${bookmarkSentence.audioName}',
+      );
       await _autoAdvance();
       return;
     }

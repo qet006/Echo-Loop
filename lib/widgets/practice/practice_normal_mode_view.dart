@@ -35,8 +35,11 @@ class PracticeNormalModeView extends StatelessWidget {
   /// 听不懂（进入跟读模式）
   final VoidCallback onCantUnderstand;
 
-  /// 取消标记（难句/收藏）
-  final VoidCallback onRemoveMark;
+  /// 切换标记（难句/收藏）
+  final VoidCallback onToggleMark;
+
+  /// 当前句子是否已标记为难句/收藏
+  final bool isDifficult;
 
   /// 暂停/恢复倒计时
   final VoidCallback onPauseCountdown;
@@ -54,7 +57,8 @@ class PracticeNormalModeView extends StatelessWidget {
     required this.theme,
     required this.onPeekToggle,
     required this.onCantUnderstand,
-    required this.onRemoveMark,
+    required this.onToggleMark,
+    this.isDifficult = true,
     required this.onPauseCountdown,
     this.sentenceText,
     this.onWordTap,
@@ -72,7 +76,7 @@ class PracticeNormalModeView extends StatelessWidget {
 
           // 难句/收藏标记行
           TappableWrapper(
-            onTap: onRemoveMark,
+            onTap: onToggleMark,
             feedbackType: TapFeedback.opacity,
             pressedOpacity: 0.4,
             child: Row(
@@ -80,7 +84,9 @@ class PracticeNormalModeView extends StatelessWidget {
               children: [
                 Flexible(
                   child: Text(
-                    l10n.intensiveListenMarkedDifficult,
+                    isDifficult
+                        ? l10n.intensiveListenMarkedDifficult
+                        : l10n.intensiveListenNotDifficult,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.outline.withValues(alpha: 0.6),
                     ),
@@ -88,7 +94,11 @@ class PracticeNormalModeView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: AppSpacing.xs),
-                Icon(Icons.bookmark, color: Colors.amber, size: 18),
+                Icon(
+                  isDifficult ? Icons.bookmark : Icons.bookmark_border,
+                  color: isDifficult ? Colors.amber : Colors.grey,
+                  size: 18,
+                ),
               ],
             ),
           ),
@@ -165,7 +175,7 @@ class PracticeNormalModeView extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     TextButton(
-                      onPressed: onRemoveMark,
+                      onPressed: onToggleMark,
                       style: TextButton.styleFrom(
                         foregroundColor: theme.colorScheme.onSurfaceVariant,
                         padding: const EdgeInsets.symmetric(
@@ -174,7 +184,9 @@ class PracticeNormalModeView extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        l10n.practiceRemoveMark,
+                        isDifficult
+                            ? l10n.practiceRemoveMark
+                            : l10n.practiceAddMark,
                         style: theme.textTheme.titleSmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),

@@ -77,6 +77,9 @@ class ListenAndRepeatPlayerState {
   /// 当前步骤是否自然完成（用于 Screen 层检测完成信号）
   final bool stepFinished;
 
+  /// 收藏标记版本号（每次 toggle 递增，用于触发 select 监听的 rebuild）
+  final int bookmarkVersion;
+
   const ListenAndRepeatPlayerState({
     this.currentSentenceIndex = 0,
     this.totalSentences = 0,
@@ -92,6 +95,7 @@ class ListenAndRepeatPlayerState {
     this.isCountdownFastForward = false,
     this.isPostEvalCountdown = false,
     this.stepFinished = false,
+    this.bookmarkVersion = 0,
   });
 
   ListenAndRepeatPlayerState copyWith({
@@ -109,6 +113,7 @@ class ListenAndRepeatPlayerState {
     bool? isCountdownFastForward,
     bool? isPostEvalCountdown,
     bool? stepFinished,
+    int? bookmarkVersion,
   }) {
     return ListenAndRepeatPlayerState(
       currentSentenceIndex: currentSentenceIndex ?? this.currentSentenceIndex,
@@ -127,6 +132,7 @@ class ListenAndRepeatPlayerState {
           isCountdownFastForward ?? this.isCountdownFastForward,
       isPostEvalCountdown: isPostEvalCountdown ?? this.isPostEvalCountdown,
       stepFinished: stepFinished ?? this.stepFinished,
+      bookmarkVersion: bookmarkVersion ?? this.bookmarkVersion,
     );
   }
 }
@@ -345,6 +351,18 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
     return removed;
   }
 
+  /// 切换当前句子的收藏标记（不从列表移除）
+  ///
+  /// 仅更新内存中的 isBookmarked 状态并触发 UI 重建，
+  /// DB 操作由 Screen 层负责。
+  void toggleCurrentBookmark() {
+    if (_sentences.isEmpty) return;
+    final idx = state.currentSentenceIndex;
+    final s = _sentences[idx];
+    _sentences[idx] = s.copyWith(isBookmarked: !s.isBookmarked);
+    state = state.copyWith(bookmarkVersion: state.bookmarkVersion + 1);
+  }
+
   /// 更新跟读设置（即时生效，仅本次会话）
   ///
   /// 当 repeatCount 调小时，clamp currentPlayCount 避免越界显示（如"第3/1遍"），
@@ -553,9 +571,7 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
 
   /// 释放资源
   void disposePlayer() {
-    ref
-        .read(shadowingRecordingControllerProvider.notifier)
-        .setRecorder(null);
+    ref.read(shadowingRecordingControllerProvider.notifier).setRecorder(null);
     _engine.cleanup();
     _sentences = [];
     state = const ListenAndRepeatPlayerState();

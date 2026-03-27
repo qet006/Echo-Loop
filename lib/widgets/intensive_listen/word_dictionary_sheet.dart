@@ -19,6 +19,7 @@ import '../../providers/saved_word_provider.dart';
 import '../../services/dictionary_service.dart';
 import '../../services/tts_service.dart';
 import '../../theme/app_theme.dart';
+import '../animated_bookmark_icon.dart';
 import '../common/text_context_menu.dart';
 
 /// 显示词典底部弹窗
@@ -119,17 +120,12 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
   }
 
   /// 切换收藏状态
+  ///
+  /// 弹窗不会关闭，图标动画已提供足够反馈，无需 SnackBar。
   Future<void> _toggleSave(bool currentlySaved) async {
     final notifier = ref.read(savedWordListProvider.notifier);
     if (currentlySaved) {
       await notifier.removeWord(_lemmaWord);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context)!.favoritesWordRemoved),
-          duration: const Duration(seconds: 1),
-        ),
-      );
     } else {
       await notifier.saveWord(
         word: _lemmaWord,
@@ -138,13 +134,6 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
         sentenceText: widget.sentenceText,
         sentenceStartMs: widget.sentenceStartMs,
         sentenceEndMs: widget.sentenceEndMs,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context)!.favoritesWordSaved),
-          duration: const Duration(seconds: 1),
-        ),
       );
     }
   }
@@ -315,14 +304,9 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
           ),
           tooltip: l10n.flashcardTts,
         ),
-        IconButton(
+        AnimatedBookmarkIcon(
+          isSaved: isSaved,
           onPressed: () => _toggleSave(isSaved),
-          icon: Icon(
-            isSaved ? Icons.bookmark : Icons.bookmark_border,
-            color: isSaved
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurfaceVariant,
-          ),
           tooltip: isSaved ? l10n.favoritesUnsaveWord : l10n.favoritesSaveWord,
         ),
       ],

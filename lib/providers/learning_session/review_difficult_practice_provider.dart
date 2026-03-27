@@ -85,6 +85,9 @@ class ReviewDifficultPracticeState {
   /// 当前步骤是否自然完成（用于 Screen 层检测完成信号）
   final bool stepFinished;
 
+  /// 收藏标记版本号（每次 toggle 递增，用于触发 select 监听的 rebuild）
+  final int bookmarkVersion;
+
   const ReviewDifficultPracticeState({
     this.currentSentenceIndex = 0,
     this.totalSentences = 0,
@@ -101,6 +104,7 @@ class ReviewDifficultPracticeState {
     this.isCountdownFastForward = false,
     this.isPostEvalCountdown = false,
     this.stepFinished = false,
+    this.bookmarkVersion = 0,
   });
 
   ReviewDifficultPracticeState copyWith({
@@ -119,6 +123,7 @@ class ReviewDifficultPracticeState {
     bool? isCountdownFastForward,
     bool? isPostEvalCountdown,
     bool? stepFinished,
+    int? bookmarkVersion,
   }) {
     return ReviewDifficultPracticeState(
       currentSentenceIndex: currentSentenceIndex ?? this.currentSentenceIndex,
@@ -138,6 +143,7 @@ class ReviewDifficultPracticeState {
           isCountdownFastForward ?? this.isCountdownFastForward,
       isPostEvalCountdown: isPostEvalCountdown ?? this.isPostEvalCountdown,
       stepFinished: stepFinished ?? this.stepFinished,
+      bookmarkVersion: bookmarkVersion ?? this.bookmarkVersion,
     );
   }
 }
@@ -352,6 +358,18 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     return removed;
   }
 
+  /// 切换当前句子的收藏标记（不从列表移除）
+  ///
+  /// 仅更新内存中的 isBookmarked 状态并触发 UI 重建，
+  /// DB 操作由 Screen 层负责。
+  void toggleCurrentBookmark() {
+    if (_sentences.isEmpty) return;
+    final idx = state.currentSentenceIndex;
+    final s = _sentences[idx];
+    _sentences[idx] = s.copyWith(isBookmarked: !s.isBookmarked);
+    state = state.copyWith(bookmarkVersion: state.bookmarkVersion + 1);
+  }
+
   /// 跳到下一句
   Future<void> goToNext() async {
     if (state.currentSentenceIndex >= state.totalSentences - 1) return;
@@ -521,9 +539,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
 
   /// 释放资源
   void disposePlayer() {
-    ref
-        .read(shadowingRecordingControllerProvider.notifier)
-        .setRecorder(null);
+    ref.read(shadowingRecordingControllerProvider.notifier).setRecorder(null);
     _engine.cleanup();
     _sentences = [];
     state = const ReviewDifficultPracticeState();
