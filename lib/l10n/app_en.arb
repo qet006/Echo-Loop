@@ -877,6 +877,7 @@
   "favoritesWordSaved": "Word saved",
   "favoritesWordRemoved": "Word removed",
   "favoritesBookmarkRemoved": "Bookmark removed",
+  "undo": "Undo",
   "favoritesSaveWord": "Save Word",
   "favoritesUnsaveWord": "Remove Saved Word",
 
@@ -1016,6 +1017,7 @@
   "demoMode": "Demo Mode",
   "demoModeSubtitle": "Use demo data for screenshots and presentations",
   "practiceRemoveMark": "Unmark",
+  "practiceAddMark": "Re-mark",
 
   "blindListenSegmentProgress": "Paragraph {current}/{total}",
   "@blindListenSegmentProgress": {

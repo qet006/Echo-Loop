@@ -1584,6 +1584,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get favoritesBookmarkRemoved => 'Bookmark removed';
 
   @override
+  String get undo => 'Undo';
+
+  @override
   String get favoritesSaveWord => 'Save Word';
 
   @override
@@ -1881,6 +1884,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get practiceRemoveMark => 'Unmark';
+
+  @override
+  String get practiceAddMark => 'Re-mark';
 
   @override
   String blindListenSegmentProgress(int current, int total) {

@@ -1539,6 +1539,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get favoritesBookmarkRemoved => '已取消收藏';
 
   @override
+  String get undo => '撤销';
+
+  @override
   String get favoritesSaveWord => '收藏单词';
 
   @override
@@ -1827,6 +1830,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get practiceRemoveMark => '取消标记';
+
+  @override
+  String get practiceAddMark => '重新标记';
 
   @override
   String blindListenSegmentProgress(int current, int total) {

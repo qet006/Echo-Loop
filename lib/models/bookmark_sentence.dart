@@ -22,4 +22,12 @@ class BookmarkSentence {
     required this.audioName,
     required this.originalSentenceIndex,
   });
+
+  /// 创建一份 isBookmarked 状态不同的副本
+  BookmarkSentence copyWithBookmark(bool isBookmarked) => BookmarkSentence(
+    sentence: sentence.copyWith(isBookmarked: isBookmarked),
+    audioItemId: audioItemId,
+    audioName: audioName,
+    originalSentenceIndex: originalSentenceIndex,
+  );
 }

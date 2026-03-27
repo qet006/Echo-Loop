@@ -2834,6 +2834,12 @@ abstract class AppLocalizations {
   /// **'Bookmark removed'**
   String get favoritesBookmarkRemoved;
 
+  /// No description provided for @undo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get undo;
+
   /// No description provided for @favoritesSaveWord.
   ///
   /// In en, this message translates to:
@@ -3373,6 +3379,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unmark'**
   String get practiceRemoveMark;
+
+  /// No description provided for @practiceAddMark.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-mark'**
+  String get practiceAddMark;
 
   /// No description provided for @blindListenSegmentProgress.
   ///

@@ -653,6 +653,7 @@
   "favoritesWordSaved": "已收藏",
   "favoritesWordRemoved": "已取消收藏",
   "favoritesBookmarkRemoved": "已取消收藏",
+  "undo": "撤销",
   "favoritesSaveWord": "收藏单词",
   "favoritesUnsaveWord": "取消收藏",
 
@@ -765,6 +766,7 @@
   "demoMode": "演示模式",
   "demoModeSubtitle": "开启后使用演示数据，方便截图展示",
   "practiceRemoveMark": "取消标记",
+  "practiceAddMark": "重新标记",
 
   "blindListenSegmentProgress": "段落 {current}/{total}",
   "blindListenSegmentDuration": "段落时长 {duration}s",
