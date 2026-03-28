@@ -1,0 +1,122 @@
+/// 异步 toggle 按钮
+///
+/// 内部管理 loading 状态，点击时执行异步回调，
+/// 自动显示 loading 指示器并禁止重复点击。
+/// 支持默认、选中、加载、禁用四种视觉状态。
+library;
+
+import 'package:flutter/material.dart';
+
+/// 异步 toggle 按钮
+///
+/// 按钮高度 36dp，圆角 8dp，图标 16dp + labelMedium 文字。
+/// [onPressed] 返回 Future，按钮在 Future 完成前自动显示 loading。
+class AsyncToggleButton extends StatefulWidget {
+  /// 按钮文字
+  final String label;
+
+  /// 按钮图标
+  final IconData icon;
+
+  /// 是否处于选中（激活）状态
+  final bool isActive;
+
+  /// 是否禁用
+  final bool isDisabled;
+
+  /// 点击回调，返回 Future；按钮自动管理 loading 状态
+  final Future<void> Function() onPressed;
+
+  const AsyncToggleButton({
+    super.key,
+    required this.label,
+    required this.icon,
+    this.isActive = false,
+    this.isDisabled = false,
+    required this.onPressed,
+  });
+
+  @override
+  State<AsyncToggleButton> createState() => _AsyncToggleButtonState();
+}
+
+class _AsyncToggleButtonState extends State<AsyncToggleButton> {
+  bool _isLoading = false;
+
+  Future<void> _handleTap() async {
+    if (_isLoading || widget.isDisabled) return;
+    setState(() => _isLoading = true);
+    try {
+      await widget.onPressed();
+    } catch (_) {
+      // 错误由 onPressed 内部处理，按钮只负责停止 loading
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    // 根据状态决定颜色
+    final Color backgroundColor;
+    final Color foregroundColor;
+    final Border? border;
+
+    if (widget.isDisabled) {
+      backgroundColor = colorScheme.surfaceContainerHighest.withValues(
+        alpha: 0.3,
+      );
+      foregroundColor = colorScheme.onSurfaceVariant.withValues(alpha: 0.38);
+      border = null;
+    } else if (widget.isActive || _isLoading) {
+      backgroundColor = colorScheme.primaryContainer;
+      foregroundColor = colorScheme.primary;
+      border = Border.all(color: colorScheme.primary, width: 1);
+    } else {
+      backgroundColor = colorScheme.surfaceContainerHighest.withValues(
+        alpha: 0.5,
+      );
+      foregroundColor = colorScheme.onSurfaceVariant;
+      border = null;
+    }
+
+    return GestureDetector(
+      onTap: _handleTap,
+      child: Container(
+        height: 36,
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(8),
+          border: border,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (_isLoading)
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: foregroundColor,
+                ),
+              )
+            else
+              Icon(widget.icon, size: 16, color: foregroundColor),
+            const SizedBox(width: 4),
+            Text(
+              widget.label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: foregroundColor,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
