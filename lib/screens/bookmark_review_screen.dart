@@ -34,12 +34,13 @@ import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/difficult_practice/difficult_practice_settings_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
 import '../widgets/intensive_listen/word_dictionary_sheet.dart';
+import '../theme/app_theme.dart';
 import '../widgets/common/countdown_chip.dart';
+import '../widgets/practice/annotation_with_recording.dart';
 import '../widgets/practice/practice_normal_mode_view.dart';
 import '../widgets/practice/practice_play_count_label.dart';
 import '../widgets/practice/practice_playback_controls.dart';
 import '../widgets/practice/practice_progress_section.dart';
-import '../widgets/practice/practice_shadow_reading_view.dart';
 
 /// 收藏句子复习页面
 class BookmarkReviewScreen extends ConsumerStatefulWidget {
@@ -483,16 +484,21 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                 // 主体内容：盲听/跟读 双态切换
                 Expanded(
                   child: playerState.isAnnotationMode
-                      ? PracticeShadowReadingView(
-                          text: currentSentence?.text ?? '',
-                          playerState: playerState,
-                          l10n: l10n,
-                          onToggleMark: _handleToggleBookmark,
-                          isDifficult: currentSentence?.isBookmarked ?? true,
-                          aiNotifier: ref.read(sentenceAiNotifierProvider),
-                          audioItemId: currentBookmark?.audioItemId,
-                          sentenceIndex: currentBookmark?.originalSentenceIndex,
-                          recording: RecordingConfig(
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.l,
+                          ),
+                          child: AnnotationWithRecording(
+                            text: currentSentence?.text ?? '',
+                            playerState: playerState,
+                            l10n: l10n,
+                            isDifficult:
+                                currentSentence?.isBookmarked ?? true,
+                            onToggleMark: _handleToggleBookmark,
+                            aiNotifier: ref.read(sentenceAiNotifierProvider),
+                            audioItemId: currentBookmark?.audioItemId,
+                            sentenceIndex:
+                                currentBookmark?.originalSentenceIndex,
                             turnState: turnState,
                             currentPromptId: currentPromptId,
                             currentAttempt: currentAttempt,
@@ -501,11 +507,6 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                                 _playingPromptId == currentPromptId,
                             onRecordTap: _handleRecordTap,
                             onAttemptPlaybackTap: _handleAttemptPlaybackTap,
-                            pauseRemaining: playerState.pauseRemaining,
-                            pauseDuration: playerState.pauseDuration,
-                            isCountdownPaused: playerState.isCountdownPaused,
-                            isPostEvalCountdown:
-                                playerState.isPostEvalCountdown,
                             onFastForward: () => ref
                                 .read(bookmarkReviewProvider.notifier)
                                 .completePausedTurn(),

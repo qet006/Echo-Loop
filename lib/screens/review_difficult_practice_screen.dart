@@ -32,6 +32,7 @@ import '../services/app_logger.dart';
 import '../services/audio_playback_service.dart';
 import '../utils/wakelock_mixin.dart';
 import '../providers/sentence_ai_provider.dart';
+import '../theme/app_theme.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/review/review_briefing_sheet.dart';
@@ -42,8 +43,8 @@ import '../widgets/common/countdown_chip.dart';
 import '../widgets/practice/practice_normal_mode_view.dart';
 import '../widgets/practice/practice_play_count_label.dart';
 import '../widgets/practice/practice_playback_controls.dart';
+import '../widgets/practice/annotation_with_recording.dart';
 import '../widgets/practice/practice_progress_section.dart';
-import '../widgets/practice/practice_shadow_reading_view.dart';
 
 /// 复习难句补练页面
 class ReviewDifficultPracticeScreen extends ConsumerStatefulWidget {
@@ -680,16 +681,20 @@ class _ReviewDifficultPracticeScreenState
                 // 主体内容：盲听/跟读 双态切换
                 Expanded(
                   child: playerState.isAnnotationMode
-                      ? PracticeShadowReadingView(
-                          text: currentSentence?.text ?? '',
-                          playerState: playerState,
-                          l10n: l10n,
-                          onToggleMark: _handleToggleDifficult,
-                          isDifficult: currentSentence?.isBookmarked ?? true,
-                          aiNotifier: ref.read(sentenceAiNotifierProvider),
-                          audioItemId: widget.audioItemId,
-                          sentenceIndex: currentSentence?.index ?? player.currentIndex,
-                          recording: RecordingConfig(
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.l,
+                          ),
+                          child: AnnotationWithRecording(
+                            text: currentSentence?.text ?? '',
+                            playerState: playerState,
+                            l10n: l10n,
+                            isDifficult:
+                                currentSentence?.isBookmarked ?? true,
+                            onToggleMark: _handleToggleDifficult,
+                            aiNotifier: ref.read(sentenceAiNotifierProvider),
+                            audioItemId: widget.audioItemId,
+                            sentenceIndex: player.currentIndex,
                             turnState: turnState,
                             currentPromptId: currentPromptId,
                             currentAttempt: currentAttempt,
@@ -698,11 +703,6 @@ class _ReviewDifficultPracticeScreenState
                                 _playingPromptId == currentPromptId,
                             onRecordTap: _handleRecordTap,
                             onAttemptPlaybackTap: _handleAttemptPlaybackTap,
-                            pauseRemaining: playerState.pauseRemaining,
-                            pauseDuration: playerState.pauseDuration,
-                            isCountdownPaused: playerState.isCountdownPaused,
-                            isPostEvalCountdown:
-                                playerState.isPostEvalCountdown,
                             onFastForward: () => ref
                                 .read(reviewDifficultPracticeProvider.notifier)
                                 .completePausedTurn(),

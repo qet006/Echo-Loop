@@ -28,9 +28,8 @@ import '../providers/listen_and_repeat_turn_controller_provider.dart';
 import '../services/app_logger.dart';
 import '../services/audio_playback_service.dart';
 import '../theme/app_theme.dart';
-import '../models/speech_practice_models.dart';
 import '../providers/sentence_ai_provider.dart';
-import '../widgets/intensive_listen/sentence_annotation_card.dart';
+import '../widgets/common/bookmark_toggle_row.dart';
 import '../widgets/common/countdown_chip.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_settings_sheet.dart';
 import '../widgets/listen_and_repeat/speech_practice_turn_panel.dart';
@@ -39,6 +38,7 @@ import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/review/review_briefing_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
+import '../widgets/practice/annotation_content_view.dart';
 import '../widgets/practice/practice_progress_section.dart';
 
 /// 录音/倒计时区域固定高度（录音面板最高：24 状态 + 4 间距 + 56 按钮 + 16 底部 = 100）
@@ -282,37 +282,6 @@ class _ListenAndRepeatPlayerScreenState
         );
   }
 
-  /// 构建带 AI 翻译/解析回调的句子卡片
-  Widget _buildAnnotationCard(
-    String text,
-    int sentenceIndex, {
-    Widget? inlineFeedback,
-    List<SpeechTranscriptSegment>? highlightedSegments,
-  }) {
-    final ai = ref.read(sentenceAiNotifierProvider);
-    final cachedTranslation = ai.getCachedTranslation(text)?.translation;
-    final cachedAnalysis = ai.getCachedAnalysis(text);
-    final cachedAnalysisText = cachedAnalysis?.toDisplayString();
-
-    return SentenceAnnotationCard(
-      key: ValueKey(text),
-      text: text,
-      audioItemId: widget.audioItemId,
-      sentenceIndex: sentenceIndex,
-      inlineFeedback: inlineFeedback,
-      highlightedSegments: highlightedSegments,
-      onRequestTranslation: () async {
-        final result = await ai.getTranslation(text);
-        return result.translation;
-      },
-      onRequestAnalysis: () async {
-        final result = await ai.getAnalysis(text);
-        return result.toDisplayString();
-      },
-      cachedTranslation: cachedTranslation,
-      cachedAnalysis: cachedAnalysisText,
-    );
-  }
 
   /// 切换当前句子的难句标记
   Future<void> _handleToggleDifficult() async {
@@ -755,22 +724,36 @@ class _ListenAndRepeatPlayerScreenState
                   durationText: durationText,
                 ),
 
-                // 主体内容：句子卡片
+                // 主体内容：书签行 + 标注内容
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.l,
                     ),
-                    child: SingleChildScrollView(
-                      child: currentSentence != null
-                          ? _buildAnnotationCard(
-                              currentSentence.text,
-                              player.currentIndex,
-                              highlightedSegments:
-                                  currentAttempt?.referenceSegments,
-                            )
-                          : const SizedBox.shrink(),
-                    ),
+                    child: currentSentence != null
+                        ? Column(
+                            children: [
+                              const SizedBox(height: AppSpacing.s),
+                              BookmarkToggleRow(
+                                isDifficult: currentSentence.isBookmarked,
+                                onTap: _handleToggleDifficult,
+                              ),
+                              const SizedBox(height: AppSpacing.m),
+                              Expanded(
+                                child: AnnotationContentView(
+                                  text: currentSentence.text,
+                                  aiNotifier: ref.read(
+                                    sentenceAiNotifierProvider,
+                                  ),
+                                  audioItemId: widget.audioItemId,
+                                  sentenceIndex: player.currentIndex,
+                                  highlightedSegments:
+                                      currentAttempt?.referenceSegments,
+                                ),
+                              ),
+                            ],
+                          )
+                        : const SizedBox.shrink(),
                   ),
                 ),
 

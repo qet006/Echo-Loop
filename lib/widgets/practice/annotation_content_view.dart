@@ -10,6 +10,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../models/sense_group_result.dart';
+import '../../models/speech_practice_models.dart';
 import '../../providers/sentence_ai_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/sense_group_timing.dart';
@@ -61,6 +62,9 @@ class AnnotationContentView extends StatefulWidget {
   /// 是否有词级时间戳
   final bool hasWordTimestamps;
 
+  /// 语音评估高亮片段（逐词绿/红标色）
+  final List<SpeechTranscriptSegment>? highlightedSegments;
+
   const AnnotationContentView({
     super.key,
     required this.text,
@@ -77,6 +81,7 @@ class AnnotationContentView extends StatefulWidget {
     this.onTapSenseGroup,
     this.onRequestSenseGroups,
     this.hasWordTimestamps = false,
+    this.highlightedSegments,
   });
 
   @override
@@ -168,6 +173,7 @@ class _AnnotationContentViewState extends State<AnnotationContentView> {
               onTapSenseGroup: widget.onTapSenseGroup,
               onRequestSenseGroups: widget.onRequestSenseGroups,
               hasWordTimestamps: widget.hasWordTimestamps,
+              highlightedSegments: widget.highlightedSegments,
             ),
           ),
         ),
