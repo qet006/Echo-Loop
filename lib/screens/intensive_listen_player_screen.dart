@@ -32,6 +32,7 @@ import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/review/review_briefing_sheet.dart';
 import '../widgets/intensive_listen/word_dictionary_sheet.dart';
+import '../widgets/common/bookmark_toggle_row.dart';
 import '../widgets/common/countdown_chip.dart';
 import '../widgets/common/tappable_wrapper.dart';
 import '../widgets/player_hotkey_scope.dart';
@@ -721,15 +722,9 @@ class _IntensiveListenPlayerScreenState
                           playerState.isAnnotationReplay
                       ? _AnnotationWithBookmark(
                           playerState: playerState,
-                          l10n: l10n,
-                          theme: theme,
                           onToggleDifficult: _toggleAndSaveDifficult,
                           child: AnnotationContentView(
                             text: currentSentence?.text ?? '',
-                            isDifficult: playerState.difficultSentences
-                                .contains(playerState.currentSentenceIndex),
-                            isAutoMarked:
-                                playerState.isCurrentSentenceAutoMarked,
                             aiNotifier: ref.read(sentenceAiNotifierProvider),
                             audioItemId: widget.audioItemId,
                             sentenceIndex: currentSentence?.index ?? playerState.currentSentenceIndex,
@@ -1013,15 +1008,11 @@ class _ProgressSection extends StatelessWidget {
 /// 标注模式外层包装：在顶部显示和普通模式相同的书签标记行
 class _AnnotationWithBookmark extends StatelessWidget {
   final IntensiveListenState playerState;
-  final AppLocalizations l10n;
-  final ThemeData theme;
   final VoidCallback onToggleDifficult;
   final Widget child;
 
   const _AnnotationWithBookmark({
     required this.playerState,
-    required this.l10n,
-    required this.theme,
     required this.onToggleDifficult,
     required this.child,
   });
@@ -1031,48 +1022,18 @@ class _AnnotationWithBookmark extends StatelessWidget {
     final isDifficult = playerState.difficultSentences.contains(
       playerState.currentSentenceIndex,
     );
-    final isAutoMarked = playerState.isCurrentSentenceAutoMarked;
-
-    // 标记文案：自动标记 / 手动标记 / 未标记
-    final labelText = isDifficult
-        ? (isAutoMarked
-              ? l10n.intensiveListenAutoMarkedDifficult
-              : l10n.intensiveListenMarkedDifficult)
-        : l10n.intensiveListenNotDifficult;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
       child: Column(
         children: [
           const SizedBox(height: AppSpacing.s),
-          // 书签标记行（和普通模式同位置、同样式）
-          TappableWrapper(
+          BookmarkToggleRow(
+            isDifficult: isDifficult,
+            isAutoMarked: playerState.isCurrentSentenceAutoMarked,
             onTap: onToggleDifficult,
-            feedbackType: TapFeedback.opacity,
-            pressedOpacity: 0.4,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Flexible(
-                  child: Text(
-                    labelText,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.6),
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Icon(
-                  isDifficult ? Icons.bookmark : Icons.bookmark_border,
-                  color: isDifficult ? Colors.amber.shade700 : Colors.grey,
-                  size: 18,
-                ),
-              ],
-            ),
           ),
           const SizedBox(height: AppSpacing.m),
-          // 标注内容
           Expanded(child: child),
         ],
       ),

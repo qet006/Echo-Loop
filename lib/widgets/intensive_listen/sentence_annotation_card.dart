@@ -15,7 +15,6 @@ import '../../theme/app_theme.dart';
 import '../../utils/sense_group_timing.dart';
 import '../common/async_toggle_button.dart';
 import '../common/shimmer_placeholder.dart';
-import '../common/tappable_wrapper.dart';
 import '../common/text_context_menu.dart';
 import 'sense_group_text.dart';
 import 'word_dictionary_sheet.dart';
@@ -38,18 +37,6 @@ enum SenseGroupMode { off, medium, fine }
 class SentenceAnnotationCard extends StatefulWidget {
   /// 句子文本
   final String text;
-
-  /// 当前句子是否标记为难句
-  final bool isDifficult;
-
-  /// 是否展示"自动标记"文案
-  ///
-  /// 仅在"看不懂"触发自动标记的当次传 true；
-  /// 其它场景（包括已存在的难句）保持 false。
-  final bool showAutoMarkedLabel;
-
-  /// 切换难句标记回调（为 null 时不显示标记行）
-  final VoidCallback? onToggle;
 
   /// 请求翻译回调（返回翻译文本）
   final Future<String> Function()? onRequestTranslation;
@@ -121,9 +108,6 @@ class SentenceAnnotationCard extends StatefulWidget {
   const SentenceAnnotationCard({
     super.key,
     required this.text,
-    required this.isDifficult,
-    this.showAutoMarkedLabel = false,
-    this.onToggle,
     this.onRequestTranslation,
     this.onRequestAnalysis,
     this.cachedTranslation,
@@ -567,40 +551,6 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 难句标记（可点击切换；onToggle 为 null 时不显示）
-        if (widget.onToggle != null) ...[
-          TappableWrapper(
-            onTap: widget.onToggle,
-            feedbackType: TapFeedback.opacity,
-            pressedOpacity: 0.4,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Flexible(
-                  child: Text(
-                    widget.isDifficult
-                        ? (widget.showAutoMarkedLabel
-                              ? l10n.intensiveListenAutoMarkedDifficult
-                              : l10n.intensiveListenMarkedDifficult)
-                        : l10n.intensiveListenNotDifficult,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.6),
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Icon(
-                  widget.isDifficult ? Icons.bookmark : Icons.bookmark_border,
-                  color: widget.isDifficult ? Colors.amber : Colors.grey,
-                  size: 18,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.m),
-        ],
-
         // 句子文本 — 意群色块模式或纯 RichText（带长按/右键复制整句）
         if (showSenseGroupBlocks) ...[
           SenseGroupText(

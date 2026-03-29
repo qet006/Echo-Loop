@@ -147,8 +147,6 @@ class PracticeShadowReadingView extends StatelessWidget {
               child: SentenceAnnotationCard(
                 key: ValueKey(text),
                 text: text,
-                isDifficult: isDifficult,
-                onToggle: onToggleMark,
                 audioItemId: audioItemId,
                 sentenceIndex: sentenceIndex,
                 highlightedSegments: rec?.currentAttempt?.referenceSegments,

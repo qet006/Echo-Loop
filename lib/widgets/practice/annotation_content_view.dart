@@ -22,12 +22,6 @@ class AnnotationContentView extends StatefulWidget {
   /// 句子文本
   final String text;
 
-  /// 当前句子是否标记为难句
-  final bool isDifficult;
-
-  /// 是否展示"自动标记为难句"文案
-  final bool isAutoMarked;
-
   /// AI 翻译/解析服务
   final SentenceAiNotifier? aiNotifier;
 
@@ -70,8 +64,6 @@ class AnnotationContentView extends StatefulWidget {
   const AnnotationContentView({
     super.key,
     required this.text,
-    required this.isDifficult,
-    required this.isAutoMarked,
     this.aiNotifier,
     this.audioItemId,
     this.sentenceIndex,
@@ -148,8 +140,6 @@ class _AnnotationContentViewState extends State<AnnotationContentView> {
             child: SentenceAnnotationCard(
               key: _cardKey,
               text: widget.text,
-              isDifficult: widget.isDifficult,
-              showAutoMarkedLabel: widget.isAutoMarked,
               showToolbar: false,
               onToolbarStateChanged: _toolbarNotifier.notify,
               onRequestTranslation: ai != null

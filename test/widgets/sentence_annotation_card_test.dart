@@ -15,81 +15,17 @@ void main() {
   const sep = SentenceAnalysis.fieldSeparator;
 
   group('SentenceAnnotationCard — 基本渲染', () {
-    testWidgets('显示句子文本和难句标记', (tester) async {
+    testWidgets('显示句子文本', (tester) async {
       await tester.pumpWidget(
         createTestApp(
           SentenceAnnotationCard(
             text: 'Hello world',
-            isDifficult: false,
-            onToggle: () {},
           ),
         ),
       );
 
       // 句子文本通过 RichText 渲染
       expect(find.byType(RichText), findsWidgets);
-      // 非难句状态
-      expect(find.byIcon(Icons.bookmark_border), findsOneWidget);
-    });
-
-    testWidgets('难句标记状态正确显示', (tester) async {
-      await tester.pumpWidget(
-        createTestApp(
-          SentenceAnnotationCard(
-            text: 'Difficult sentence',
-            isDifficult: true,
-            onToggle: () {},
-          ),
-        ),
-      );
-
-      expect(find.byIcon(Icons.bookmark), findsOneWidget);
-    });
-
-    testWidgets('自动标记分支显示自动文案', (tester) async {
-      await tester.pumpWidget(
-        createTestApp(
-          SentenceAnnotationCard(
-            text: 'Auto difficult',
-            isDifficult: true,
-            showAutoMarkedLabel: true,
-            onToggle: () {},
-          ),
-        ),
-      );
-
-      expect(find.text('Auto-marked difficult, tap to undo'), findsOneWidget);
-    });
-
-    testWidgets('已标记分支显示普通难句文案', (tester) async {
-      await tester.pumpWidget(
-        createTestApp(
-          SentenceAnnotationCard(
-            text: 'Marked difficult',
-            isDifficult: true,
-            showAutoMarkedLabel: false,
-            onToggle: () {},
-          ),
-        ),
-      );
-
-      expect(find.text('Marked difficult, tap to undo'), findsOneWidget);
-    });
-
-    testWidgets('点击难句标记触发 onToggle', (tester) async {
-      var toggled = false;
-      await tester.pumpWidget(
-        createTestApp(
-          SentenceAnnotationCard(
-            text: 'Test',
-            isDifficult: false,
-            onToggle: () => toggled = true,
-          ),
-        ),
-      );
-
-      await tester.tap(find.byIcon(Icons.bookmark_border));
-      expect(toggled, isTrue);
     });
   });
 
@@ -99,8 +35,6 @@ void main() {
         createTestApp(
           SentenceAnnotationCard(
             text: 'Test',
-            isDifficult: false,
-            onToggle: () {},
             onRequestTranslation: () async => '翻译',
             onRequestAnalysis: () async => '语法${sep}词汇${sep}用法',
             hasWordTimestamps: true,
@@ -123,8 +57,6 @@ void main() {
         createTestApp(
           SentenceAnnotationCard(
             text: 'Test',
-            isDifficult: false,
-            onToggle: () {},
             onRequestTranslation: () async => '翻译',
             onRequestAnalysis: () async => '语法${sep}词汇${sep}用法',
             hasWordTimestamps: false,
@@ -148,8 +80,6 @@ void main() {
         createTestApp(
           SentenceAnnotationCard(
             text: 'Test',
-            isDifficult: false,
-            onToggle: () {},
           ),
         ),
       );
@@ -170,8 +100,6 @@ void main() {
         createTestApp(
           SentenceAnnotationCard(
             text: 'Test sentence',
-            isDifficult: false,
-            onToggle: () {},
             onRequestTranslation: () {
               requested = true;
               return completer.future;
@@ -203,8 +131,6 @@ void main() {
         createTestApp(
           SentenceAnnotationCard(
             text: 'Test',
-            isDifficult: false,
-            onToggle: () {},
             cachedTranslation: '已缓存的翻译',
             onRequestTranslation: () {
               requested = true;
@@ -232,8 +158,6 @@ void main() {
         createTestApp(
           SentenceAnnotationCard(
             text: 'Test',
-            isDifficult: false,
-            onToggle: () {},
             onRequestTranslation: () {
               callCount++;
               return Future.error('network error');
@@ -262,8 +186,6 @@ void main() {
         createTestApp(
           SentenceAnnotationCard(
             text: 'Test',
-            isDifficult: false,
-            onToggle: () {},
             onRequestTranslation: () async => '翻译内容',
             onRequestAnalysis: () async => '语法${sep}词汇${sep}用法',
           ),
@@ -291,8 +213,6 @@ void main() {
         createTestApp(
           SentenceAnnotationCard(
             text: 'Test sentence',
-            isDifficult: false,
-            onToggle: () {},
             onRequestTranslation: () async => '翻译',
             onRequestAnalysis: () {
               requested = true;
@@ -319,8 +239,6 @@ void main() {
         createTestApp(
           SentenceAnnotationCard(
             text: 'Hello',
-            isDifficult: false,
-            onToggle: () {},
             cachedAnalysis: '语法分析${sep}词汇分析${sep}用法分析',
             onRequestAnalysis: () async => '语法分析${sep}词汇分析${sep}用法分析',
           ),
@@ -346,8 +264,6 @@ void main() {
         createTestApp(
           SentenceAnnotationCard(
             text: 'Test',
-            isDifficult: false,
-            onToggle: () {},
             onRequestTranslation: () async => '翻译OK',
             onRequestAnalysis: () async => '语法OK${sep}词汇OK${sep}用法OK',
           ),
@@ -374,8 +290,6 @@ void main() {
         createTestApp(
           SentenceAnnotationCard(
             text: 'Test',
-            isDifficult: false,
-            onToggle: () {},
             cachedTranslation: '缓存翻译',
             onRequestTranslation: () async => '缓存翻译',
             cachedAnalysis: '缓存语法${sep}缓存词汇${sep}缓存用法',
@@ -411,8 +325,6 @@ void main() {
         createTestApp(
           SentenceAnnotationCard(
             text: 'Test sentence here',
-            isDifficult: false,
-            onToggle: () {},
             onRequestTranslation: () async => '翻译',
             hasWordTimestamps: true,
             onRequestSenseGroups: () async {
@@ -447,8 +359,6 @@ void main() {
         createTestApp(
           SentenceAnnotationCard(
             text: 'Hello world',
-            isDifficult: false,
-            onToggle: () {},
             onRequestTranslation: () async => '翻译',
             senseGroups: groups,
             senseGroupTimings: timings,
@@ -482,8 +392,6 @@ void main() {
         createTestApp(
           SentenceAnnotationCard(
             text: 'Test',
-            isDifficult: false,
-            onToggle: () {},
             onRequestTranslation: () async => '翻译',
             hasWordTimestamps: true,
             onRequestSenseGroups: () => completer.future,

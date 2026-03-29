@@ -297,13 +297,6 @@ class _ListenAndRepeatPlayerScreenState
     return SentenceAnnotationCard(
       key: ValueKey(text),
       text: text,
-      isDifficult:
-          ref
-              .read(listenAndRepeatPlayerProvider.notifier)
-              .currentSentence
-              ?.isBookmarked ??
-          true,
-      onToggle: _handleToggleDifficult,
       audioItemId: widget.audioItemId,
       sentenceIndex: sentenceIndex,
       inlineFeedback: inlineFeedback,
