@@ -87,7 +87,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           // SegmentedButton 切换
           Padding(
             padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.l,
+              horizontal: AppSpacing.m,
               vertical: AppSpacing.s,
             ),
             child: SizedBox(
