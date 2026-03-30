@@ -20,9 +20,6 @@ class AnimatedBookmarkIcon extends StatefulWidget {
   /// 点击回调
   final VoidCallback? onPressed;
 
-  /// 提示文案
-  final String? tooltip;
-
   const AnimatedBookmarkIcon({
     super.key,
     required this.isSaved,
@@ -30,7 +27,6 @@ class AnimatedBookmarkIcon extends StatefulWidget {
     this.savedColor,
     this.unsavedColor,
     this.onPressed,
-    this.tooltip,
   });
 
   @override
@@ -93,7 +89,6 @@ class _AnimatedBookmarkIconState extends State<AnimatedBookmarkIcon>
           size: widget.size,
           color: widget.isSaved ? savedColor : unsavedColor,
         ),
-        tooltip: widget.tooltip,
       ),
     );
   }

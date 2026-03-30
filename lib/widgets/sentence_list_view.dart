@@ -309,7 +309,6 @@ class _SentenceTile extends StatelessWidget {
                     minHeight: iconButtonSize,
                   ),
                   onPressed: onBookmarkToggle,
-                  tooltip: isBookmarked ? 'Remove bookmark' : 'Add bookmark',
                 ),
               ],
             ),

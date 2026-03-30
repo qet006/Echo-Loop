@@ -269,7 +269,6 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
   Widget _buildTitleRow(ThemeData theme, DictEntry entry) {
     final isSavedAsync = ref.watch(isWordSavedProvider(_lemmaWord));
     final isSaved = isSavedAsync.valueOrNull ?? false;
-    final l10n = AppLocalizations.of(context)!;
 
     return Row(
       children: [
@@ -302,14 +301,10 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
             Icons.volume_up,
             color: theme.colorScheme.onSurfaceVariant,
           ),
-          tooltip: l10n.flashcardTts,
         ),
         AnimatedBookmarkIcon(
           isSaved: isSaved,
           onPressed: () => _toggleSave(isSaved),
-          tooltip: isSaved
-              ? l10n.favoritesUnsaveVocabulary
-              : l10n.favoritesSaveVocabulary,
         ),
       ],
     );

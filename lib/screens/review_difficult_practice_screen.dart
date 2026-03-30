@@ -659,7 +659,6 @@ class _ReviewDifficultPracticeScreenState
               actions: [
                 IconButton(
                   icon: const Icon(Icons.tune),
-                  tooltip: l10n.difficultPracticeSettings,
                   onPressed: () =>
                       showDifficultPracticeSettingsSheet(context: context),
                 ),

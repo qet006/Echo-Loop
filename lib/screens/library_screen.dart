@@ -81,7 +81,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             final isGrid = viewMode == CollectionViewMode.grid;
             return IconButton(
               icon: Icon(isGrid ? Icons.view_list : Icons.grid_view),
-              tooltip: isGrid ? l10n.listView : l10n.gridView,
               onPressed: () =>
                   ref.read(collectionListProvider.notifier).toggleViewMode(),
             );
@@ -90,7 +89,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         // 创建合集
         IconButton(
           icon: const Icon(Icons.add),
-          tooltip: l10n.createCollection,
           onPressed: () => showCreateCollectionDialog(context),
         ),
       ];
@@ -101,7 +99,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         // 添加音频
         IconButton(
           icon: const Icon(Icons.add),
-          tooltip: l10n.addAudio,
           onPressed: _handleAddAudio,
         ),
       ];

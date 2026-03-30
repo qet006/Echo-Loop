@@ -68,12 +68,10 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.copy),
-            tooltip: '复制全部',
             onPressed: entries.isEmpty ? null : _copyAll,
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline),
-            tooltip: '清空',
             onPressed: entries.isEmpty
                 ? null
                 : () {

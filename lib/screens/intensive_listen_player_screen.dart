@@ -534,7 +534,6 @@ class _IntensiveListenPlayerScreenState
               actions: [
                 IconButton(
                   icon: const Icon(Icons.tune),
-                  tooltip: l10n.intensiveListenSettings,
                   onPressed: () {
                     showIntensiveListenSettingsSheet(context: context);
                   },

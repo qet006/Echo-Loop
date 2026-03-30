@@ -85,7 +85,6 @@ class EditTagMembershipSheet extends ConsumerWidget {
                             icon: const Icon(Icons.delete_outline, size: 20),
                             onPressed: () =>
                                 _showDeleteTagDialog(context, ref, tag),
-                            tooltip: l10n.deleteTag,
                           ),
                         ],
                       ),

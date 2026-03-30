@@ -97,14 +97,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
               ),
               onPressed: () =>
                   controller.setAutoScroll(!playerState.autoScrollEnabled),
-              tooltip: playerState.autoScrollEnabled
-                  ? l10n.disableAutoScroll
-                  : l10n.enableAutoScroll,
             ),
             IconButton(
               icon: const Icon(Icons.settings),
               onPressed: () => _showSettingsDialog(context),
-              tooltip: l10n.settings,
             ),
           ],
         ),
@@ -424,9 +420,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                         ),
                         onPressed: () =>
                             controller.toggleBookmark(currentSentence.index),
-                        tooltip: isBookmarked
-                            ? l10n.removeBookmarkTip
-                            : l10n.addBookmarkTip,
                       ),
                     ],
                   ),

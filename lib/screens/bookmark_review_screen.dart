@@ -460,7 +460,6 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
               actions: [
                 IconButton(
                   icon: const Icon(Icons.tune),
-                  tooltip: l10n.difficultPracticeSettings,
                   onPressed: () =>
                       showBookmarkReviewSettingsSheet(context: context),
                 ),

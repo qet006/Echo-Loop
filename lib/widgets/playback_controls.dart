@@ -66,7 +66,6 @@ class PlaybackControls extends ConsumerWidget {
                     ),
                   );
                 },
-                tooltip: 'Single Sentence Mode',
               ),
               const SizedBox(width: 4),
               _buildSpeedButton(context, playerState, controller),
@@ -84,7 +83,6 @@ class PlaybackControls extends ConsumerWidget {
                     ),
                   );
                 },
-                tooltip: 'Show Transcript',
               ),
               const SizedBox(width: 4),
               _buildToggleButton(
@@ -98,7 +96,6 @@ class PlaybackControls extends ConsumerWidget {
                     ),
                   );
                 },
-                tooltip: 'Sentence Repeat',
               ),
             ],
           ),
@@ -114,7 +111,6 @@ class PlaybackControls extends ConsumerWidget {
                   onPressed: playerState.hasSentences
                       ? () => controller.previousSentence()
                       : null,
-                  tooltip: 'Previous Sentence',
                 ),
                 const SizedBox(width: 12),
                 _buildPlayPauseButton(context, controller, engineNotifier),
@@ -125,7 +121,6 @@ class PlaybackControls extends ConsumerWidget {
                   onPressed: playerState.hasSentences
                       ? () => controller.nextSentence()
                       : null,
-                  tooltip: 'Next Sentence',
                 ),
               ],
             ),
@@ -160,7 +155,6 @@ class PlaybackControls extends ConsumerWidget {
                 ),
               );
             },
-            tooltip: 'Single Sentence Mode',
           ),
           const SizedBox(width: 6),
           _buildSpeedButton(context, playerState, controller),
@@ -171,7 +165,6 @@ class PlaybackControls extends ConsumerWidget {
             onPressed: playerState.hasSentences
                 ? () => controller.previousSentence()
                 : null,
-            tooltip: 'Previous Sentence',
           ),
           const SizedBox(width: 6),
           _buildPlayPauseButton(context, controller, engineNotifier),
@@ -182,7 +175,6 @@ class PlaybackControls extends ConsumerWidget {
             onPressed: playerState.hasSentences
                 ? () => controller.nextSentence()
                 : null,
-            tooltip: 'Next Sentence',
           ),
           const SizedBox(width: 16),
           _buildToggleButton(
@@ -198,7 +190,6 @@ class PlaybackControls extends ConsumerWidget {
                 ),
               );
             },
-            tooltip: 'Show Transcript',
           ),
           const SizedBox(width: 6),
           _buildToggleButton(
@@ -212,7 +203,6 @@ class PlaybackControls extends ConsumerWidget {
                 ),
               );
             },
-            tooltip: 'Sentence Repeat',
           ),
         ],
       ),
@@ -241,7 +231,6 @@ class PlaybackControls extends ConsumerWidget {
             controller.play();
           }
         },
-        tooltip: isPlaying ? 'Pause' : 'Play',
       ),
     );
   }
@@ -251,7 +240,6 @@ class PlaybackControls extends ConsumerWidget {
     required IconData icon,
     required bool isActive,
     required VoidCallback onPressed,
-    required String tooltip,
   }) {
     return IconButton(
       icon: Icon(icon),
@@ -260,7 +248,6 @@ class PlaybackControls extends ConsumerWidget {
           ? Theme.of(context).colorScheme.primary
           : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
       onPressed: onPressed,
-      tooltip: tooltip,
     );
   }
 
@@ -278,7 +265,6 @@ class PlaybackControls extends ConsumerWidget {
           color: Theme.of(context).colorScheme.onSurface,
         ),
       ),
-      tooltip: 'Playback Speed',
       itemBuilder: (context) {
         return [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map((speed) {
           return PopupMenuItem<double>(

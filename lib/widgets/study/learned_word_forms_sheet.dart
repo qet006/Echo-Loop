@@ -199,7 +199,6 @@ class _LearnedWordFormsSheetState extends ConsumerState<LearnedWordFormsSheet> {
                     ),
                   ),
                   PopupMenuButton<LearnedWordSortMode>(
-                    tooltip: l10n.sortCollections,
                     initialValue: _sortMode,
                     onSelected: _changeSort,
                     itemBuilder: (context) => [

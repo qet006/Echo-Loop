@@ -23,7 +23,6 @@ class CollectionSortButton extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     return PopupMenuButton<CollectionSortType>(
       icon: const Icon(Icons.sort),
-      tooltip: l10n.sortCollections,
       onSelected: (type) {
         ref.read(collectionListProvider.notifier).setSortType(type);
       },
@@ -223,9 +222,6 @@ class _CollectionGridTile extends ConsumerWidget {
                             ? AppTheme.bookmarkColor
                             : null,
                       ),
-                      tooltip: collection.isStarred
-                          ? l10n.unstarCollection
-                          : l10n.starCollection,
                       onPressed: () {
                         ref
                             .read(collectionListProvider.notifier)
@@ -357,9 +353,6 @@ class _CollectionListTile extends ConsumerWidget {
                   color: collection.isStarred ? AppTheme.bookmarkColor : null,
                   size: 22,
                 ),
-                tooltip: collection.isStarred
-                    ? l10n.unstarCollection
-                    : l10n.starCollection,
                 padding: EdgeInsets.zero,
                 onPressed: () {
                   ref

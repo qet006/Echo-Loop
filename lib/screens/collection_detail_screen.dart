@@ -51,7 +51,6 @@ class CollectionDetailScreen extends ConsumerWidget {
           const AudioSortButton(),
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: l10n.addAudioToCollection,
             onPressed: () => _showAddAudioDialog(context, collection),
           ),
         ],

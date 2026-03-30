@@ -183,7 +183,6 @@ class AudioSortButton extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     return PopupMenuButton<AudioSortType>(
       icon: const Icon(Icons.sort),
-      tooltip: l10n.sortAudio,
       onSelected: (type) {
         ref.read(audioListSettingsProvider.notifier).setSortType(type);
       },

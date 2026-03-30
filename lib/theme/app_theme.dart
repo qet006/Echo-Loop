@@ -61,6 +61,16 @@ class AppTheme {
         margin: EdgeInsets.zero,
       ),
 
+      // 全局禁用 Tooltip（长按提示）
+      tooltipTheme: const TooltipThemeData(
+        padding: EdgeInsets.zero,
+        margin: EdgeInsets.zero,
+        constraints: BoxConstraints(maxHeight: 0, maxWidth: 0),
+        textStyle: TextStyle(fontSize: 0),
+        decoration: BoxDecoration(color: Colors.transparent),
+        waitDuration: Duration(days: 1),
+      ),
+
       // AppBar 主题：与页面背景一致，标题加粗
       appBarTheme: AppBarTheme(
         elevation: 0,

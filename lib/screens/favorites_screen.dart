@@ -363,7 +363,6 @@ class _AudioBookmarkGroup extends ConsumerWidget {
                 color: theme.colorScheme.primary,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                tooltip: l10n.bookmarkReviewStartCount(bookmarks.length),
                 onPressed: () {
                   final provider = ref.read(bookmarkReviewProvider.notifier);
                   final audioItemDao = ref.read(audioItemDaoProvider);

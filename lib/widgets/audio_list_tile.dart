@@ -313,7 +313,6 @@ class AudioListTile extends ConsumerWidget {
             ? AppTheme.bookmarkColor
             : theme.colorScheme.onSurfaceVariant,
       ),
-      tooltip: audioItem.isStarred ? l10n.unstarAudio : l10n.starAudio,
       onPressed: () {
         ref.read(audioLibraryProvider.notifier).toggleStar(audioItem.id);
       },

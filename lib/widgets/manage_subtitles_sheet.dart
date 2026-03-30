@@ -138,7 +138,6 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
                             _handleDeleteSubtitle(context, audioItem),
                         icon: const Icon(Icons.delete_outline, size: 20),
                         color: theme.colorScheme.onSurfaceVariant,
-                        tooltip: l10n.deleteSubtitle,
                         visualDensity: VisualDensity.compact,
                       ),
                   ],
