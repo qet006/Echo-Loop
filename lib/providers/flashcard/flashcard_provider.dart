@@ -188,11 +188,14 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     // 启动输入时间追踪（例句音频播放）
     _startInputTimeTracking();
 
+    _userPaused = false;
     if (items.isNotEmpty) {
-      // 自动 TTS 播放
+      // 自动 TTS 播放（播完后内部会启动倒计时）
       _speakCurrentWord();
-      // 启动倒计时
-      _startCountdown();
+      // 仅在不自动播放时立即启动倒计时
+      if (!state.settings.autoPlayWord) {
+        _startCountdown();
+      }
     }
   }
 
@@ -469,6 +472,9 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     }
   }
 
+  /// 用户是否手动暂停（区分用户暂停和系统生命周期暂停）
+  bool _userPaused = false;
+
   /// 暂停（AppLifecycle / 弹窗时调用）
   void pause() {
     _countdown.pause();
@@ -476,19 +482,23 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     state = state.copyWith(isPaused: true);
   }
 
-  /// 恢复
+  /// 恢复（仅在非用户手动暂停时恢复）
   void resume() {
-    if (state.isCompleted) return;
+    if (state.isCompleted || _userPaused) return;
     _studyStopwatch.start();
     state = state.copyWith(isPaused: false);
     _countdown.resume();
   }
 
-  /// 切换暂停/恢复
+  /// 切换暂停/恢复（用户手动操作）
   void togglePause() {
     if (state.isPaused) {
-      resume();
+      _userPaused = false;
+      _studyStopwatch.start();
+      state = state.copyWith(isPaused: false);
+      _countdown.resume();
     } else {
+      _userPaused = true;
       pause();
     }
   }
@@ -521,7 +531,6 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       state = state.copyWith(
         countdownRemaining: Duration.zero,
         countdownTotal: Duration.zero,
-        isPaused: false,
       );
       return;
     }
@@ -531,7 +540,6 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     state = state.copyWith(
       countdownRemaining: total,
       countdownTotal: total,
-      isPaused: false,
     );
 
     _countdown.start(total, (remaining) {

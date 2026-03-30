@@ -328,15 +328,11 @@ class _BackContentState extends ConsumerState<_BackContent> {
   ///
   /// TTS + 例句全部播完后通知 Provider 启动倒计时。
   Future<void> _autoPlayOnFlipToBack() async {
-    AppLogger.log(
-      'FC-Audio',
-      'autoPlay START: word="${widget.item.savedWord.word}", '
-          'autoPlayWord=${widget.autoPlayWord}, '
-          'autoPlaySentence=${widget.autoPlaySentence}',
-    );
+    var didPlay = false;
 
     // TTS 朗读单词
     if (widget.autoPlayWord) {
+      didPlay = true;
       await TtsService.instance.speak(widget.item.displayText);
       if (!mounted) return;
       // TTS 播完，计入 1 个输入词
@@ -345,6 +341,7 @@ class _BackContentState extends ConsumerState<_BackContent> {
 
     // 自动播放来源例句
     if (widget.autoPlaySentence && widget.item.sentenceText != null) {
+      didPlay = true;
       await Future<void>.delayed(const Duration(milliseconds: 600));
       AppLogger.log(
         'FC-Audio',
@@ -356,8 +353,10 @@ class _BackContentState extends ConsumerState<_BackContent> {
       if (!mounted) return;
     }
 
-    // 全部播放完成，通知 Provider 启动倒计时
-    ref.read(flashcardNotifierProvider.notifier).onAutoPlayCompleted();
+    // 仅在实际播放了内容时才通知（避免 autoPlay 全关时重复启动倒计时）
+    if (didPlay) {
+      ref.read(flashcardNotifierProvider.notifier).onAutoPlayCompleted();
+    }
   }
 
   @override
@@ -429,11 +428,9 @@ class _BackContentState extends ConsumerState<_BackContent> {
                             height: 32,
                             child: IconButton(
                               onPressed: () async {
-                                await TtsService.instance.speak(word.displayText);
-                                if (!mounted) return;
-                                ref
+                                await ref
                                     .read(flashcardNotifierProvider.notifier)
-                                    .onWordPlayed();
+                                    .speakWordAndRestartCountdown();
                               },
                               icon: const Icon(Icons.volume_up, size: 18),
                               color: theme.colorScheme.primary,
