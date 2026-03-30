@@ -644,8 +644,7 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       clampedPlayCount = newSettings.repeatCount;
     }
 
-    final switchedToManual =
-        newSettings.isManualMode && !state.settings.isManualMode;
+    final modeChanged = newSettings.isManualMode != state.settings.isManualMode;
     final repeatCountChanged =
         newSettings.repeatCount != state.settings.repeatCount;
 
@@ -654,8 +653,8 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       currentPlayCount: clampedPlayCount,
     );
 
-    // 切换到手动模式时，停在当前句子，取消一切异步操作
-    if (switchedToManual) {
+    // 自动↔手动切换时，停在当前句子，取消一切异步操作
+    if (modeChanged) {
       _invalidateSession();
       state = state.copyWith(
         isPlaying: false,

@@ -383,12 +383,26 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
       clampedPlayCount = newSettings.repeatCount;
     }
 
+    final modeChanged = newSettings.isManualMode != state.settings.isManualMode;
     final needRestart = newSettings.repeatCount != state.settings.repeatCount;
 
     state = state.copyWith(
       settings: newSettings,
       currentPlayCount: clampedPlayCount,
     );
+
+    // 自动↔手动切换时，停在当前句子，取消一切异步操作
+    if (modeChanged) {
+      _engine.invalidateSession();
+      state = state.copyWith(
+        isPlaying: false,
+        isPauseBetweenPlays: false,
+        isPauseBetweenSentences: false,
+        isCountdownPaused: false,
+        isCountdownFastForward: false,
+      );
+      return;
+    }
 
     // repeatCount 变化时中断当前循环，以新设置重新开始
     if (needRestart && state.isPlaying) {

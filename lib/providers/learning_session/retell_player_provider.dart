@@ -267,9 +267,7 @@ class RetellPlayer extends _$RetellPlayer {
     });
 
     // 注入 recorder 到录音控制器
-    ref
-        .read(retellRecordingControllerProvider.notifier)
-        .setRecorder(_recorder);
+    ref.read(retellRecordingControllerProvider.notifier).setRecorder(_recorder);
   }
 
   /// 获取当前段落第一句的全局句子索引（用于保存断点）
@@ -511,9 +509,28 @@ class RetellPlayer extends _$RetellPlayer {
   ///
   /// 当 [keywordRatio] 变化时自动重新生成关键词。
   void updateSettings(RetellSettings newSettings) {
+    final modeChanged = newSettings.isManualMode != state.settings.isManualMode;
     final ratioChanged =
         newSettings.keywordRatio != state.settings.keywordRatio;
+
     state = state.copyWith(settings: newSettings);
+
+    // 自动↔手动切换时，停在当前段落，取消一切异步操作
+    if (modeChanged) {
+      _invalidateRetellCountdown();
+      final engine = ref.read(audioEngineProvider.notifier);
+      _sessionId = engine.newSession();
+      engine.stopPlayback();
+      state = state.copyWith(
+        isPlaying: false,
+        isRetellCountdown: false,
+        isCountdownPaused: false,
+        isCountdownFastForward: false,
+      );
+      if (ratioChanged) regenerateKeywords();
+      return;
+    }
+
     if (ratioChanged) {
       regenerateKeywords();
     }
@@ -532,9 +549,7 @@ class RetellPlayer extends _$RetellPlayer {
 
   /// 释放资源
   void disposePlayer() {
-    ref
-        .read(retellRecordingControllerProvider.notifier)
-        .setRecorder(null);
+    ref.read(retellRecordingControllerProvider.notifier).setRecorder(null);
     _cleanup();
     _paragraphs = [];
     _allSentences = [];
