@@ -47,6 +47,15 @@ class AnnotationWithRecording extends StatelessWidget {
   /// 句子索引
   final int? sentenceIndex;
 
+  /// 句子起始时间（毫秒）
+  final int? sentenceStartMs;
+
+  /// 句子结束时间（毫秒）
+  final int? sentenceEndMs;
+
+  /// 播放意群前停止主播放
+  final VoidCallback? onStopMainPlayer;
+
   /// 录音控制器状态
   final ListenAndRepeatTurnState turnState;
 
@@ -84,6 +93,9 @@ class AnnotationWithRecording extends StatelessWidget {
     this.aiNotifier,
     this.audioItemId,
     this.sentenceIndex,
+    this.sentenceStartMs,
+    this.sentenceEndMs,
+    this.onStopMainPlayer,
     required this.turnState,
     required this.currentPromptId,
     this.currentAttempt,
@@ -119,7 +131,10 @@ class AnnotationWithRecording extends StatelessWidget {
             aiNotifier: aiNotifier,
             audioItemId: audioItemId,
             sentenceIndex: sentenceIndex,
+            sentenceStartMs: sentenceStartMs,
+            sentenceEndMs: sentenceEndMs,
             highlightedSegments: currentAttempt?.referenceSegments,
+            onStopMainPlayer: onStopMainPlayer,
           ),
         ),
 

@@ -14,12 +14,7 @@ import '../database/enums.dart';
 import '../utils/wakelock_mixin.dart';
 import '../database/providers.dart';
 import '../l10n/app_localizations.dart';
-import '../models/audio_item.dart';
-import '../models/sense_group_result.dart';
-import '../models/sentence.dart';
-import '../models/word_timestamp.dart';
 import '../providers/learning_progress_provider.dart';
-import '../services/transcription_api_client.dart';
 import '../providers/learning_session/intensive_listen_player_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/listening_practice/bookmark_manager.dart';
@@ -67,17 +62,8 @@ class _IntensiveListenPlayerScreenState
   /// 是否正在显示完成弹窗，防止重复弹窗
   bool _isShowingDialog = false;
 
-  /// 词级时间戳（从后端获取，按音频缓存）
-  List<WordTimestamp>? _wordTimestamps;
-
-  /// 当前句子的意群拆分结果（双粒度）
-  SenseGroupResult? _senseGroupResult;
-
-  /// 当前句子的意群时间范围
+  /// 意群时间范围（由 AnnotationContentView 通过回调更新，播放按钮使用）
   List<SenseGroupTiming>? _senseGroupTimings;
-
-  /// 上次请求意群的句子索引（切句时重置）
-  int? _lastSenseGroupSentenceIndex;
 
   @override
   void initState() {
@@ -85,145 +71,7 @@ class _IntensiveListenPlayerScreenState
     // 进入后自动开始播放
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(intensiveListenPlayerProvider.notifier).startPlaying();
-      _fetchWordTimestamps();
     });
-  }
-
-  /// 加载词级时间戳（DB 优先，未命中则从 API 拉取并保存）
-  Future<void> _fetchWordTimestamps() async {
-    final audioDao = ref.read(audioItemDaoProvider);
-    final audioItem = await audioDao.getById(widget.audioItemId);
-    if (audioItem == null) return;
-    // 仅 AI 转录有词级时间戳
-    if (audioItem.transcriptSource != TranscriptSource.ai.index) return;
-
-    // 1. 优先从 audio_items 表读取
-    final json = audioItem.wordTimestampsJson;
-    if (json != null) {
-      final words = decodeWordTimestamps(json);
-      if (words != null && words.isNotEmpty) {
-        if (mounted) setState(() => _wordTimestamps = words);
-        return;
-      }
-      // JSON 解析失败，清除脏数据，走 API fallback
-      await audioDao.updateWordTimestamps(widget.audioItemId, null);
-    }
-
-    // 2. DB 未命中，从 API 拉取并保存
-    final sha256 = audioItem.audioSha256;
-    final language = audioItem.transcriptLanguage;
-    if (sha256 == null || language == null) {
-      debugPrint('词级时间戳 API fallback 跳过: sha256=$sha256, language=$language');
-      return;
-    }
-
-    try {
-      final api = ref.read(transcriptionApiClientProvider);
-      final result = await api.getTranscript(sha256, language);
-      if (result.words != null && result.words!.isNotEmpty) {
-        // 保存到 audio_items 表
-        await audioDao.updateWordTimestamps(
-          widget.audioItemId,
-          encodeWordTimestamps(result.words!),
-        );
-        if (mounted) setState(() => _wordTimestamps = result.words);
-      }
-    } catch (e) {
-      debugPrint('获取词级时间戳失败: $e');
-    }
-  }
-
-  /// 请求 AI 拆分意群
-  Future<void> _requestSenseGroups() async {
-    final player = ref.read(intensiveListenPlayerProvider.notifier);
-    final sentence = player.currentSentence;
-    if (sentence == null) {
-      AppLogger.log('SenseGroup', '请求意群：当前无句子，跳过');
-      return;
-    }
-
-    AppLogger.log('SenseGroup', '请求意群: "${sentence.text}"');
-    final ai = ref.read(sentenceAiNotifierProvider);
-
-    try {
-      final result = await ai.getSenseGroups(sentence.text);
-
-      if (!mounted) return;
-
-      // 有词级时间戳时计算时间范围映射（支持点击播放意群）
-      // 默认使用大意群的时间映射
-      final sentenceIndex = ref
-          .read(intensiveListenPlayerProvider)
-          .currentSentenceIndex;
-      final timings = _wordTimestamps != null
-          ? _computeTimings(result.medium, sentence, sentenceIndex)
-          : null;
-
-      AppLogger.log('SenseGroup', '意群数据就绪 | medium=${result.medium.length}组 fine=${result.fine.length}组 equal=${result.areBothEqual} hasTimings=${timings != null}');
-
-      setState(() {
-        _senseGroupResult = result;
-        _senseGroupTimings = timings;
-        _lastSenseGroupSentenceIndex = sentenceIndex;
-      });
-    } catch (e) {
-      AppLogger.log('SenseGroup', '请求意群失败: $e');
-      if (mounted) {
-        final l10n = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n?.senseGroupLoadFailed ?? 'Failed to load sense groups, please retry')),
-        );
-      }
-    }
-  }
-
-  /// 计算意群时间范围
-  List<SenseGroupTiming> _computeTimings(
-    List<String> chunks,
-    Sentence sentence,
-    int sentenceIndex,
-  ) {
-    final words = _wordTimestamps!;
-    // 找到句子在 words 中的范围：时间范围匹配
-    final startMs = sentence.startTime.inMilliseconds;
-    final endMs = sentence.endTime.inMilliseconds;
-
-    var startIdx = 0;
-    var endIdx = words.length - 1;
-
-    // 找第一个开始时间 >= 句子开始时间的词
-    for (var i = 0; i < words.length; i++) {
-      if (words[i].startTime.inMilliseconds >= startMs - 100) {
-        startIdx = i;
-        break;
-      }
-    }
-    // 找最后一个结束时间 <= 句子结束时间的词
-    for (var i = words.length - 1; i >= 0; i--) {
-      if (words[i].endTime.inMilliseconds <= endMs + 100) {
-        endIdx = i;
-        break;
-      }
-    }
-
-    return mapSenseGroupTimings(
-      chunks: chunks,
-      words: words,
-      sentenceStart: sentence.startTime,
-      sentenceEnd: sentence.endTime,
-      sentenceStartWordIndex: startIdx,
-      sentenceEndWordIndex: endIdx,
-    );
-  }
-
-  /// 切句时重置意群状态
-  void _resetSenseGroupsIfNeeded(int currentIndex) {
-    if (_lastSenseGroupSentenceIndex != null &&
-        _lastSenseGroupSentenceIndex != currentIndex) {
-      _senseGroupResult = null;
-      _senseGroupTimings = null;
-      _lastSenseGroupSentenceIndex = null;
-    }
   }
 
   /// 处理退出（close 按钮 / 系统返回）
@@ -643,9 +491,6 @@ class _IntensiveListenPlayerScreenState
 
     final currentSentence = player.currentSentence;
 
-    // 切句时重置意群
-    _resetSenseGroupsIfNeeded(playerState.currentSentenceIndex);
-
     // 句子时长（如 "3.5s"）和时间戳（如 "00:32.1 - 00:35.6"）分开传递，
     // 由 _ProgressSection 用不同样式渲染以建立视觉层级。
     final hasDuration =
@@ -661,7 +506,7 @@ class _IntensiveListenPlayerScreenState
     return wakelockBody(
       child: LearningHotkeyScope(
         onPlayPause: () {
-          AppLogger.log('PlayPause', 'isPlaying=${playerState.isPlaying} isAnnotationReplay=${playerState.isAnnotationReplay} isPauseBetweenPlays=${playerState.isPauseBetweenPlays} isAnnotationMode=${playerState.isAnnotationMode} sgTimings=${_senseGroupTimings?.length} sgResult=${_senseGroupResult != null}');
+          AppLogger.log('PlayPause', 'isPlaying=${playerState.isPlaying} isAnnotationReplay=${playerState.isAnnotationReplay} isPauseBetweenPlays=${playerState.isPauseBetweenPlays} isAnnotationMode=${playerState.isAnnotationMode} sgTimings=${_senseGroupTimings?.length} sgTimingsAvailable=${_senseGroupTimings != null}');
           if (playerState.isPlaying) {
             player.pause();
           } else if (playerState.isAnnotationReplay) {
@@ -732,47 +577,12 @@ class _IntensiveListenPlayerScreenState
                                 currentSentence?.startTime.inMilliseconds,
                             sentenceEndMs:
                                 currentSentence?.endTime.inMilliseconds,
-                            senseGroupResult: _senseGroupResult,
-                            senseGroupTimings: _senseGroupTimings,
-                            onSenseGroupModeChanged: (chunks) {
-                              AppLogger.log('SenseGroup', '粒度切换回调 | chunks=${chunks.length}组 hasWordTs=${_wordTimestamps != null}');
-                              // 切换粒度时停止当前意群播放
-                              player.stopSenseGroupPlayback();
-                              if (chunks.isEmpty) {
-                                // 意群关闭（off），清空 timings，播放按钮恢复整句播放
-                                setState(() => _senseGroupTimings = null);
-                              } else if (_wordTimestamps != null && currentSentence != null) {
-                                final timings = _computeTimings(
-                                  chunks,
-                                  currentSentence,
-                                  playerState.currentSentenceIndex,
-                                );
-                                setState(() => _senseGroupTimings = timings);
-                              }
+                            onStopMainPlayer: () => player.pause(),
+                            onTimingsChanged: (timings) {
+                              setState(
+                                () => _senseGroupTimings = timings,
+                              );
                             },
-                            playingSenseGroupIndex:
-                                playerState.playingSenseGroupIndex,
-                            playedSenseGroupIndices:
-                                playerState.playedSenseGroupIndices,
-                            onTapSenseGroup: (index) {
-                              if (_senseGroupTimings != null &&
-                                  index < _senseGroupTimings!.length) {
-                                final timing = _senseGroupTimings![index];
-                                player.playSenseGroup(
-                                  timing.start,
-                                  timing.end,
-                                  index,
-                                );
-                              } else if (_senseGroupTimings == null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(l10n.wordTimestampsNotFound),
-                                  ),
-                                );
-                              }
-                            },
-                            onRequestSenseGroups: _requestSenseGroups,
-                            hasWordTimestamps: _wordTimestamps != null,
                           ),
                         )
                       : PracticeNormalModeView(
@@ -905,7 +715,7 @@ class _IntensiveListenPlayerScreenState
                           }
                         },
                         onPlayPause: () {
-                          AppLogger.log('PlayPause2', 'isPlaying=${playerState.isPlaying} isAnnotationReplay=${playerState.isAnnotationReplay} isPauseBetweenPlays=${playerState.isPauseBetweenPlays} isAnnotationMode=${playerState.isAnnotationMode} sgTimings=${_senseGroupTimings?.length} sgResult=${_senseGroupResult != null}');
+                          AppLogger.log('PlayPause2', 'isPlaying=${playerState.isPlaying} isAnnotationReplay=${playerState.isAnnotationReplay} isPauseBetweenPlays=${playerState.isPauseBetweenPlays} isAnnotationMode=${playerState.isAnnotationMode} sgTimings=${_senseGroupTimings?.length} sgTimingsAvailable=${_senseGroupTimings != null}');
                           if (playerState.isPlaying) {
                             player.pause();
                           } else if (playerState.isAnnotationReplay) {

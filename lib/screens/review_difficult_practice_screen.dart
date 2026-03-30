@@ -695,6 +695,13 @@ class _ReviewDifficultPracticeScreenState
                             aiNotifier: ref.read(sentenceAiNotifierProvider),
                             audioItemId: widget.audioItemId,
                             sentenceIndex: player.currentIndex,
+                            sentenceStartMs:
+                                currentSentence?.startTime.inMilliseconds,
+                            sentenceEndMs:
+                                currentSentence?.endTime.inMilliseconds,
+                            onStopMainPlayer: () => ref
+                                .read(reviewDifficultPracticeProvider.notifier)
+                                .pause(),
                             turnState: turnState,
                             currentPromptId: currentPromptId,
                             currentAttempt: currentAttempt,

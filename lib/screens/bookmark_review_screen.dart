@@ -499,6 +499,13 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                             audioItemId: currentBookmark?.audioItemId,
                             sentenceIndex:
                                 currentBookmark?.originalSentenceIndex,
+                            sentenceStartMs:
+                                currentSentence?.startTime.inMilliseconds,
+                            sentenceEndMs:
+                                currentSentence?.endTime.inMilliseconds,
+                            onStopMainPlayer: () => ref
+                                .read(bookmarkReviewProvider.notifier)
+                                .pause(),
                             turnState: turnState,
                             currentPromptId: currentPromptId,
                             currentAttempt: currentAttempt,
