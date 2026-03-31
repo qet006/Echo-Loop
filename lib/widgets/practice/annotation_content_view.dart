@@ -99,6 +99,9 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
   SenseGroupResult? _senseGroupResult;
   List<SenseGroupTiming>? _senseGroupTimings;
 
+  /// 当前显示模式对应的 chunks（medium 或 fine）
+  List<String>? _activeChunks;
+
   // --- 意群播放 UI 状态 ---
   int? _playingSenseGroupIndex;
   final Set<int> _playedSenseGroupIndices = {};
@@ -192,6 +195,7 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
       setState(() {
         _senseGroupResult = result;
         _senseGroupTimings = timings;
+        _activeChunks = result.medium;
       });
       widget.onTimingsChanged?.call(timings);
     } catch (e) {
@@ -216,17 +220,23 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     _stopSenseGroupPlayback();
 
     if (chunks.isEmpty) {
-      setState(() => _senseGroupTimings = null);
+      setState(() {
+        _senseGroupTimings = null;
+        _activeChunks = null;
+      });
       widget.onTimingsChanged?.call(null);
-    } else if (_wordTimestamps != null) {
-      final timings = _sgService.computeTimings(
-        chunks: chunks,
-        wordTimestamps: _wordTimestamps!,
-        sentenceStartMs: widget.sentenceStartMs ?? 0,
-        sentenceEndMs: widget.sentenceEndMs ?? 0,
-      );
-      setState(() => _senseGroupTimings = timings);
-      widget.onTimingsChanged?.call(timings);
+    } else {
+      _activeChunks = chunks;
+      if (_wordTimestamps != null) {
+        final timings = _sgService.computeTimings(
+          chunks: chunks,
+          wordTimestamps: _wordTimestamps!,
+          sentenceStartMs: widget.sentenceStartMs ?? 0,
+          sentenceEndMs: widget.sentenceEndMs ?? 0,
+        );
+        setState(() => _senseGroupTimings = timings);
+        widget.onTimingsChanged?.call(timings);
+      }
     }
   }
 
@@ -268,7 +278,7 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     _dismissActionBar();
     _actionBarGroupIndex = index;
 
-    final chunks = _senseGroupResult?.medium ?? [];
+    final chunks = _activeChunks ?? _senseGroupResult?.medium ?? [];
     if (index >= chunks.length) return;
     final chunk = chunks[index];
     final normalized = normalizeSenseGroupPhrase(chunk);
@@ -365,6 +375,7 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
   void _resetSenseGroups() {
     _senseGroupResult = null;
     _senseGroupTimings = null;
+    _activeChunks = null;
     _playingSenseGroupIndex = null;
     _playedSenseGroupIndices.clear();
     _sgPlaybackSession = null;
