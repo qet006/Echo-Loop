@@ -811,9 +811,19 @@ class _ReviewDifficultPracticeScreenState
                   },
                 ),
 
-                // 遍数
+                // 遍数 + 模式指示器
                 PracticePlayCountLabel(
-                  playerState: playerState,
+                  isManualMode: playerState.isManualMode,
+                  playCountText: l10n.listenAndRepeatPlayCount(
+                    playerState.currentPlayCount,
+                    playerState.isAnnotationMode
+                        ? playerState.targetRepeatCount
+                        : (playerState.isManualMode
+                              ? 1
+                              : playerState
+                                    .settings
+                                    .blindListenRepeatCount),
+                  ),
                   l10n: l10n,
                   theme: theme,
                 ),

@@ -31,6 +31,7 @@ import '../widgets/common/countdown_chip.dart';
 import '../widgets/common/tappable_wrapper.dart';
 import '../widgets/player_hotkey_scope.dart';
 import '../widgets/practice/annotation_content_view.dart';
+import '../widgets/practice/practice_play_count_label.dart';
 import '../widgets/practice/practice_normal_mode_view.dart';
 
 /// 精听播放器页面
@@ -714,18 +715,16 @@ class _IntensiveListenPlayerScreenState
                           }
                         },
                       ),
-                      // 播放遍数（手动模式隐藏）
-                      if (!playerState.settings.isManualMode)
-                        Text(
-                          l10n.intensiveListenPlayCount(
-                            playerState.currentPlayCount,
-                            playerState.settings.repeatCount,
-                          ),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.5),
-                          ),
+                      // 遍数 + 模式指示器
+                      PracticePlayCountLabel(
+                        isManualMode: playerState.settings.isManualMode,
+                        playCountText: l10n.intensiveListenPlayCount(
+                          playerState.currentPlayCount,
+                          playerState.settings.repeatCount,
                         ),
+                        l10n: l10n,
+                        theme: theme,
+                      ),
                     ],
                   ),
                 ),

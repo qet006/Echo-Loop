@@ -528,13 +528,14 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
       children: [
         Expanded(
           child: AsyncToggleButton(
-            key: const ValueKey('senseGroup'),
-            label: senseGroupLabel,
-            icon: Icons.auto_fix_high,
-            iconColor: Colors.orange.shade700,
-            isActive: showSenseGroupBlocks,
-            isDisabled: !_isSenseGroupEnabled,
-            onPressed: _onTapSenseGroup,
+            key: const ValueKey('analysis'),
+            label: l10n.annotationBtnAnalysis,
+            icon: Icons.auto_awesome,
+            iconColor: Colors.purple.shade400,
+            isActive:
+                _analysisExpanded && _analysisState != ContentLoadState.idle,
+            isDisabled: !_hasAnalysis,
+            onPressed: _onTapAnalysis,
           ),
         ),
         const SizedBox(width: AppSpacing.s),
@@ -554,14 +555,13 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
         const SizedBox(width: AppSpacing.s),
         Expanded(
           child: AsyncToggleButton(
-            key: const ValueKey('analysis'),
-            label: l10n.annotationBtnAnalysis,
-            icon: Icons.auto_awesome,
-            iconColor: Colors.purple.shade400,
-            isActive:
-                _analysisExpanded && _analysisState != ContentLoadState.idle,
-            isDisabled: !_hasAnalysis,
-            onPressed: _onTapAnalysis,
+            key: const ValueKey('senseGroup'),
+            label: senseGroupLabel,
+            icon: Icons.auto_fix_high,
+            iconColor: Colors.orange.shade700,
+            isActive: showSenseGroupBlocks,
+            isDisabled: !_isSenseGroupEnabled,
+            onPressed: _onTapSenseGroup,
           ),
         ),
       ],

@@ -39,6 +39,7 @@ import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/review/review_briefing_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
 import '../widgets/practice/annotation_content_view.dart';
+import '../widgets/practice/practice_play_count_label.dart';
 import '../widgets/practice/practice_progress_section.dart';
 
 /// 录音/倒计时区域固定高度（录音面板最高：24 状态 + 4 间距 + 56 按钮 + 16 底部 = 100）
@@ -777,12 +778,12 @@ class _ListenAndRepeatPlayerScreenState
                                     }
                                     _manualStoppedThisSentence = true;
                                     AppLogger.log('ShadowScreen', '工具栏点击: 进入句子手动模式');
-                                    ref
-                                        .read(
-                                          listenAndRepeatPlayerProvider
-                                              .notifier,
-                                        )
-                                        .pauseCountdown();
+                                    final player = ref.read(
+                                      listenAndRepeatPlayerProvider.notifier,
+                                    );
+                                    player.pauseCountdown();
+                                    // 取消评估后倒计时，防止手动模式下自动推进
+                                    player.cancelPostEvalCountdown();
                                     final controller = ref.read(
                                       shadowingRecordingControllerProvider
                                           .notifier,
@@ -913,19 +914,15 @@ class _ListenAndRepeatPlayerScreenState
                           }
                         },
                       ),
-                      // 遍数（手动模式下隐藏文字但保留占位）
-                      Opacity(
-                        opacity: playerState.settings.isManualMode ? 0 : 1,
-                        child: Text(
-                          l10n.listenAndRepeatPlayCount(
-                            playerState.currentPlayCount,
-                            playerState.settings.repeatCount,
-                          ),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.5),
-                          ),
+                      // 遍数 + 模式指示器
+                      PracticePlayCountLabel(
+                        isManualMode: playerState.settings.isManualMode,
+                        playCountText: l10n.listenAndRepeatPlayCount(
+                          playerState.currentPlayCount,
+                          playerState.settings.repeatCount,
                         ),
+                        l10n: l10n,
+                        theme: theme,
                       ),
                     ],
                   ),

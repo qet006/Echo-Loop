@@ -243,10 +243,14 @@ class BookmarkReview extends _$BookmarkReview {
   }
 
   /// 当前句进入手动模式（工具栏点击、手动停止播放等触发）
+  ///
+  /// 同时暂停盲听倒计时 + 取消评估后倒计时，防止自动推进。
   void enterManualForSentence() {
     if (state.isManualForSentence) return;
     state = state.copyWith(isManualForSentence: true);
     _engine.pauseCountdown();
+    // 取消评估后倒计时，防止手动模式下自动推进
+    _invalidatePostEvalCountdown();
   }
 
   /// 获取当前句子索引

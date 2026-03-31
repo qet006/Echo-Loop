@@ -29,6 +29,7 @@ import '../utils/wakelock_mixin.dart';
 import '../widgets/intensive_listen/word_dictionary_sheet.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
+import '../widgets/practice/practice_play_count_label.dart';
 import '../widgets/review/review_briefing_sheet.dart';
 import '../widgets/listen_and_repeat/speech_record_button.dart';
 import '../widgets/common/speech_rating_badge.dart';
@@ -964,24 +965,16 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
                   onNext: _goToNextParagraph,
                 ),
 
-                // 遍数（手动模式下隐藏）
-                if (!state.settings.isManualMode)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.m),
-                    child: Text(
-                      l10n.retellRepeatInfo(
-                        state.currentRepeatCount,
-                        state.settings.repeatCount,
-                      ),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant.withValues(
-                          alpha: 0.5,
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  const SizedBox(height: AppSpacing.m),
+                // 遍数 + 模式指示器
+                PracticePlayCountLabel(
+                  isManualMode: state.settings.isManualMode,
+                  playCountText: l10n.retellRepeatInfo(
+                    state.currentRepeatCount,
+                    state.settings.repeatCount,
+                  ),
+                  l10n: l10n,
+                  theme: theme,
+                ),
               ],
             ),
           ),

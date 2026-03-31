@@ -28,6 +28,7 @@ import '../widgets/common/countdown_chip.dart';
 import '../widgets/common/paragraph_bottom_controls.dart';
 import '../widgets/common/paragraph_progress_header.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
+import '../widgets/practice/practice_play_count_label.dart';
 import '../widgets/intensive_listen/word_dictionary_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
 import '../widgets/retell/retell_sentence_tile.dart';
@@ -574,24 +575,16 @@ class _BlindListenPlayerScreenState
                 },
               ),
 
-              // 遍数（手动模式隐藏）
-              if (!playerState.settings.isManualMode)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.m),
-                  child: Text(
-                    l10n.blindListenRepeatInfo(
-                      playerState.currentRepeatCount,
-                      playerState.settings.repeatCount,
-                    ),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant.withValues(
-                        alpha: 0.5,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                const SizedBox(height: AppSpacing.m),
+              // 遍数 + 模式指示器
+              PracticePlayCountLabel(
+                isManualMode: playerState.settings.isManualMode,
+                playCountText: l10n.blindListenRepeatInfo(
+                  playerState.currentRepeatCount,
+                  playerState.settings.repeatCount,
+                ),
+                l10n: l10n,
+                theme: theme,
+              ),
             ],
           ),
         ),
