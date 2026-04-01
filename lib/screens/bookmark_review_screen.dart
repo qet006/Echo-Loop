@@ -499,14 +499,12 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                             onFastForward: () => ref
                                 .read(bookmarkReviewProvider.notifier)
                                 .completePausedTurn(),
-                            onCountdownTap: () {
-                              final p = ref.read(
-                                bookmarkReviewProvider.notifier,
-                              );
-                              playerState.isCountdownPaused
-                                  ? p.resumePostEvalCountdown()
-                                  : p.pausePostEvalCountdown();
-                            },
+                            onCountdownPause: () => ref
+                                .read(bookmarkReviewProvider.notifier)
+                                .pausePostEvalCountdown(),
+                            onCountdownResume: () => ref
+                                .read(bookmarkReviewProvider.notifier)
+                                .resumePostEvalCountdown(),
                             onToolbarButtonTapped: () {
                               if (playerState.isManualMode) return;
                               ref
@@ -544,9 +542,8 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                                 remaining: s.remaining,
                                 total: s.total,
                                 isPaused: s.paused,
-                                onTap: () => s.paused
-                                    ? player.resumeCountdown()
-                                    : player.pauseCountdown(),
+                                onPause: () => player.pauseCountdown(),
+                                onResume: () => player.resumeCountdown(),
                               );
                             },
                           ),

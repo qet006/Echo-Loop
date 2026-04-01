@@ -29,6 +29,9 @@ class ShadowingSessionState {
   /// 遍间倒计时剩余时间（仅 WaitingInterval 阶段有意义）
   final Duration intervalRemaining;
 
+  /// 倒计时是否暂停（用户点击倒计时圆环暂停）
+  final bool isIntervalPaused;
+
   /// 最新录音文件路径（null = 本遍未录音）
   final String? recordingPath;
 
@@ -46,6 +49,7 @@ class ShadowingSessionState {
     this.totalRepeats = 3,
     this.intervalTotal = Duration.zero,
     this.intervalRemaining = Duration.zero,
+    this.isIntervalPaused = false,
     this.recordingPath,
     this.recordingScore,
     this.flowToken = 0,
@@ -59,6 +63,7 @@ class ShadowingSessionState {
     int? totalRepeats,
     Duration? intervalTotal,
     Duration? intervalRemaining,
+    bool? isIntervalPaused,
     Object? recordingPath = _noChange,
     Object? recordingScore = _noChange,
     int? flowToken,
@@ -71,6 +76,7 @@ class ShadowingSessionState {
       totalRepeats: totalRepeats ?? this.totalRepeats,
       intervalTotal: intervalTotal ?? this.intervalTotal,
       intervalRemaining: intervalRemaining ?? this.intervalRemaining,
+      isIntervalPaused: isIntervalPaused ?? this.isIntervalPaused,
       recordingPath: identical(recordingPath, _noChange)
           ? this.recordingPath
           : recordingPath as String?,

@@ -499,11 +499,8 @@ class _BlindListenPlayerScreenState
                               remaining: s.pauseRemaining,
                               total: s.pauseDuration,
                               isPaused: s.isCountdownPaused,
-                              onTap: () {
-                                s.isCountdownPaused
-                                    ? player.resumeCountdown()
-                                    : player.pauseCountdown();
-                              },
+                              onPause: () => player.pauseCountdown(),
+                              onResume: () => player.resumeCountdown(),
                             );
                           },
                         )

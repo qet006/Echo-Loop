@@ -695,14 +695,16 @@ class _ReviewDifficultPracticeScreenState
                             onFastForward: () => ref
                                 .read(reviewDifficultPracticeProvider.notifier)
                                 .completePausedTurn(),
-                            onCountdownTap: () {
-                              final p = ref.read(
-                                reviewDifficultPracticeProvider.notifier,
-                              );
-                              playerState.isCountdownPaused
-                                  ? p.resumePostEvalCountdown()
-                                  : p.pausePostEvalCountdown();
-                            },
+                            onCountdownPause: () => ref
+                                .read(
+                                  reviewDifficultPracticeProvider.notifier,
+                                )
+                                .pausePostEvalCountdown(),
+                            onCountdownResume: () => ref
+                                .read(
+                                  reviewDifficultPracticeProvider.notifier,
+                                )
+                                .resumePostEvalCountdown(),
                             onToolbarButtonTapped: () {
                               if (playerState.isManualMode) return;
                               ref
@@ -742,9 +744,8 @@ class _ReviewDifficultPracticeScreenState
                                 remaining: s.remaining,
                                 total: s.total,
                                 isPaused: s.paused,
-                                onTap: () => s.paused
-                                    ? player.resumeCountdown()
-                                    : player.pauseCountdown(),
+                                onPause: () => player.pauseCountdown(),
+                                onResume: () => player.resumeCountdown(),
                               );
                             },
                           ),

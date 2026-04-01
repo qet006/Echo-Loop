@@ -10,13 +10,15 @@ import '../../l10n/app_localizations.dart';
 import '../../models/speech_practice_models.dart';
 import '../../providers/learning_session/review_difficult_practice_provider.dart';
 import '../../providers/listen_and_repeat_turn_controller_provider.dart'
-    show ListenAndRepeatTurnState;
+    show ListenAndRepeatTurnPhase, ListenAndRepeatTurnState;
 import '../../providers/sentence_ai_provider.dart';
 import '../../theme/app_theme.dart';
 import '../common/bookmark_toggle_row.dart';
 import '../common/countdown_chip.dart';
 import '../common/speech_rating_badge.dart';
-import '../listen_and_repeat/speech_practice_turn_panel.dart';
+import '../common/recording_button.dart'
+    show RecordingButton, RecordingButtonMode;
+import '../common/status_label.dart';
 import 'annotation_content_view.dart';
 
 /// 标注模式 + 录音 UI 组合
@@ -77,11 +79,14 @@ class AnnotationWithRecording extends StatelessWidget {
   /// 录音回放点击
   final void Function(String) onAttemptPlaybackTap;
 
-  /// 快进倒计时
-  final VoidCallback onFastForward;
+  /// 快进倒计时（可选，传入后在倒计时旁显示快进按钮）
+  final VoidCallback? onFastForward;
 
-  /// 暂停/恢复倒计时
-  final VoidCallback onCountdownTap;
+  /// 暂停倒计时
+  final VoidCallback onCountdownPause;
+
+  /// 恢复倒计时
+  final VoidCallback onCountdownResume;
 
   /// 用户点击工具栏按钮（意群/翻译/解析）时触发，通知外部切换到手动模式
   final VoidCallback? onToolbarButtonTapped;
@@ -106,8 +111,9 @@ class AnnotationWithRecording extends StatelessWidget {
     required this.isPlayingAttempt,
     required this.onRecordTap,
     required this.onAttemptPlaybackTap,
-    required this.onFastForward,
-    required this.onCountdownTap,
+    this.onFastForward,
+    required this.onCountdownPause,
+    required this.onCountdownResume,
     this.onToolbarButtonTapped,
   });
 
@@ -169,25 +175,27 @@ class AnnotationWithRecording extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(width: 32),
-                    const SizedBox(width: 48),
                     CountdownChip(
                       remaining: playerState.pauseRemaining,
                       total: playerState.pauseDuration,
                       isPaused: playerState.isCountdownPaused,
-                      onTap: onCountdownTap,
+                      onPause: onCountdownPause,
+                      onResume: onCountdownResume,
                     ),
-                    const SizedBox(width: 48),
-                    IconButton(
-                      onPressed: onFastForward,
-                      icon: Icon(
-                        Icons.fast_forward_rounded,
-                        size: 32,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.6,
+                    if (onFastForward != null &&
+                        !playerState.isCountdownPaused) ...[
+                      const SizedBox(width: 48),
+                      GestureDetector(
+                        onTap: onFastForward,
+                        child: Icon(
+                          Icons.fast_forward_rounded,
+                          size: 32,
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ],
@@ -196,12 +204,48 @@ class AnnotationWithRecording extends StatelessWidget {
         else if (shouldShowTurnPanel)
           Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.m),
-            child: SpeechPracticeTurnPanel(
-              l10n: l10n,
-              turnState: turnState,
-              isRecordingCurrent: isRecordingCurrent,
-              onRecordTap: onRecordTap,
-              currentAttempt: currentAttempt,
+            child: Builder(
+              builder: (context) {
+                final mode = isRecordingCurrent
+                    ? switch (turnState.phase) {
+                        ListenAndRepeatTurnPhase.idle ||
+                        ListenAndRepeatTurnPhase.waitingForUser =>
+                          RecordingButtonMode.idle,
+                        ListenAndRepeatTurnPhase.awaitingSpeech ||
+                        ListenAndRepeatTurnPhase.speaking =>
+                          RecordingButtonMode.recording,
+                        ListenAndRepeatTurnPhase.processing =>
+                          RecordingButtonMode.disabled,
+                        _ => RecordingButtonMode.idle,
+                      }
+                    : RecordingButtonMode.idle;
+
+                final hasError = currentAttempt?.errorMessage != null;
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    StatusLabel(
+                      text: hasError
+                          ? currentAttempt!.errorMessage
+                          : switch (mode) {
+                              RecordingButtonMode.idle =>
+                                l10n.listenAndRepeatTapToRecord,
+                              RecordingButtonMode.recording =>
+                                l10n.listenAndRepeatRecordingInProgress,
+                              RecordingButtonMode.disabled =>
+                                l10n.listenAndRepeatAnalyzing,
+                            },
+                      color: hasError
+                          ? Theme.of(context).colorScheme.error
+                          : null,
+                      bold: hasError,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    RecordingButton(mode: mode, onTap: onRecordTap),
+                  ],
+                );
+              },
             ),
           )
         else if (playerState.isPauseBetweenPlays)
@@ -223,7 +267,8 @@ class AnnotationWithRecording extends StatelessWidget {
                   remaining: playerState.pauseRemaining,
                   total: playerState.pauseDuration,
                   isPaused: playerState.isCountdownPaused,
-                  onTap: () {},
+                  onPause: () {},
+                  onResume: () {},
                 ),
               ],
             ),

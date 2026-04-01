@@ -31,7 +31,8 @@ import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/practice/practice_play_count_label.dart';
 import '../widgets/review/review_briefing_sheet.dart';
-import '../widgets/listen_and_repeat/speech_record_button.dart';
+import '../widgets/common/recording_button.dart'
+    show RecordingButton, RecordingButtonMode;
 import '../widgets/common/speech_rating_badge.dart';
 import '../widgets/common/countdown_chip.dart';
 import '../widgets/retell/retell_sentence_tile.dart';
@@ -505,32 +506,23 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
             remaining: s.pauseRemaining,
             total: s.pauseDuration,
             isPaused: s.isCountdownPaused,
-            onTap: () {
-              final p = ref.read(retellPlayerProvider.notifier);
-              s.isCountdownPaused ? p.resumeCountdown() : p.pauseCountdown();
-            },
+            onPause: () =>
+                ref.read(retellPlayerProvider.notifier).pauseCountdown(),
+            onResume: () =>
+                ref.read(retellPlayerProvider.notifier).resumeCountdown(),
           );
         },
       );
     }
 
     // retelling 阶段：录音按钮
-    final isProcessing = turnState.phase == ListenAndRepeatTurnPhase.processing;
-    return IgnorePointer(
-      ignoring: isProcessing,
-      child: Opacity(
-        opacity: isProcessing ? 0.45 : 1.0,
-        child: SpeechRecordButton(
-          phase: switch (turnState.phase) {
-            ListenAndRepeatTurnPhase.idle ||
-            ListenAndRepeatTurnPhase.processing =>
-              ListenAndRepeatTurnPhase.waitingForUser,
-            final p => p,
-          },
-          onTap: _handleRecordTap,
-        ),
-      ),
-    );
+    final buttonMode = switch (turnState.phase) {
+      ListenAndRepeatTurnPhase.awaitingSpeech ||
+      ListenAndRepeatTurnPhase.speaking => RecordingButtonMode.recording,
+      ListenAndRepeatTurnPhase.processing => RecordingButtonMode.disabled,
+      _ => RecordingButtonMode.idle,
+    };
+    return RecordingButton(mode: buttonMode, onTap: _handleRecordTap);
   }
 
   /// 重播当前段落
@@ -627,7 +619,7 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     );
     final retellRecState = ref.read(retellRecordingControllerProvider);
 
-    // 映射为 ListenAndRepeatTurnState 供 SpeechPracticeTurnPanel 复用
+    // 映射为 ListenAndRepeatTurnState 供 RecordingButton 复用
     final turnState = _mapToTurnState(retellRecState);
 
     // 评估完成 → 启动段间停顿倒计时
@@ -702,7 +694,10 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
         if (!mounted) return;
         final latestRecState = ref.read(retellRecordingControllerProvider);
         if (latestRecState.phase != RetellRecordingPhase.idle) {
-          AppLogger.log('RetellScreen', '⏭ 自动录音跳过: phase=${latestRecState.phase.name}');
+          AppLogger.log(
+            'RetellScreen',
+            '⏭ 自动录音跳过: phase=${latestRecState.phase.name}',
+          );
           return;
         }
         if (latestRecState.awaitingSpeechTimedOut) {
@@ -711,7 +706,10 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
         }
         final latestState = ref.read(retellPlayerProvider);
         if (latestState.phase != RetellPhase.retelling) {
-          AppLogger.log('RetellScreen', '⏭ 自动录音跳过: retellPhase=${latestState.phase.name}');
+          AppLogger.log(
+            'RetellScreen',
+            '⏭ 自动录音跳过: retellPhase=${latestState.phase.name}',
+          );
           return;
         }
         if (latestState.isRetellCountdown) {
@@ -985,7 +983,7 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
 }
 
 /// 将 [RetellRecordingState] 映射为 [ListenAndRepeatTurnState]，
-/// 供 [SpeechPracticeTurnPanel] 复用。
+/// 供 [RecordingButton] 复用。
 ListenAndRepeatTurnState _mapToTurnState(RetellRecordingState rs) {
   return ListenAndRepeatTurnState(
     phase: switch (rs.phase) {

@@ -188,9 +188,10 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen>
                         : null,
                     onNext: () =>
                         ref.read(flashcardNotifierProvider.notifier).nextCard(),
-                    onTogglePause: () => ref
-                        .read(flashcardNotifierProvider.notifier)
-                        .togglePause(),
+                    onPause: () =>
+                        ref.read(flashcardNotifierProvider.notifier).pause(),
+                    onResume: () =>
+                        ref.read(flashcardNotifierProvider.notifier).resume(),
                   );
                 },
               ),
@@ -239,7 +240,8 @@ class _BottomControls extends StatelessWidget {
   final bool showCountdown;
   final VoidCallback? onPrevious;
   final VoidCallback onNext;
-  final VoidCallback onTogglePause;
+  final VoidCallback onPause;
+  final VoidCallback onResume;
 
   const _BottomControls({
     required this.currentIndex,
@@ -250,7 +252,8 @@ class _BottomControls extends StatelessWidget {
     required this.showCountdown,
     this.onPrevious,
     required this.onNext,
-    required this.onTogglePause,
+    required this.onPause,
+    required this.onResume,
   });
 
   @override
@@ -282,7 +285,8 @@ class _BottomControls extends StatelessWidget {
                 remaining: countdownRemaining,
                 total: countdownTotal,
                 isPaused: isPaused,
-                onTap: onTogglePause,
+                onPause: onPause,
+                onResume: onResume,
               )
             else
               const SizedBox(width: 56, height: 56),

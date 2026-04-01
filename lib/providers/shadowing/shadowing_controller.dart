@@ -14,12 +14,16 @@ library;
 
 import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../database/providers.dart';
 import '../../models/sentence.dart';
 import '../../services/app_logger.dart';
 import '../../services/audio_playback_service.dart';
 import '../audio_engine/audio_engine_provider.dart';
+import '../learning_progress_provider.dart';
 import '../learning_session/countdown_controller.dart';
+import '../learning_session/learning_session_provider.dart';
 import '../listen_and_repeat_turn_controller_provider.dart';
+import '../listening_practice/bookmark_manager.dart';
 import 'shadowing_phase.dart';
 import 'shadowing_session_state.dart';
 
@@ -191,20 +195,41 @@ class ShadowingController extends _$ShadowingController {
   ///
   /// 只在 WaitingInterval 阶段允许开始录音。
   void startManualRecording() {
-    if (state.phase is! WaitingInterval) return;
+    AppLogger.log(
+      'Shadowing',
+      'startManualRecording: phase=${state.phase.runtimeType}',
+    );
+    if (state.phase is! WaitingInterval) {
+      AppLogger.log('Shadowing', '⏭ 跳过: 不在 WaitingInterval');
+      return;
+    }
     _startRecording();
   }
 
   /// 手动停止录音
+  ///
+  /// 如果未检测到语音，取消录音（不评估）回到 WaitingInterval 等用户重试。
+  /// 如果已检测到语音，停止并评估。
   Future<void> stopRecording() async {
     if (state.phase is! ShadowingRecording) return;
     final sentence = _currentSentence;
     if (sentence == null) return;
 
-    AppLogger.log('Shadowing', '手动停止录音');
-    await ref
-        .read(shadowingRecordingControllerProvider.notifier)
-        .stopAndEvaluate(referenceText: sentence.text);
+    final recController = ref.read(
+      shadowingRecordingControllerProvider.notifier,
+    );
+    final recState = ref.read(shadowingRecordingControllerProvider);
+
+    if (!recState.hasDetectedSpeech) {
+      // 没检测到语音 → 取消录音，回到等待状态
+      AppLogger.log('Shadowing', '手动停止录音: 无语音 → 取消');
+      await recController.cancelActiveRecording();
+      state = state.copyWith(phase: const WaitingInterval());
+      return;
+    }
+
+    AppLogger.log('Shadowing', '手动停止录音: 有语音 → 评估');
+    await recController.stopAndEvaluate(referenceText: sentence.text);
     // 评估完成后 _onRecordingStateChanged 回调推进流程
   }
 
@@ -259,27 +284,50 @@ class ShadowingController extends _$ShadowingController {
     await resume();
   }
 
-  /// 快进倒计时（直接跳到结束）
+  /// 快进倒计时（10 倍速）
   void fastForwardInterval() {
+    AppLogger.log(
+      'Shadowing',
+      'fastForward: phase=${state.phase.runtimeType}, '
+          'countdownActive=${_countdown.isActive}, '
+          'countdownPaused=${_countdown.isPaused}, '
+          'speed=${_countdown.speed}',
+    );
     if (state.phase is! WaitingInterval) return;
-    _countdown.cancel();
-    _onIntervalFinished();
+    if (!_countdown.isActive) return;
+    _countdown.setSpeed(10.0);
+    AppLogger.log('Shadowing', '倒计时快进 10x → speed=${_countdown.speed}');
   }
 
   /// 暂停倒计时（WaitingInterval 中用户点击倒计时圆环）
   void pauseInterval() {
+    AppLogger.log(
+      'Shadowing',
+      'pauseInterval: phase=${state.phase.runtimeType}, '
+          'countdownActive=${_countdown.isActive}, '
+          'countdownPaused=${_countdown.isPaused}',
+    );
     if (state.phase is! WaitingInterval) return;
     if (_countdown.isPaused) return;
     _countdown.pause();
-    AppLogger.log('Shadowing', '倒计时暂停');
+    state = state.copyWith(isIntervalPaused: true);
+    AppLogger.log('Shadowing', '倒计时暂停 ✓');
   }
 
   /// 恢复倒计时
   void resumeInterval() {
+    AppLogger.log(
+      'Shadowing',
+      'resumeInterval: phase=${state.phase.runtimeType}, '
+          'countdownActive=${_countdown.isActive}, '
+          'countdownPaused=${_countdown.isPaused}, '
+          'isIntervalPaused=${state.isIntervalPaused}',
+    );
     if (state.phase is! WaitingInterval) return;
     if (!_countdown.isPaused) return;
     _countdown.resume();
-    AppLogger.log('Shadowing', '倒计时恢复');
+    state = state.copyWith(isIntervalPaused: false);
+    AppLogger.log('Shadowing', '倒计时恢复 ✓');
   }
 
   /// 停止会话
@@ -301,9 +349,7 @@ class ShadowingController extends _$ShadowingController {
   /// 停止所有资源，保持当前遍数，重新播放当前句子。
   Future<void> replayCurrentSentence() async {
     _stopAllResources();
-    ref
-        .read(shadowingRecordingControllerProvider.notifier)
-        .clearRecording();
+    ref.read(shadowingRecordingControllerProvider.notifier).clearRecording();
     state = state.copyWith(
       recordingPath: null,
       recordingScore: null,
@@ -312,22 +358,75 @@ class ShadowingController extends _$ShadowingController {
     await _playCurrentSentence();
   }
 
-  /// 切换当前句子的收藏标记（不从列表移除）
-  ///
-  /// 仅更新内存中的 isBookmarked 状态，DB 操作由 Screen 层负责。
-  void toggleCurrentBookmark() {
+  /// 切换当前句子的收藏标记（内存 + DB）
+  Future<void> toggleCurrentBookmark() async {
     if (_sentences.isEmpty) return;
     final idx = state.sentenceIndex;
     final s = _sentences[idx];
-    _sentences[idx] = s.copyWith(isBookmarked: !s.isBookmarked);
-    // 递增 flowToken 触发 UI 重建（bookmark 变化不影响流程）
+    final wasBookmarked = s.isBookmarked;
+    _sentences[idx] = s.copyWith(isBookmarked: !wasBookmarked);
     state = state.copyWith(flowToken: state.flowToken + 1);
+
+    final bookmarkDao = ref.read(bookmarkDaoProvider);
+    if (wasBookmarked) {
+      await bookmarkDao.removeBookmark(_config.audioItemId, s.index);
+    } else {
+      await BookmarkManager.addBookmarkToDb(
+        _config.audioItemId,
+        s,
+        dao: bookmarkDao,
+      );
+    }
+  }
+
+  // ========== 进度管理 ==========
+
+  /// 保存跟读断点
+  Future<void> saveBreakpoint({required bool isFreePlay}) async {
+    await ref
+        .read(learningProgressNotifierProvider.notifier)
+        .saveShadowingSentenceIndex(
+          _config.audioItemId,
+          state.sentenceIndex,
+          isFreePlay: isFreePlay,
+        );
+  }
+
+  /// 清除断点（完成时调用）
+  Future<void> clearBreakpoint({required bool isFreePlay}) async {
+    await ref
+        .read(learningProgressNotifierProvider.notifier)
+        .saveShadowingSentenceIndex(
+          _config.audioItemId,
+          null,
+          isFreePlay: isFreePlay,
+        );
+  }
+
+  /// 递增跟读遍数统计
+  Future<void> incrementPassCount() async {
+    await ref
+        .read(learningProgressNotifierProvider.notifier)
+        .incrementShadowingPassCount(_config.audioItemId);
+  }
+
+  /// 标记当前子步骤完成
+  Future<void> completeSubStage() async {
+    await ref
+        .read(learningProgressNotifierProvider.notifier)
+        .completeCurrentSubStage(_config.audioItemId);
+  }
+
+  /// 退出学习模式（释放资源 + 通知 learningSession）
+  Future<void> exitLearningMode() async {
+    disposeSession();
+    await ref.read(learningSessionProvider.notifier).exitLearningMode();
   }
 
   /// 获取当前句子（供 Screen 读取）
   Sentence? get currentSentence => _currentSentence;
 
-  /// 获取当前句子索引（供 Screen 保存断点）
+  /// 获取当前句子索引
   int get currentIndex => state.sentenceIndex;
 
   /// 获取句子列表（只读）
@@ -348,11 +447,16 @@ class ShadowingController extends _$ShadowingController {
         next.currentAttempt != null) {
       final token = state.flowToken;
       final attempt = next.currentAttempt!;
-      _onRecordingFinished(
-        token,
-        attempt.filePath,
-        attempt.score,
-      );
+      _onRecordingFinished(token, attempt.filePath, attempt.score);
+    }
+
+    // 录音超时/取消（→ waitingForUser 或 → idle 无结果）→ 回到等待状态
+    if (state.phase is ShadowingRecording &&
+        (next.phase == ListenAndRepeatTurnPhase.waitingForUser ||
+            (next.phase == ListenAndRepeatTurnPhase.idle &&
+                next.currentAttempt == null))) {
+      AppLogger.log('Shadowing', '录音取消/超时 → WaitingInterval');
+      state = state.copyWith(phase: const WaitingInterval());
     }
   }
 
@@ -381,19 +485,34 @@ class ShadowingController extends _$ShadowingController {
     if (token != state.flowToken) return;
     if (state.phase is! ShadowingRecording) return;
 
-    AppLogger.log('Shadowing', '录音完成: score=$score');
-    state = state.copyWith(
-      recordingPath: filePath,
-      recordingScore: score,
+    AppLogger.log(
+      'Shadowing',
+      score != null ? '录音评估完成: score=$score' : '录音评估失败: 无有效识别结果',
     );
+    state = state.copyWith(recordingPath: filePath, recordingScore: score);
 
+    // 识别失败（score 为 null）：回到等待状态，清掉失败的 attempt
+    if (score == null) {
+      AppLogger.log('Shadowing', '→ 识别失败，等待用户重试');
+      // 先改 phase，再 clear，避免 clearRecording 触发 _onRecordingStateChanged 时
+      // state.phase 还是 ShadowingRecording 导致二次触发
+      state = state.copyWith(
+        phase: const WaitingInterval(),
+        recordingPath: null,
+        recordingScore: null,
+      );
+      ref.read(shadowingRecordingControllerProvider.notifier).clearRecording();
+      return;
+    }
+
+    // 手动模式：停在 WaitingInterval，等用户操作
     if (_config.isManualMode()) {
-      // 手动模式：停在这里，等用户操作（播放录音、下一遍等）
+      AppLogger.log('Shadowing', '→ 手动模式，等待用户操作');
       state = state.copyWith(phase: const WaitingInterval());
       return;
     }
 
-    // 自动模式：进入遍间倒计时
+    // 自动模式 + 识别成功：进入遍间倒计时
     _startInterval(resetFull: true);
   }
 
@@ -463,8 +582,7 @@ class ShadowingController extends _$ShadowingController {
 
     state = state.copyWith(phase: const ShadowingRecording());
 
-    final promptId =
-        'shadowing:${_config.audioItemId}:${sentence.index}';
+    final promptId = 'shadowing:${_config.audioItemId}:${sentence.index}';
 
     // 设置录音阈值：max(2.5 × sentenceDuration + 5s, 10s)
     final computed = sentence.duration * 2.5 + const Duration(seconds: 5);
@@ -472,9 +590,7 @@ class ShadowingController extends _$ShadowingController {
         ? const Duration(seconds: 10)
         : computed;
 
-    final controller = ref.read(
-      shadowingRecordingControllerProvider.notifier,
-    );
+    final controller = ref.read(shadowingRecordingControllerProvider.notifier);
     controller.setMaxRecordingDuration(maxDuration);
 
     AppLogger.log('Shadowing', '开始录音: $promptId');
@@ -494,6 +610,7 @@ class ShadowingController extends _$ShadowingController {
     state = state.copyWith(
       phase: const WaitingInterval(),
       intervalRemaining: remaining,
+      isIntervalPaused: false,
     );
 
     if (_config.isManualMode()) return;
@@ -525,6 +642,7 @@ class ShadowingController extends _$ShadowingController {
         'Shadowing',
         '下一遍: ${nextRepeat + 1}/${state.totalRepeats}',
       );
+      ref.read(shadowingRecordingControllerProvider.notifier).clearRecording();
       state = state.copyWith(
         repeatIndex: nextRepeat,
         recordingPath: null,
@@ -589,6 +707,6 @@ class ShadowingController extends _$ShadowingController {
   /// 当前句子
   Sentence? get _currentSentence =>
       _sentences.isNotEmpty && state.sentenceIndex < _sentences.length
-          ? _sentences[state.sentenceIndex]
-          : null;
+      ? _sentences[state.sentenceIndex]
+      : null;
 }
