@@ -1,0 +1,416 @@
+/// 跟读会话控制器
+///
+/// **唯一的状态入口**：所有状态变更都通过此控制器。
+/// Screen 只读 state、只调公开方法，不直接操作资源服务。
+///
+/// 流程：PlayingPrompt → Recording → (ReviewingRecording) → WaitingInterval → 下一遍/句
+///
+/// 关键设计：
+/// - 倒计时只在 WaitingInterval
+/// - flowToken 防异步竞态
+/// - 切句原子重置
+/// - 手动暂停(保留剩余) vs 外部打断(重置T)
+library;
+
+import 'dart:async';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../models/sentence.dart';
+import '../../services/app_logger.dart';
+import '../audio_engine/audio_engine_provider.dart';
+import '../learning_session/countdown_controller.dart';
+import 'shadowing_phase.dart';
+import 'shadowing_session_state.dart';
+
+part 'shadowing_controller.g.dart';
+
+/// 跟读差异化配置
+///
+/// 各页面（跟读/难句补练/收藏复习）通过不同 Config 注入差异行为。
+class ShadowingConfig {
+  /// 获取指定句子的目标遍数
+  final int Function(Sentence sentence) getRepeatCount;
+
+  /// 获取遍间倒计时时长
+  final Duration Function(Sentence sentence) getIntervalDuration;
+
+  /// 是否手动模式（手动模式下不自动录音、不自动倒计时推进）
+  final bool Function() isManualMode;
+
+  /// 句子播放前的钩子（如收藏复习需要跨音频加载）
+  final Future<void> Function(int sentenceIndex)? onBeforeSentenceStart;
+
+  /// 句子播完一遍的回调（用于学习统计）
+  final void Function(Sentence sentence)? onSentencePlayed;
+
+  const ShadowingConfig({
+    required this.getRepeatCount,
+    required this.getIntervalDuration,
+    required this.isManualMode,
+    this.onBeforeSentenceStart,
+    this.onSentencePlayed,
+  });
+}
+
+/// 跟读会话控制器
+@Riverpod(keepAlive: true)
+class ShadowingController extends _$ShadowingController {
+  /// 句子列表
+  List<Sentence> _sentences = [];
+
+  /// 差异化配置
+  late ShadowingConfig _config;
+
+  /// 倒计时控制器
+  final CountdownController _countdown = CountdownController();
+
+  @override
+  ShadowingSessionState build() {
+    ref.onDispose(() {
+      _countdown.cancel();
+    });
+    return const ShadowingSessionState();
+  }
+
+  // ========== 公开方法（Screen 调用） ==========
+
+  /// 初始化并开始会话
+  Future<void> startSession({
+    required List<Sentence> sentences,
+    required ShadowingConfig config,
+    int startIndex = 0,
+  }) async {
+    _sentences = sentences.map((s) => s.copyWith()).toList();
+    _config = config;
+
+    final safeIndex = _sentences.isEmpty
+        ? 0
+        : startIndex.clamp(0, _sentences.length - 1);
+    final sentence = _sentences[safeIndex];
+
+    state = ShadowingSessionState(
+      phase: const Idle(),
+      sentenceIndex: safeIndex,
+      totalSentences: _sentences.length,
+      totalRepeats: config.getRepeatCount(sentence),
+      intervalTotal: config.getIntervalDuration(sentence),
+      flowToken: 1,
+    );
+
+    await _playCurrentSentence();
+  }
+
+  /// 手动暂停（恢复时继续剩余倒计时间）
+  void pause() {
+    final phase = state.phase;
+    if (phase is Interrupted) return;
+    if (phase is Idle || phase is SessionCompleted) return;
+
+    _stopAllResources();
+    state = state.copyWith(
+      phase: Interrupted(
+        reason: InterruptReason.manualPause,
+        phaseBeforeInterrupt: phase,
+      ),
+    );
+    AppLogger.log('Shadowing', '暂停: 从 ${phase.runtimeType}');
+  }
+
+  /// 恢复（从暂停/打断中恢复）
+  Future<void> resume() async {
+    final phase = state.phase;
+    if (phase is! Interrupted) return;
+
+    final reason = phase.reason;
+    final previousPhase = phase.phaseBeforeInterrupt;
+
+    AppLogger.log('Shadowing', '恢复: 回到 ${previousPhase.runtimeType}, 原因=$reason');
+
+    // 恢复到之前的阶段
+    switch (previousPhase) {
+      case PlayingPrompt():
+        await _playCurrentSentence();
+      case ShadowingRecording():
+        // 录音被打断后不恢复录音，进入 WaitingInterval
+        await _startInterval(resetFull: reason != InterruptReason.manualPause);
+      case WaitingInterval():
+        await _startInterval(resetFull: reason != InterruptReason.manualPause);
+      case ReviewingRecording():
+        // 回放被打断后不恢复回放，进入 WaitingInterval
+        await _startInterval(resetFull: reason != InterruptReason.manualPause);
+      default:
+        state = state.copyWith(phase: const Idle());
+    }
+  }
+
+  /// 下一句（原子重置）
+  Future<void> nextSentence() async {
+    if (state.isLastSentence) return;
+    await _jumpToSentence(state.sentenceIndex + 1);
+  }
+
+  /// 上一句（原子重置）
+  Future<void> previousSentence() async {
+    if (state.isFirstSentence) return;
+    await _jumpToSentence(state.sentenceIndex - 1);
+  }
+
+  /// 手动停止录音
+  void stopRecording() {
+    if (state.phase is! ShadowingRecording) return;
+    // TODO: 调录音控制器 stopAndEvaluate
+    // 评估完成后 _onRecordingFinished 回调会推进流程
+    AppLogger.log('Shadowing', '手动停止录音');
+  }
+
+  /// 播放录音回放
+  void playRecording() {
+    if (state.recordingPath == null) return;
+    if (state.phase is! WaitingInterval && state.phase is! ShadowingRecording) {
+      return;
+    }
+
+    // 如果在倒计时中，打断倒计时
+    if (state.phase is WaitingInterval) {
+      _countdown.cancel();
+    }
+
+    state = state.copyWith(phase: const ReviewingRecording());
+    // TODO: 调 AudioPlaybackService.play(recordingPath)
+    // 播放结束后 _onReviewPlaybackFinished 回调推进
+    AppLogger.log('Shadowing', '播放录音回放');
+  }
+
+  /// 停止录音回放
+  void stopPlayback() {
+    if (state.phase is! ReviewingRecording) return;
+    // TODO: 调 AudioPlaybackService.stop()
+    _onReviewPlaybackFinished();
+  }
+
+  /// 查词典（打断，恢复后重置 T）
+  void openLookup() {
+    _interrupt(InterruptReason.lookupWord);
+  }
+
+  /// 关闭词典
+  Future<void> closeLookup() async {
+    await resume();
+  }
+
+  /// 打开设置（打断，恢复后重置 T）
+  void openSettings() {
+    _interrupt(InterruptReason.settings);
+  }
+
+  /// 关闭设置
+  Future<void> closeSettings() async {
+    await resume();
+  }
+
+  /// 快进倒计时（直接跳到结束）
+  void fastForwardInterval() {
+    if (state.phase is! WaitingInterval) return;
+    _countdown.cancel();
+    _onIntervalFinished();
+  }
+
+  /// 停止会话
+  void stopSession() {
+    _atomicReset();
+    state = state.copyWith(phase: const Idle());
+  }
+
+  /// 释放资源
+  void dispose() {
+    _atomicReset();
+    _sentences = [];
+    state = const ShadowingSessionState();
+  }
+
+  // ========== 资源回调（内部方法） ==========
+
+  /// 原句播放完成回调
+  void _onPromptFinished(int token) {
+    if (token != state.flowToken) return;
+    if (state.phase is! PlayingPrompt) return;
+
+    AppLogger.log('Shadowing', '原句播放完成 → 进入录音');
+    _config.onSentencePlayed?.call(_currentSentence!);
+
+    if (_config.isManualMode()) {
+      // 手动模式：停在这里等用户操作
+      state = state.copyWith(phase: const Idle());
+      return;
+    }
+
+    // 自动模式：开始录音
+    state = state.copyWith(phase: const ShadowingRecording());
+    // TODO: 启动录音
+  }
+
+  /// 录音完成回调（自动/手动统一收口）
+  void _onRecordingFinished(int token, String? filePath, double? score) {
+    if (token != state.flowToken) return;
+    if (state.phase is! ShadowingRecording) return;
+
+    AppLogger.log('Shadowing', '录音完成: score=$score → 进入 WaitingInterval');
+    state = state.copyWith(
+      recordingPath: filePath,
+      recordingScore: score,
+    );
+    _startInterval(resetFull: true);
+  }
+
+  /// 录音回放完成回调
+  void _onReviewPlaybackFinished() {
+    if (state.phase is! ReviewingRecording) return;
+
+    AppLogger.log('Shadowing', '回放结束 → 进入 WaitingInterval');
+    // 回放结束后重置完整 T 秒
+    _startInterval(resetFull: true);
+  }
+
+  /// 倒计时 tick 回调
+  void _onIntervalTick(int token, Duration remaining) {
+    if (token != state.flowToken) return;
+    if (state.phase is! WaitingInterval) return;
+    state = state.copyWith(intervalRemaining: remaining);
+  }
+
+  /// 倒计时结束回调
+  void _onIntervalFinished() {
+    if (state.phase is! WaitingInterval) return;
+    _advanceToNextRepeatOrSentence();
+  }
+
+  // ========== 内部流程方法 ==========
+
+  /// 播放当前句子
+  Future<void> _playCurrentSentence() async {
+    final sentence = _currentSentence;
+    if (sentence == null) return;
+
+    await _config.onBeforeSentenceStart?.call(state.sentenceIndex);
+
+    state = state.copyWith(phase: const PlayingPrompt());
+    final token = state.flowToken;
+
+    AppLogger.log('Shadowing', '播放句子 ${state.sentenceIndex + 1}/${state.totalSentences}');
+
+    final engine = ref.read(audioEngineProvider.notifier);
+    final sessionId = engine.newSession();
+    await engine.playClipOnce(sentence, sessionId);
+
+    // 播放完成后校验 token
+    _onPromptFinished(token);
+  }
+
+  /// 启动遍间倒计时
+  Future<void> _startInterval({required bool resetFull}) async {
+    final total = state.intervalTotal;
+    final remaining = resetFull ? total : state.intervalRemaining;
+
+    if (_config.isManualMode()) {
+      // 手动模式不自动倒计时
+      state = state.copyWith(
+        phase: const WaitingInterval(),
+        intervalRemaining: remaining,
+      );
+      return;
+    }
+
+    state = state.copyWith(
+      phase: const WaitingInterval(),
+      intervalRemaining: remaining,
+    );
+
+    final token = state.flowToken;
+    await _countdown.start(remaining, (rem) {
+      _onIntervalTick(token, rem);
+    });
+
+    // 倒计时自然结束
+    if (token == state.flowToken) {
+      _onIntervalFinished();
+    }
+  }
+
+  /// 推进到下一遍或下一句
+  void _advanceToNextRepeatOrSentence() {
+    if (state.isLastRepeat) {
+      // 当前句所有遍数完成
+      if (state.isLastSentence) {
+        AppLogger.log('Shadowing', '全部完成');
+        state = state.copyWith(phase: const SessionCompleted());
+      } else {
+        AppLogger.log('Shadowing', '当前句完成 → 下一句');
+        _jumpToSentence(state.sentenceIndex + 1);
+      }
+    } else {
+      // 下一遍
+      final nextRepeat = state.repeatIndex + 1;
+      AppLogger.log('Shadowing', '下一遍: ${nextRepeat + 1}/${state.totalRepeats}');
+      state = state.copyWith(
+        repeatIndex: nextRepeat,
+        recordingPath: null,
+        recordingScore: null,
+      );
+      _playCurrentSentence();
+    }
+  }
+
+  /// 跳转到指定句子（原子重置）
+  Future<void> _jumpToSentence(int index) async {
+    _atomicReset();
+
+    final sentence = _sentences[index];
+    state = state.copyWith(
+      phase: const Idle(),
+      sentenceIndex: index,
+      repeatIndex: 0,
+      totalRepeats: _config.getRepeatCount(sentence),
+      intervalTotal: _config.getIntervalDuration(sentence),
+      intervalRemaining: Duration.zero,
+      recordingPath: null,
+      recordingScore: null,
+      flowToken: state.flowToken + 1,
+    );
+
+    await _playCurrentSentence();
+  }
+
+  /// 原子重置：停止所有资源 + 递增 token
+  void _atomicReset() {
+    _countdown.cancel();
+    _stopAllResources();
+    state = state.copyWith(flowToken: state.flowToken + 1);
+  }
+
+  /// 停止所有资源服务
+  void _stopAllResources() {
+    final engine = ref.read(audioEngineProvider.notifier);
+    engine.pause();
+    _countdown.cancel();
+    // TODO: 停止录音、停止录音回放
+  }
+
+  /// 打断当前流程
+  void _interrupt(InterruptReason reason) {
+    final phase = state.phase;
+    if (phase is Interrupted || phase is Idle || phase is SessionCompleted) {
+      return;
+    }
+
+    _stopAllResources();
+    state = state.copyWith(
+      phase: Interrupted(reason: reason, phaseBeforeInterrupt: phase),
+    );
+    AppLogger.log('Shadowing', '打断: $reason, 从 ${phase.runtimeType}');
+  }
+
+  /// 当前句子
+  Sentence? get _currentSentence =>
+      _sentences.isNotEmpty && state.sentenceIndex < _sentences.length
+          ? _sentences[state.sentenceIndex]
+          : null;
+}
