@@ -5,7 +5,7 @@
 /// 盲听 N 遍 → 句间停顿 → 自动推进；偷看字幕、听不懂进入跟读模式。
 /// 支持手动/自动控制模式切换、跟读自动录音。
 ///
-/// 录音通过 [ShadowingRecordingController] 驱动（跟读专用控制器）。
+/// 录音通过 [SpeechRecordingController] 驱动（跟读专用控制器）。
 /// 录音回放通过 [AudioPlaybackService] 播放本地 .m4a 文件。
 ///
 /// 额外功能：
@@ -26,7 +26,7 @@ import '../providers/listening_practice/bookmark_manager.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/learning_session/bookmark_review_provider.dart';
 import '../providers/learning_session/review_difficult_practice_provider.dart';
-import '../providers/listen_and_repeat_turn_controller_provider.dart';
+import '../providers/speech/speech_recording_controller.dart';
 import '../providers/sentence_ai_provider.dart';
 import '../services/audio_playback_service.dart';
 import '../utils/wakelock_mixin.dart';
@@ -79,7 +79,7 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
       // 同步初始控制模式到录音控制器
       final playerState = ref.read(bookmarkReviewProvider);
       ref
-          .read(shadowingRecordingControllerProvider.notifier)
+          .read(speechRecordingControllerProvider.notifier)
           .setManualMode(playerState.isManualMode);
       ref.read(bookmarkReviewProvider.notifier).startPlaying();
     });
@@ -108,7 +108,7 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
     final currentSentence = player.currentSentence;
     if (currentSentence == null) return;
 
-    final controller = ref.read(shadowingRecordingControllerProvider.notifier);
+    final controller = ref.read(speechRecordingControllerProvider.notifier);
     final sentenceDuration = currentSentence.duration;
 
     final computed = sentenceDuration * 2.5 + const Duration(seconds: 5);
@@ -121,7 +121,7 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
 
   /// 取消录音和回放
   Future<void> _cancelRecordingAndPlayback() async {
-    final controller = ref.read(shadowingRecordingControllerProvider.notifier);
+    final controller = ref.read(speechRecordingControllerProvider.notifier);
     await controller.cancelActiveRecording();
     await _stopPlayback();
   }
@@ -142,8 +142,8 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
     }
 
     final player = ref.read(bookmarkReviewProvider.notifier);
-    final controller = ref.read(shadowingRecordingControllerProvider.notifier);
-    final recState = ref.read(shadowingRecordingControllerProvider);
+    final controller = ref.read(speechRecordingControllerProvider.notifier);
+    final recState = ref.read(speechRecordingControllerProvider);
     final currentSentence = player.currentSentence;
     if (currentSentence == null) return;
 
@@ -183,7 +183,7 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
 
     ref.read(bookmarkReviewProvider.notifier).enterManualForSentence();
 
-    final recState = ref.read(shadowingRecordingControllerProvider);
+    final recState = ref.read(speechRecordingControllerProvider);
     final attempt = recState.currentAttempt;
     final filePath = attempt?.filePath;
     if (filePath == null || filePath.isEmpty) return;
@@ -201,7 +201,7 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
     if (!mounted) return;
 
     // 释放录音
-    await ref.read(shadowingRecordingControllerProvider.notifier).fullReset();
+    await ref.read(speechRecordingControllerProvider.notifier).fullReset();
 
     // 收藏复习无需保存断点，直接退出
     player.disposePlayer();
@@ -239,7 +239,7 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
     _isShowingDialog = true;
 
     // 完成时释放录音
-    await ref.read(shadowingRecordingControllerProvider.notifier).fullReset();
+    await ref.read(speechRecordingControllerProvider.notifier).fullReset();
 
     final playerState = ref.read(bookmarkReviewProvider);
     final l10n = AppLocalizations.of(context)!;
@@ -270,11 +270,11 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
 
     // watch 录音相关状态（仅监听 build 中实际使用的字段，避免转录更新触发重建）
     ref.watch(
-      shadowingRecordingControllerProvider.select(
+      speechRecordingControllerProvider.select(
         (s) => (s.phase, s.currentAttempt, s.promptId),
       ),
     );
-    final turnState = ref.read(shadowingRecordingControllerProvider);
+    final turnState = ref.read(speechRecordingControllerProvider);
 
     // 监听句子切换 + 自动播完信号 + 控制模式变化
     ref.listen<ReviewDifficultPracticeState>(bookmarkReviewProvider, (
@@ -285,7 +285,7 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
       if (prev != null &&
           prev.currentSentenceIndex != next.currentSentenceIndex) {
         ref
-            .read(shadowingRecordingControllerProvider.notifier)
+            .read(speechRecordingControllerProvider.notifier)
             .clearRecording();
       }
       // 监听自然完成信号 → 触发完成弹窗
@@ -298,13 +298,13 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
       // 手动模式变化时同步到录音控制器（全局设置切换 或 单句手动模式变化）
       if (prev?.isManualMode != next.isManualMode) {
         final controller = ref.read(
-          shadowingRecordingControllerProvider.notifier,
+          speechRecordingControllerProvider.notifier,
         );
         controller.setManualMode(next.isManualMode);
         if (next.isManualMode) {
-          final recState = ref.read(shadowingRecordingControllerProvider);
-          if (recState.phase == ListenAndRepeatTurnPhase.awaitingSpeech ||
-              recState.phase == ListenAndRepeatTurnPhase.speaking) {
+          final recState = ref.read(speechRecordingControllerProvider);
+          if (recState.phase == SpeechRecordingPhase.awaitingSpeech ||
+              recState.phase == SpeechRecordingPhase.speaking) {
             controller.cancelActiveRecording();
           }
         }
@@ -312,12 +312,12 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
     });
 
     // 评估完成 → 启动 review countdown（仅跟读模式）
-    ref.listen<ListenAndRepeatTurnState>(shadowingRecordingControllerProvider, (
+    ref.listen<SpeechRecordingState>(speechRecordingControllerProvider, (
       prev,
       next,
     ) {
-      if (prev?.phase == ListenAndRepeatTurnPhase.processing &&
-          next.phase == ListenAndRepeatTurnPhase.idle &&
+      if (prev?.phase == SpeechRecordingPhase.processing &&
+          next.phase == SpeechRecordingPhase.idle &&
           next.currentAttempt != null) {
         final latestState = ref.read(bookmarkReviewProvider);
         if (latestState.isPauseBetweenPlays &&
@@ -351,15 +351,15 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
         playerState.isPauseBetweenPlays &&
         currentSentence != null &&
         !playerState.isManualMode &&
-        turnState.phase == ListenAndRepeatTurnPhase.idle &&
+        turnState.phase == SpeechRecordingPhase.idle &&
         !playerState.isPostEvalCountdown) {
       final promptId = currentPromptId;
       final referenceText = currentSentence.text;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        final latestRecState = ref.read(shadowingRecordingControllerProvider);
-        if (latestRecState.phase != ListenAndRepeatTurnPhase.idle) return;
+        final latestRecState = ref.read(speechRecordingControllerProvider);
+        if (latestRecState.phase != SpeechRecordingPhase.idle) return;
         final latestPlayer = ref.read(bookmarkReviewProvider);
         if (!latestPlayer.isAnnotationMode ||
             !latestPlayer.isPauseBetweenPlays ||
@@ -374,7 +374,7 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
         _updateRecordingThresholds();
         unawaited(
           ref
-              .read(shadowingRecordingControllerProvider.notifier)
+              .read(speechRecordingControllerProvider.notifier)
               .startRecording(promptId: promptId, referenceText: referenceText),
         );
       });
@@ -396,7 +396,7 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
           unawaited(_cancelRecordingAndPlayback());
           if (playerState.isPauseBetweenPlays) {
             ref
-                .read(shadowingRecordingControllerProvider.notifier)
+                .read(speechRecordingControllerProvider.notifier)
                 .clearRecording();
             player.replayDuringCountdown();
           } else if (playerState.isPlaying) {
@@ -408,14 +408,14 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
         onPrevious: () {
           unawaited(_cancelRecordingAndPlayback());
           ref
-              .read(shadowingRecordingControllerProvider.notifier)
+              .read(speechRecordingControllerProvider.notifier)
               .clearRecording();
           player.goToPrevious();
         },
         onNext: () {
           unawaited(_cancelRecordingAndPlayback());
           ref
-              .read(shadowingRecordingControllerProvider.notifier)
+              .read(speechRecordingControllerProvider.notifier)
               .clearRecording();
           player.goToNext();
         },
@@ -483,7 +483,7 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                                 ..notifyExternalStop();
                               ref
                                   .read(
-                                    shadowingRecordingControllerProvider
+                                    speechRecordingControllerProvider
                                         .notifier,
                                   )
                                   .cancelActiveRecording();
@@ -512,7 +512,7 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                                   .enterManualForSentence();
                               ref
                                   .read(
-                                    shadowingRecordingControllerProvider
+                                    speechRecordingControllerProvider
                                         .notifier,
                                   )
                                   .cancelActiveRecording();
@@ -582,14 +582,14 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                   onPrevious: () {
                     unawaited(_cancelRecordingAndPlayback());
                     ref
-                        .read(shadowingRecordingControllerProvider.notifier)
+                        .read(speechRecordingControllerProvider.notifier)
                         .clearRecording();
                     player.goToPrevious();
                   },
                   onNext: () {
                     unawaited(_cancelRecordingAndPlayback());
                     ref
-                        .read(shadowingRecordingControllerProvider.notifier)
+                        .read(speechRecordingControllerProvider.notifier)
                         .clearRecording();
                     final isLast =
                         playerState.currentSentenceIndex >=
@@ -605,7 +605,7 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                     unawaited(_cancelRecordingAndPlayback());
                     if (playerState.isPauseBetweenPlays) {
                       ref
-                          .read(shadowingRecordingControllerProvider.notifier)
+                          .read(speechRecordingControllerProvider.notifier)
                           .clearRecording();
                       player.replayDuringCountdown();
                     } else if (playerState.isPlaying) {

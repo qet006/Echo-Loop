@@ -36,7 +36,7 @@ import '../study_stats_provider.dart';
 import 'countdown_controller.dart';
 import 'review_difficult_practice_provider.dart';
 import 'sentence_playback_engine.dart';
-import '../listen_and_repeat_turn_controller_provider.dart';
+import '../speech/speech_recording_controller.dart';
 
 part 'bookmark_review_provider.g.dart';
 
@@ -221,7 +221,7 @@ class BookmarkReview extends _$BookmarkReview {
 
     // 注入 recorder 到录音控制器
     ref
-        .read(shadowingRecordingControllerProvider.notifier)
+        .read(speechRecordingControllerProvider.notifier)
         .setRecorder(_recorder);
   }
 
@@ -611,7 +611,7 @@ class BookmarkReview extends _$BookmarkReview {
 
   /// 释放资源
   void disposePlayer() {
-    ref.read(shadowingRecordingControllerProvider.notifier).setRecorder(null);
+    ref.read(speechRecordingControllerProvider.notifier).setRecorder(null);
     _stopPeriodicSaveTimer();
     _saveAndRefreshStudyTime();
     _engine.cleanup();

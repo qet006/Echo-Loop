@@ -4,7 +4,7 @@
 /// 用户听完后在停顿时间内跟读。
 ///
 /// 流程控制通过 [ListenAndRepeatController] 驱动（统一管理播放、录音、倒计时）。
-/// 录音 UI 状态通过 [ShadowingRecordingController] 读取（转录文本、评估结果）。
+/// 录音 UI 状态通过 [SpeechRecordingController] 读取（转录文本、评估结果）。
 ///
 /// 完成处理：所有句子播完 → 完成对话框 → completeCurrentSubStage → 退出
 /// 退出处理：PopScope → 保存断点 → exitLearningMode → pop
@@ -19,7 +19,7 @@ import '../database/enums.dart';
 import '../utils/wakelock_mixin.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/learning_progress_provider.dart';
-import '../providers/listen_and_repeat_turn_controller_provider.dart';
+import '../providers/speech/speech_recording_controller.dart';
 import '../providers/listen_and_repeat/listen_and_repeat_controller.dart';
 import '../providers/listen_and_repeat/listen_and_repeat_phase.dart';
 import '../providers/listen_and_repeat/listen_and_repeat_settings_provider.dart';
@@ -107,7 +107,7 @@ class _ListenAndRepeatPlayerScreenState
     }
 
     final ctrl = ref.read(listenAndRepeatControllerProvider.notifier);
-    final recState = ref.read(shadowingRecordingControllerProvider);
+    final recState = ref.read(speechRecordingControllerProvider);
     final currentSentence = ctrl.currentSentence;
     if (currentSentence == null) return;
 
@@ -377,11 +377,11 @@ class _ListenAndRepeatPlayerScreenState
 
     // watch 录音相关状态（仅监听 build 中实际使用的字段，避免转录更新触发重建）
     ref.watch(
-      shadowingRecordingControllerProvider.select(
+      speechRecordingControllerProvider.select(
         (s) => (s.phase, s.currentAttempt, s.promptId),
       ),
     );
-    final turnState = ref.read(shadowingRecordingControllerProvider);
+    final turnState = ref.read(speechRecordingControllerProvider);
 
     // 监听完成信号 → 触发完成弹窗
     ref.listen<ListenAndRepeatSessionState>(listenAndRepeatControllerProvider, (
@@ -427,7 +427,7 @@ class _ListenAndRepeatPlayerScreenState
 
           if (isInPause) {
             ref
-                .read(shadowingRecordingControllerProvider.notifier)
+                .read(speechRecordingControllerProvider.notifier)
                 .clearRecording();
             ctrl.replayCurrentSentence();
           } else if (isPlaying) {
@@ -438,13 +438,13 @@ class _ListenAndRepeatPlayerScreenState
         },
         onPrevious: () {
           ref
-              .read(shadowingRecordingControllerProvider.notifier)
+              .read(speechRecordingControllerProvider.notifier)
               .clearRecording();
           unawaited(ctrl.previousSentence());
         },
         onNext: () {
           ref
-              .read(shadowingRecordingControllerProvider.notifier)
+              .read(speechRecordingControllerProvider.notifier)
               .clearRecording();
           unawaited(ctrl.nextSentence());
         },
@@ -626,7 +626,7 @@ class _ListenAndRepeatPlayerScreenState
                                     final isProcessing =
                                         turnState.promptId == currentPromptId &&
                                         turnState.phase ==
-                                            ListenAndRepeatTurnPhase.processing;
+                                            SpeechRecordingPhase.processing;
 
                                     // 评估中 → 显示 ProcessingIndicator
                                     if (isProcessing) {
@@ -637,9 +637,9 @@ class _ListenAndRepeatPlayerScreenState
 
                                     final mode = isRecordingCurrent
                                         ? switch (turnState.phase) {
-                                            ListenAndRepeatTurnPhase
+                                            SpeechRecordingPhase
                                                 .awaitingSpeech ||
-                                            ListenAndRepeatTurnPhase.speaking =>
+                                            SpeechRecordingPhase.speaking =>
                                               RecordingButtonMode.recording,
                                             _ => RecordingButtonMode.idle,
                                           }
@@ -693,7 +693,7 @@ class _ListenAndRepeatPlayerScreenState
                         onPrevious: () {
                           ref
                               .read(
-                                shadowingRecordingControllerProvider.notifier,
+                                speechRecordingControllerProvider.notifier,
                               )
                               .clearRecording();
                           unawaited(ctrl.previousSentence());
@@ -701,7 +701,7 @@ class _ListenAndRepeatPlayerScreenState
                         onNext: () {
                           ref
                               .read(
-                                shadowingRecordingControllerProvider.notifier,
+                                speechRecordingControllerProvider.notifier,
                               )
                               .clearRecording();
                           if (ctrlState.isLastSentence) {
@@ -716,7 +716,7 @@ class _ListenAndRepeatPlayerScreenState
                           if (isInPause) {
                             ref
                                 .read(
-                                  shadowingRecordingControllerProvider.notifier,
+                                  speechRecordingControllerProvider.notifier,
                                 )
                                 .clearRecording();
                             ctrl.replayCurrentSentence();

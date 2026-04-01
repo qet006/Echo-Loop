@@ -14,7 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fluency/models/audio_engine_state.dart';
 import 'package:fluency/models/sentence.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
-import 'package:fluency/providers/listen_and_repeat_turn_controller_provider.dart';
+import 'package:fluency/providers/speech/speech_recording_controller.dart';
 import 'package:fluency/providers/listen_and_repeat/listen_and_repeat_controller.dart';
 import 'package:fluency/providers/listen_and_repeat/listen_and_repeat_phase.dart';
 import 'package:fluency/providers/listen_and_repeat/listen_and_repeat_session_state.dart';
@@ -67,8 +67,8 @@ void main() {
     container = ProviderContainer(
       overrides: [
         audioEngineProvider.overrideWith(() => _InstantAudioEngine()),
-        shadowingRecordingControllerProvider.overrideWith(
-          TestShadowingRecordingController.new,
+        speechRecordingControllerProvider.overrideWith(
+          TestSpeechRecordingController.new,
         ),
       ],
     );

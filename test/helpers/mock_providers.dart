@@ -34,7 +34,7 @@ import 'package:fluency/models/retell_settings.dart';
 import 'package:fluency/providers/learning_session/review_difficult_practice_provider.dart';
 import 'package:fluency/providers/daily_study_time_provider.dart';
 import 'package:fluency/providers/speech_practice_session_provider.dart';
-import 'package:fluency/providers/listen_and_repeat_turn_controller_provider.dart';
+import 'package:fluency/providers/speech/speech_recording_controller.dart';
 import 'package:fluency/providers/retell_recording_controller_provider.dart';
 import 'package:fluency/models/speech_practice_models.dart';
 import 'package:fluency/providers/transcription_task_provider.dart';
@@ -1473,18 +1473,18 @@ class TestSpeechPracticeSession extends SpeechPracticeSession {
   SpeechPracticeAttempt? attemptFor(String promptId) => null;
 }
 
-/// 测试用 ShadowingRecordingController — 不依赖平台通道
-class TestShadowingRecordingController extends ShadowingRecordingController {
+/// 测试用 SpeechRecordingController — 不依赖平台通道
+class TestSpeechRecordingController extends SpeechRecordingController {
   /// 初始阶段（默认 idle）
-  final ListenAndRepeatTurnPhase initialPhase;
+  final SpeechRecordingPhase initialPhase;
 
-  TestShadowingRecordingController({
-    this.initialPhase = ListenAndRepeatTurnPhase.idle,
+  TestSpeechRecordingController({
+    this.initialPhase = SpeechRecordingPhase.idle,
   });
 
   @override
-  ListenAndRepeatTurnState build() =>
-      ListenAndRepeatTurnState(phase: initialPhase);
+  SpeechRecordingState build() =>
+      SpeechRecordingState(phase: initialPhase);
 
   @override
   Future<void> startRecording({
@@ -1500,12 +1500,12 @@ class TestShadowingRecordingController extends ShadowingRecordingController {
 
   @override
   Future<void> clearRecording() async {
-    state = const ListenAndRepeatTurnState();
+    state = const SpeechRecordingState();
   }
 
   @override
   Future<void> fullReset() async {
-    state = const ListenAndRepeatTurnState();
+    state = const SpeechRecordingState();
   }
 
   @override
@@ -1540,8 +1540,8 @@ TranscriptionApiClient createTestTranscriptionApiClient() {
 List<Override> studyTimeOverrides() {
   return [
     studyTimeServiceProvider.overrideWithValue(_NoOpStudyTimeService()),
-    shadowingRecordingControllerProvider.overrideWith(
-      TestShadowingRecordingController.new,
+    speechRecordingControllerProvider.overrideWith(
+      TestSpeechRecordingController.new,
     ),
     retellRecordingControllerProvider.overrideWith(
       TestRetellRecordingController.new,

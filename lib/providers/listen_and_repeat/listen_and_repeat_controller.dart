@@ -25,7 +25,7 @@ import '../audio_engine/audio_engine_provider.dart';
 import '../learning_progress_provider.dart';
 import '../learning_session/countdown_controller.dart';
 import '../learning_session/sentence_playback_engine.dart';
-import '../listen_and_repeat_turn_controller_provider.dart';
+import '../speech/speech_recording_controller.dart';
 import '../listening_practice/bookmark_manager.dart';
 import '../study_task_controller_mixin.dart';
 import 'listen_and_repeat_phase.dart';
@@ -89,14 +89,14 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
   @override
   ListenAndRepeatSessionState build() {
     // 监听录音控制器状态变化（评估完成时推进流程）
-    ref.listen(shadowingRecordingControllerProvider, _onRecordingStateChanged);
+    ref.listen(speechRecordingControllerProvider, _onRecordingStateChanged);
 
     // 打印状态变化日志
     ref.listenSelf((prev, next) {
       if (prev?.phase.runtimeType != next.phase.runtimeType ||
           prev?.sentenceIndex != next.sentenceIndex ||
           prev?.repeatIndex != next.repeatIndex) {
-        final recPhase = ref.read(shadowingRecordingControllerProvider).phase;
+        final recPhase = ref.read(speechRecordingControllerProvider).phase;
         AppLogger.log(
           'L&R State',
           '${next.phase.runtimeType} | '
@@ -230,7 +230,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
 
     // 同步录音控制器模式
     ref
-        .read(shadowingRecordingControllerProvider.notifier)
+        .read(speechRecordingControllerProvider.notifier)
         .setManualMode(config.isManualMode());
   }
 
@@ -292,9 +292,9 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     if (sentence == null) return;
 
     final recController = ref.read(
-      shadowingRecordingControllerProvider.notifier,
+      speechRecordingControllerProvider.notifier,
     );
-    final recState = ref.read(shadowingRecordingControllerProvider);
+    final recState = ref.read(speechRecordingControllerProvider);
 
     if (!recState.hasDetectedSpeech) {
       // 没检测到语音 → 取消录音，回到等待状态
@@ -345,7 +345,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
   /// 用户关闭设置弹窗 → 同步设置变更
   void onSettingsClosed() {
     ref
-        .read(shadowingRecordingControllerProvider.notifier)
+        .read(speechRecordingControllerProvider.notifier)
         .setManualMode(_config.isManualMode());
   }
 
@@ -404,7 +404,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
   /// 释放资源
   void disposeSession() {
     _atomicReset();
-    ref.read(shadowingRecordingControllerProvider.notifier).fullReset();
+    ref.read(speechRecordingControllerProvider.notifier).fullReset();
     _sentences = [];
     state = const ListenAndRepeatSessionState();
   }
@@ -414,7 +414,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
   /// 停止所有资源，保持当前遍数，重新播放当前句子。
   Future<void> replayCurrentSentence() async {
     _stopAllResources();
-    ref.read(shadowingRecordingControllerProvider.notifier).clearRecording();
+    ref.read(speechRecordingControllerProvider.notifier).clearRecording();
     state = state.copyWith(
       recordingPath: null,
       recordingScore: null,
@@ -504,8 +504,8 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
 
   /// 录音控制器状态变化回调
   void _onRecordingStateChanged(
-    ListenAndRepeatTurnState? prev,
-    ListenAndRepeatTurnState next,
+    SpeechRecordingState? prev,
+    SpeechRecordingState next,
   ) {
     if (prev == null) return;
     if (prev.phase != next.phase) {
@@ -518,8 +518,8 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     }
 
     // 评估完成（processing → idle，有结果）→ 推进流程
-    if (prev.phase == ListenAndRepeatTurnPhase.processing &&
-        next.phase == ListenAndRepeatTurnPhase.idle &&
+    if (prev.phase == SpeechRecordingPhase.processing &&
+        next.phase == SpeechRecordingPhase.idle &&
         next.currentAttempt != null) {
       final token = state.flowToken;
       final attempt = next.currentAttempt!;
@@ -528,7 +528,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
 
     // 录音取消/超时（→ idle 无结果）→ 等待用户操作
     if (state.phase is Recording &&
-        next.phase == ListenAndRepeatTurnPhase.idle &&
+        next.phase == SpeechRecordingPhase.idle &&
         next.currentAttempt == null) {
       AppLogger.log('Shadowing', '录音取消/超时 → WaitingForUser');
       state = state.copyWith(phase: const WaitingForUser());
@@ -576,7 +576,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
         recordingPath: null,
         recordingScore: null,
       );
-      ref.read(shadowingRecordingControllerProvider.notifier).clearRecording();
+      ref.read(speechRecordingControllerProvider.notifier).clearRecording();
       return;
     }
 
@@ -665,7 +665,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
         ? const Duration(seconds: 10)
         : computed;
 
-    final controller = ref.read(shadowingRecordingControllerProvider.notifier);
+    final controller = ref.read(speechRecordingControllerProvider.notifier);
     controller.setMaxRecordingDuration(maxDuration);
 
     AppLogger.log('Shadowing', '开始录音: $promptId');
@@ -717,7 +717,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
         'Shadowing',
         '下一遍: ${nextRepeat + 1}/${state.totalRepeats}',
       );
-      ref.read(shadowingRecordingControllerProvider.notifier).clearRecording();
+      ref.read(speechRecordingControllerProvider.notifier).clearRecording();
       state = state.copyWith(
         repeatIndex: nextRepeat,
         recordingPath: null,
@@ -758,7 +758,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     ref.read(audioEngineProvider.notifier).pause();
     _countdown.cancel();
     final recController = ref.read(
-      shadowingRecordingControllerProvider.notifier,
+      speechRecordingControllerProvider.notifier,
     );
     recController.cancelActiveRecording();
     recController.clearRecording();

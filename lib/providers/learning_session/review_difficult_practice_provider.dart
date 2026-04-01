@@ -25,7 +25,7 @@ import '../audio_engine/audio_engine_provider.dart';
 import '../learned_vocabulary_tracker_provider.dart';
 import '../../services/app_logger.dart';
 import '../learning_progress_provider.dart';
-import '../listen_and_repeat_turn_controller_provider.dart';
+import '../speech/speech_recording_controller.dart';
 import 'countdown_controller.dart';
 import 'learning_session_provider.dart';
 import 'sentence_playback_engine.dart';
@@ -227,7 +227,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
 
     // 注入 recorder 到录音控制器
     ref
-        .read(shadowingRecordingControllerProvider.notifier)
+        .read(speechRecordingControllerProvider.notifier)
         .setRecorder(_recorder);
   }
 
@@ -578,7 +578,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
 
   /// 释放资源
   void disposePlayer() {
-    ref.read(shadowingRecordingControllerProvider.notifier).setRecorder(null);
+    ref.read(speechRecordingControllerProvider.notifier).setRecorder(null);
     _engine.cleanup();
     _sentences = [];
     state = const ReviewDifficultPracticeState();
