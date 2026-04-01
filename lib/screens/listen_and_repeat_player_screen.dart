@@ -22,6 +22,7 @@ import '../utils/wakelock_mixin.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
+import '../providers/learning_session/listen_and_repeat_coordinator_provider.dart';
 import '../providers/learning_session/listen_and_repeat_player_provider.dart';
 import '../providers/listening_practice/bookmark_manager.dart';
 import '../providers/listen_and_repeat_turn_controller_provider.dart';
@@ -74,9 +75,6 @@ class _ListenAndRepeatPlayerScreenState
   /// 是否正在显示完成弹窗，防止重复弹窗
   bool _isShowingDialog = false;
 
-  /// 用户手动停止了录音（评估后倒计时 +2s）
-  bool _manualStoppedRecording = false;
-
   /// 录音回放服务
   final AudioPlaybackService _playbackService = AudioPlaybackService();
 
@@ -97,6 +95,12 @@ class _ListenAndRepeatPlayerScreenState
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 激活协调 Provider + 设置 audioItemId
+      final coordinator = ref.read(
+        listenAndRepeatCoordinatorProvider.notifier,
+      );
+      coordinator.setAudioItemId(widget.audioItemId);
+
       // 同步初始控制模式到录音控制器
       final settings = ref.read(listenAndRepeatPlayerProvider).settings;
       ref
@@ -121,29 +125,6 @@ class _ListenAndRepeatPlayerScreenState
     return 'shadowing:${widget.audioItemId}:$sentenceIndex';
   }
 
-  /// 更新录音相关阈值
-  void _updateRecordingThresholds() {
-    final player = ref.read(listenAndRepeatPlayerProvider.notifier);
-    final currentSentence = player.currentSentence;
-    if (currentSentence == null) return;
-
-    final controller = ref.read(shadowingRecordingControllerProvider.notifier);
-    final sentenceDuration = currentSentence.duration;
-
-    // 跟读场景最大录音时长：max(2.5 × sentenceDuration + 5s, 10s)
-    final computed = sentenceDuration * 2.5 + const Duration(seconds: 5);
-    final maxRecording = computed < const Duration(seconds: 10)
-        ? const Duration(seconds: 10)
-        : computed;
-
-    AppLogger.log(
-      'ShadowScreen',
-      '更新阈值: '
-          '最大录音=${maxRecording.inMilliseconds}ms',
-    );
-    controller.setMaxRecordingDuration(maxRecording);
-  }
-
   /// 处理录音按钮点击
   Future<void> _handleRecordTap() async {
     final playerState = ref.read(listenAndRepeatPlayerProvider);
@@ -158,7 +139,9 @@ class _ListenAndRepeatPlayerScreenState
     final promptId = _currentPromptId();
     if (recState.isRecordingPrompt(promptId)) {
       AppLogger.log('ShadowScreen', '手动停止录音 → 评估后倒计时 +2s');
-      _manualStoppedRecording = true;
+      ref
+          .read(listenAndRepeatCoordinatorProvider.notifier)
+          .markManualStoppedRecording();
       await controller.stopAndEvaluate(referenceText: currentSentence.text);
       return;
     }
@@ -172,7 +155,14 @@ class _ListenAndRepeatPlayerScreenState
     }
 
     AppLogger.log('ShadowScreen', '手动开始录音: 句子${player.currentIndex + 1}');
-    _updateRecordingThresholds();
+    // 设置录音阈值：max(2.5 × sentenceDuration + 5s, 10s)
+    final computed =
+        currentSentence.duration * 2.5 + const Duration(seconds: 5);
+    controller.setMaxRecordingDuration(
+      computed < const Duration(seconds: 10)
+          ? const Duration(seconds: 10)
+          : computed,
+    );
     await controller.startRecording(
       promptId: promptId,
       referenceText: currentSentence.text,
@@ -518,22 +508,14 @@ class _ListenAndRepeatPlayerScreenState
     );
     final turnState = ref.read(shadowingRecordingControllerProvider);
 
-    // 监听句子切换 + 自动播完信号
+    // 激活协调 Provider（句子切换、自动录音、评估倒计时等逻辑在此处理）
+    ref.watch(listenAndRepeatCoordinatorProvider);
+
+    // 监听自然完成信号 → 触发完成弹窗（涉及 UI，保留在 Screen）
     ref.listen<ListenAndRepeatPlayerState>(listenAndRepeatPlayerProvider, (
       prev,
       next,
     ) {
-      // 句子切换时清除上一句的录音结果
-      if (prev != null &&
-          prev.currentSentenceIndex != next.currentSentenceIndex) {
-        _manualStoppedRecording = false;
-        final controller = ref.read(
-          shadowingRecordingControllerProvider.notifier,
-        );
-        controller.setManualMode(next.settings.isManualMode);
-        controller.clearRecording();
-      }
-      // 监听自然完成信号 → 触发完成弹窗
       if (prev != null && !_isExiting) {
         if (!prev.stepFinished && next.stepFinished) {
           ref.read(learningSessionProvider.notifier).pauseStudyTimer();
@@ -542,113 +524,6 @@ class _ListenAndRepeatPlayerScreenState
         }
       }
     });
-
-    // 评估完成 → 启动 review countdown
-    ref.listen<ListenAndRepeatTurnState>(shadowingRecordingControllerProvider, (
-      prev,
-      next,
-    ) {
-      if (prev?.phase == ListenAndRepeatTurnPhase.processing &&
-          next.phase == ListenAndRepeatTurnPhase.idle &&
-          next.currentAttempt != null) {
-        final latestState = ref.read(listenAndRepeatPlayerProvider);
-        if (latestState.isPauseBetweenPlays &&
-            !latestState.settings.isManualMode &&
-            !latestState.isCountdownSuspended) {
-          final extra = _manualStoppedRecording
-              ? const Duration(seconds: 2)
-              : Duration.zero;
-          _manualStoppedRecording = false;
-          AppLogger.log(
-            'ShadowScreen',
-            '评估完成 → 启动 review countdown (extra=${extra.inSeconds}s)',
-          );
-          ref
-              .read(listenAndRepeatPlayerProvider.notifier)
-              .startPostEvaluationPause(extraDuration: extra);
-        }
-      }
-    });
-
-    // controlMode 切换 → 同步到录音控制器
-    ref.listen<ListenAndRepeatPlayerState>(listenAndRepeatPlayerProvider, (
-      prev,
-      next,
-    ) {
-      if (prev?.settings.controlMode != next.settings.controlMode) {
-        final controller = ref.read(
-          shadowingRecordingControllerProvider.notifier,
-        );
-        controller.setManualMode(next.settings.isManualMode);
-        // 切入手动模式时取消正在进行的自动录音
-        if (next.settings.isManualMode) {
-          final recState = ref.read(shadowingRecordingControllerProvider);
-          if (recState.phase == ListenAndRepeatTurnPhase.awaitingSpeech ||
-              recState.phase == ListenAndRepeatTurnPhase.speaking) {
-            controller.cancelActiveRecording();
-          }
-        }
-      }
-    });
-
-    // 自动模式录音触发（对应复述页面的 !state.isRetellCountdown）：
-    // 停顿中 + 未完成 + 非手动模式 + recording idle + 非倒计时中 + 本句未手动停止过
-    AppLogger.log(
-      'ShadowScreen',
-      'build 自动录音检查: pause=${playerState.isPauseBetweenPlays}, globalManual=${playerState.settings.isManualMode}, recPhase=${turnState.phase.name}, postEval=${playerState.isPostEvalCountdown}, suspended=${playerState.isCountdownSuspended}',
-    );
-    if (playerState.isPauseBetweenPlays &&
-        !playerState.settings.isManualMode &&
-        turnState.phase == ListenAndRepeatTurnPhase.idle &&
-        !playerState.isPostEvalCountdown &&
-        !playerState.isCountdownSuspended) {
-      final currentSentence = player.currentSentence;
-      if (currentSentence != null) {
-        final promptId = _currentPromptId();
-        final referenceText = currentSentence.text;
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          final latestRecState = ref.read(shadowingRecordingControllerProvider);
-          if (latestRecState.phase != ListenAndRepeatTurnPhase.idle) {
-            AppLogger.log(
-              'ShadowScreen',
-              '⏭ 自动录音跳过: phase=${latestRecState.phase.name}',
-            );
-            return;
-          }
-          final latestState = ref.read(listenAndRepeatPlayerProvider);
-          if (!latestState.isPauseBetweenPlays) {
-            AppLogger.log('ShadowScreen', '⏭ 自动录音跳过: 不在停顿中');
-            return;
-          }
-          if (latestState.isCountdownSuspended) {
-            AppLogger.log('ShadowScreen', '⏭ 自动录音跳过: 倒计时已挂起');
-            return;
-          }
-
-          // 暂停 player 层倒计时（录音由 ShadowingRecordingController 接管）
-          if (!latestState.isCountdownPaused) {
-            ref.read(listenAndRepeatPlayerProvider.notifier).pauseCountdown();
-          }
-
-          AppLogger.log(
-            'ShadowScreen',
-            '自动开始录音: '
-                '句子${latestState.currentSentenceIndex + 1}',
-          );
-          _updateRecordingThresholds();
-          unawaited(
-            ref
-                .read(shadowingRecordingControllerProvider.notifier)
-                .startRecording(
-                  promptId: promptId,
-                  referenceText: referenceText,
-                ),
-          );
-        });
-      }
-    }
 
     final currentSentence = player.currentSentence;
     final currentPromptId = _currentPromptId();
