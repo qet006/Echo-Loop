@@ -17,9 +17,15 @@ class AudioPlaybackService {
   StreamSubscription<PlayerState>? _playerStateSub;
   String? _currentFilePath;
   Completer<void>? _playCompleter;
+  final StreamController<bool> _isPlayingController =
+      StreamController<bool>.broadcast();
 
   /// 当前是否正在播放。
   bool get isPlaying => _player?.playing ?? false;
+
+  // TODO: 等其他页面迁移到新架构后删除，改用 play() 返回的 Future
+  /// 播放状态流（其他页面使用）。
+  Stream<bool> get isPlayingStream => _isPlayingController.stream;
 
   /// 当前播放的文件路径。
   String? get currentFilePath => _currentFilePath;
@@ -35,6 +41,7 @@ class AudioPlaybackService {
 
     final player = await _ensurePlayer();
     _currentFilePath = filePath;
+    _isPlayingController.add(true);
     await player.setFilePath(filePath);
     await player.play();
 
@@ -46,12 +53,14 @@ class AudioPlaybackService {
   Future<void> stop() async {
     if (_player == null) {
       _currentFilePath = null;
+      _isPlayingController.add(false);
       _playCompleter?.complete();
       _playCompleter = null;
       return;
     }
     await _player!.stop();
     _currentFilePath = null;
+    _isPlayingController.add(false);
     _playCompleter?.complete();
     _playCompleter = null;
   }
@@ -67,6 +76,7 @@ class AudioPlaybackService {
     _currentFilePath = null;
     _playCompleter?.complete();
     _playCompleter = null;
+    await _isPlayingController.close();
   }
 
   /// 懒初始化播放器。
@@ -78,6 +88,7 @@ class AudioPlaybackService {
     _playerStateSub = player.playerStateStream.listen((playerState) {
       if (playerState.processingState == ProcessingState.completed) {
         _currentFilePath = null;
+        _isPlayingController.add(false);
         _playCompleter?.complete();
         _playCompleter = null;
       }
