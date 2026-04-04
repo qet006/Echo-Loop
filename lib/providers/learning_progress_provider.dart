@@ -621,7 +621,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
   /// - 首次学习阶段：保留原有子步骤；
   /// - review0：旧 blindListen/listenAndRepeat/retell 都归一到难句补练或段落复述；
   /// - 中间轮：旧 listenAndRepeat -> 难句补练，旧 retell -> 段落复述；
-  /// - 末轮 review28：旧 retell -> 全文总结复述。
+  /// - 末轮 review28：旧 retell -> 全文复述。
   SubStageType _normalizeSubStageForStage({
     required LearningStage stage,
     required String rawSubStageKey,

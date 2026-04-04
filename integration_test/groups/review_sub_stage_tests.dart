@@ -63,8 +63,8 @@ void reviewSubStageTests() {
 
       // review0 是当前阶段，默认已展开，无需点击
       // 验证 2 个复习子步骤名称
-      expect(find.text('Difficult sentence practice'), findsOneWidget);
-      expect(find.text('Paragraph retelling'), findsOneWidget);
+      expect(find.text('Difficult Sentence Practice'), findsOneWidget);
+      expect(find.text('Paragraph Retelling'), findsOneWidget);
 
       // 验证底部按钮显示"Continue Learning"
       expect(find.text('Continue Learning'), findsOneWidget);
@@ -191,8 +191,8 @@ void reviewSubStageTests() {
       // review1 是当前阶段，默认已展开，无需点击
       // 验证 3 个子步骤名称（review0 已完成也可能展开，故可能出现多个同名步骤）
       expect(find.text('Blind Listening'), findsWidgets);
-      expect(find.text('Difficult sentence practice'), findsWidgets);
-      expect(find.text('Paragraph retelling'), findsWidgets);
+      expect(find.text('Difficult Sentence Practice'), findsWidgets);
+      expect(find.text('Paragraph Retelling'), findsWidgets);
     });
 
     testWidgets('难句补练页面基本 UI', (tester) async {

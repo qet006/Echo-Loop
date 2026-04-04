@@ -44,7 +44,7 @@ enum SubStageType {
   /// 复习：段落复述
   reviewRetellParagraph('reviewRetellParagraph'),
 
-  /// 复习：全文总结复述（3-5句话概述大意）
+  /// 复习：全文复述（3-5句话概述大意）
   reviewRetellSummary('reviewRetellSummary');
 
   const SubStageType(this.key);
@@ -60,7 +60,7 @@ enum SubStageType {
     retell => '段落复述',
     reviewDifficultPractice => '难句补练',
     reviewRetellParagraph => '段落复述',
-    reviewRetellSummary => '全文总结复述',
+    reviewRetellSummary => '全文复述',
   };
 
   /// 从字符串键创建枚举

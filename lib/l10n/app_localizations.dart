@@ -965,7 +965,7 @@ abstract class AppLocalizations {
   /// No description provided for @stepRetelling.
   ///
   /// In en, this message translates to:
-  /// **'Retelling'**
+  /// **'Paragraph Retelling'**
   String get stepRetelling;
 
   /// No description provided for @stepRetellingDesc.

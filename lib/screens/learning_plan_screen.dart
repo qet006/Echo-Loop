@@ -231,7 +231,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         if (difficultDuration == Duration.zero) return null;
         return difficultDuration * 2;
       case SubStageType.reviewRetellSummary:
-        // 全文总结复述 = 音频时长 × 4（听 + 停顿复述）
+        // 全文复述 = 音频时长 × 4（听 + 停顿复述）
         final totalDuration = ref.read(audioEngineProvider).totalDuration;
         return totalDuration != null ? totalDuration * 4 : null;
       default:
@@ -1745,7 +1745,7 @@ class _ReviewRoundSection extends ConsumerWidget {
       SubStageType.reviewRetellParagraph => _StepData(
         icon: Icons.chat,
         iconColor: Colors.teal,
-        name: isZh ? '段落复述' : 'Paragraph retelling',
+        name: isZh ? '段落复述' : 'Paragraph Retelling',
         description: isZh
             ? '再次复述，提升理解和表达能力'
             : 'Retell again to improve comprehension and expression',
@@ -1753,10 +1753,10 @@ class _ReviewRoundSection extends ConsumerWidget {
       SubStageType.reviewRetellSummary => _StepData(
         icon: Icons.summarize,
         iconColor: Colors.cyan,
-        name: isZh ? '全文总结复述' : 'Summary retelling',
+        name: isZh ? '全文复述' : 'Full Text Retelling',
         description: isZh
-            ? '用几句话总结全文，看看要点抓住了没'
-            : 'Summarize the full text in a few sentences to check your grasp of the key points',
+            ? '概述全文，梳理整体脉络，检验学习效果'
+            : 'Summarize the full text, grasp its overall flow, and check how well you have learned it.',
       ),
     };
   }
@@ -1821,7 +1821,7 @@ class _ReviewRoundSection extends ConsumerWidget {
     }
   }
 
-  /// 进入自由练习复述模式（段落复述 / 全文总结复述）
+  /// 进入自由练习复述模式（段落复述 / 全文复述）
   Future<void> _startFreePlayRetell(
     BuildContext context,
     WidgetRef ref, {
@@ -1831,7 +1831,7 @@ class _ReviewRoundSection extends ConsumerWidget {
     if (lpState.sentences.isEmpty) return;
 
     if (isSummary) {
-      // 全文总结复述：全文作为单个段落，无需选择时长
+      // 全文复述：全文作为单个段落，无需选择时长
       final keywordsMap = extractKeywords(
         lpState.sentences,
         ratio: KeywordRatio.oneThird,

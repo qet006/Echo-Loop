@@ -463,7 +463,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stepShadowingDesc => 'Repeat weak sentences over and over';
 
   @override
-  String get stepRetelling => 'Retelling';
+  String get stepRetelling => 'Paragraph Retelling';
 
   @override
   String get stepRetellingDesc =>

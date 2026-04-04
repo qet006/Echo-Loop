@@ -206,7 +206,7 @@
   "stepIntensiveListeningDesc": "Listen sentence by sentence, understand and mark difficult ones",
   "stepShadowing": "Listen & Repeat",
   "stepShadowingDesc": "Repeat weak sentences over and over",
-  "stepRetelling": "Retelling",
+  "stepRetelling": "Paragraph Retelling",
   "stepRetellingDesc": "Retell the gist of each paragraph in English",
   "reviewRound0": "Review 1",
   "reviewRound1": "Review 2",

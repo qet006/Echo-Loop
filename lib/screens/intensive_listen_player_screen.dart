@@ -860,7 +860,7 @@ String _getSubStageName(SubStageType type, AppLocalizations l10n) =>
       SubStageType.intensiveListen => l10n.stepIntensiveListening,
       SubStageType.listenAndRepeat => l10n.stepShadowing,
       SubStageType.retell => l10n.stepRetelling,
-      SubStageType.reviewDifficultPractice => 'Difficult practice',
-      SubStageType.reviewRetellParagraph => 'Paragraph retelling',
-      SubStageType.reviewRetellSummary => 'Summary retelling',
+      SubStageType.reviewDifficultPractice => 'Difficult Practice',
+      SubStageType.reviewRetellParagraph => 'Paragraph Retelling',
+      SubStageType.reviewRetellSummary => 'Full Text Retelling',
     };

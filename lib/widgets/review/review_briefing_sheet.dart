@@ -176,9 +176,9 @@ String _titleForSubStage(
   return switch (subStage) {
     SubStageType.blindListen => l10n.stepBlindListening,
     SubStageType.reviewDifficultPractice =>
-      isZh ? '难句补练' : 'Difficult sentence practice',
-    SubStageType.reviewRetellParagraph => isZh ? '段落复述' : 'Paragraph retelling',
-    SubStageType.reviewRetellSummary => isZh ? '全文总结复述' : 'Summary retelling',
+      isZh ? '难句补练' : 'Difficult Sentence Practice',
+    SubStageType.reviewRetellParagraph => isZh ? '段落复述' : 'Paragraph Retelling',
+    SubStageType.reviewRetellSummary => isZh ? '全文复述' : 'Full Text Retelling',
     SubStageType.intensiveListen => l10n.stepIntensiveListening,
     SubStageType.listenAndRepeat => l10n.stepShadowing,
     SubStageType.retell => l10n.stepRetelling,
