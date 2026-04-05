@@ -82,90 +82,92 @@ class _DifficultPracticeSettingsSheet extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            // 拖拽条
-            Center(
-              child: Container(
-                width: 32,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: AppSpacing.m),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurfaceVariant.withValues(
-                    alpha: 0.4,
+              // 拖拽条
+              Center(
+                child: Container(
+                  width: 32,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.m),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurfaceVariant.withValues(
+                      alpha: 0.4,
+                    ),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ),
 
-            // 标题
-            Text(
-              l10n.difficultPracticeSettings,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-
-            // 临时提示
-            Text(
-              l10n.difficultPracticeSettingsHint,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.l),
-
-            // 控制模式
-            _buildControlModeSection(l10n, theme, settings, ref),
-
-            // 自动模式才显示循环次数和停顿设置
-            if (!settings.isManualMode) ...[
-              const SizedBox(height: AppSpacing.l),
-
-              // 盲听循环次数
-              _buildRepeatRow(
-                label: l10n.difficultPracticeBlindListenRepeat,
-                value: settings.blindListenRepeatCount,
-                l10n: l10n,
-                theme: theme,
-                onChanged: (value) => onUpdate(
-                  ref,
-                  settings.copyWith(blindListenRepeatCount: value),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.m),
-
-              // 跟读循环次数
-              _buildRepeatRow(
-                label: l10n.difficultPracticeShadowReadingRepeat,
-                value: settings.shadowReadingRepeatCount,
-                l10n: l10n,
-                theme: theme,
-                onChanged: (value) => onUpdate(
-                  ref,
-                  settings.copyWith(shadowReadingRepeatCount: value),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.l),
-
-              // 句间停顿
+              // 标题
               Text(
-                l10n.intensiveListenPauseLabel,
-                style: theme.textTheme.titleSmall?.copyWith(
+                l10n.difficultPracticeSettings,
+                style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: AppSpacing.s),
+              const SizedBox(height: AppSpacing.xs),
 
-              // 模式切换
-              _buildPauseModeSelector(l10n, settings, ref),
-              const SizedBox(height: AppSpacing.m),
+              // 临时提示
+              Text(
+                l10n.difficultPracticeSettingsHint,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.6,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.l),
 
-              // 模式详情
-              _buildPauseModeDetail(l10n, theme, settings, ref),
+              // 控制模式
+              _buildControlModeSection(l10n, theme, settings, ref),
+
+              // 自动模式才显示循环次数和停顿设置
+              if (!settings.isManualMode) ...[
+                const SizedBox(height: AppSpacing.l),
+
+                // 盲听循环次数
+                _buildRepeatRow(
+                  label: l10n.difficultPracticeBlindListenRepeat,
+                  value: settings.blindListenRepeatCount,
+                  l10n: l10n,
+                  theme: theme,
+                  onChanged: (value) => onUpdate(
+                    ref,
+                    settings.copyWith(blindListenRepeatCount: value),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.m),
+
+                // 跟读循环次数
+                _buildRepeatRow(
+                  label: l10n.difficultPracticeShadowReadingRepeat,
+                  value: settings.shadowReadingRepeatCount,
+                  l10n: l10n,
+                  theme: theme,
+                  onChanged: (value) => onUpdate(
+                    ref,
+                    settings.copyWith(shadowReadingRepeatCount: value),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.l),
+
+                // 句间停顿
+                Text(
+                  l10n.intensiveListenPauseLabel,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.s),
+
+                // 模式切换
+                _buildPauseModeSelector(l10n, settings, ref),
+                const SizedBox(height: AppSpacing.m),
+
+                // 模式详情
+                _buildPauseModeDetail(l10n, theme, settings, ref),
+              ],
             ],
-          ],
-        ),
+          ),
         ),
       ),
     );
@@ -215,8 +217,8 @@ class _DifficultPracticeSettingsSheet extends ConsumerWidget {
           children: [
             Icon(
               Icons.info_outline,
-              size: 16,
-              color: theme.colorScheme.onSurfaceVariant,
+              size: 14,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
             ),
             const SizedBox(width: AppSpacing.xs),
             Expanded(
@@ -224,8 +226,10 @@ class _DifficultPracticeSettingsSheet extends ConsumerWidget {
                 settings.isManualMode
                     ? l10n.listenAndRepeatControlModeManualDesc
                     : l10n.listenAndRepeatControlModeAutoDesc,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.6,
+                  ),
                 ),
               ),
             ),
@@ -309,15 +313,17 @@ class _DifficultPracticeSettingsSheet extends ConsumerWidget {
           children: [
             Icon(
               Icons.info_outline,
-              size: 16,
-              color: theme.colorScheme.onSurfaceVariant,
+              size: 14,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
             ),
             const SizedBox(width: AppSpacing.xs),
             Expanded(
               child: Text(
                 l10n.intensiveListenPauseSmartDesc,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.6,
+                  ),
                 ),
               ),
             ),
@@ -341,9 +347,7 @@ class _DifficultPracticeSettingsSheet extends ConsumerWidget {
                 label: '${options[idx]}s',
                 onChanged: (v) => onUpdate(
                   ref,
-                  settings.copyWith(
-                    fixedPauseSeconds: options[v.round()],
-                  ),
+                  settings.copyWith(fixedPauseSeconds: options[v.round()]),
                 ),
               ),
             ),

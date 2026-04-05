@@ -72,8 +72,10 @@ class _ListenAndRepeatSettingsSheet extends ConsumerWidget {
             // 临时提示
             Text(
               l10n.listenAndRepeatSettingsTemporaryHint,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.6,
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.l),
@@ -147,9 +149,7 @@ class _ListenAndRepeatSettingsSheet extends ConsumerWidget {
             onSelectionChanged: (selected) {
               ref
                   .read(listenAndRepeatSettingsProvider.notifier)
-                  .update(
-                    settings.copyWith(controlMode: selected.first),
-                  );
+                  .update(settings.copyWith(controlMode: selected.first));
             },
             showSelectedIcon: false,
           ),
@@ -159,8 +159,8 @@ class _ListenAndRepeatSettingsSheet extends ConsumerWidget {
           children: [
             Icon(
               Icons.info_outline,
-              size: 16,
-              color: theme.colorScheme.onSurfaceVariant,
+              size: 14,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
             ),
             const SizedBox(width: AppSpacing.xs),
             Expanded(
@@ -168,8 +168,10 @@ class _ListenAndRepeatSettingsSheet extends ConsumerWidget {
                 settings.isManualMode
                     ? l10n.listenAndRepeatControlModeManualDesc
                     : l10n.listenAndRepeatControlModeAutoDesc,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.6,
+                  ),
                 ),
               ),
             ),
@@ -258,15 +260,17 @@ class _ListenAndRepeatSettingsSheet extends ConsumerWidget {
           children: [
             Icon(
               Icons.info_outline,
-              size: 16,
-              color: theme.colorScheme.onSurfaceVariant,
+              size: 14,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
             ),
             const SizedBox(width: AppSpacing.xs),
             Expanded(
               child: Text(
                 l10n.listenAndRepeatPauseSmartDesc,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.6,
+                  ),
                 ),
               ),
             ),
@@ -337,9 +341,7 @@ class _ListenAndRepeatSettingsSheet extends ConsumerWidget {
                 if (value != null) {
                   ref
                       .read(listenAndRepeatSettingsProvider.notifier)
-                      .update(
-                        settings.copyWith(pauseMultiplier: value),
-                      );
+                      .update(settings.copyWith(pauseMultiplier: value));
                 }
               },
             ),

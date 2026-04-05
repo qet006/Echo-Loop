@@ -74,8 +74,10 @@ class _IntensiveListenSettingsSheet extends ConsumerWidget {
             // 临时提示
             Text(
               l10n.intensiveListenSettingsTemporaryHint,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.6,
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.l),
@@ -147,7 +149,9 @@ class _IntensiveListenSettingsSheet extends ConsumerWidget {
             ],
             selected: {settings.controlMode},
             onSelectionChanged: (selected) {
-              ref.read(intensiveListenPlayerProvider.notifier).updateSettings(
+              ref
+                  .read(intensiveListenPlayerProvider.notifier)
+                  .updateSettings(
                     settings.copyWith(controlMode: selected.first),
                   );
             },
@@ -159,8 +163,8 @@ class _IntensiveListenSettingsSheet extends ConsumerWidget {
           children: [
             Icon(
               Icons.info_outline,
-              size: 16,
-              color: theme.colorScheme.onSurfaceVariant,
+              size: 14,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
             ),
             const SizedBox(width: AppSpacing.xs),
             Expanded(
@@ -168,8 +172,10 @@ class _IntensiveListenSettingsSheet extends ConsumerWidget {
                 settings.isManualMode
                     ? l10n.intensiveListenControlModeManualDesc
                     : l10n.intensiveListenControlModeAutoDesc,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.6,
+                  ),
                 ),
               ),
             ),
@@ -258,15 +264,17 @@ class _IntensiveListenSettingsSheet extends ConsumerWidget {
           children: [
             Icon(
               Icons.info_outline,
-              size: 16,
-              color: theme.colorScheme.onSurfaceVariant,
+              size: 14,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
             ),
             const SizedBox(width: AppSpacing.xs),
             Expanded(
               child: Text(
                 l10n.intensiveListenPauseSmartDesc,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.6,
+                  ),
                 ),
               ),
             ),

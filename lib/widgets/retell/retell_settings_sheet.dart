@@ -39,7 +39,10 @@ class _RetellSettingsSheet extends ConsumerWidget {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
-          AppSpacing.l, AppSpacing.s, AppSpacing.l, AppSpacing.l,
+          AppSpacing.l,
+          AppSpacing.s,
+          AppSpacing.l,
+          AppSpacing.l,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -72,8 +75,10 @@ class _RetellSettingsSheet extends ConsumerWidget {
             // 本次生效提示
             Text(
               l10n.settingsSessionOnly,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.6,
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.l),
@@ -114,33 +119,35 @@ class _RetellSettingsSheet extends ConsumerWidget {
             SizedBox(
               width: double.infinity,
               child: SegmentedButton<KeywordMethod>(
-              showSelectedIcon: false,
-              segments: [
-                ButtonSegment(
-                  value: KeywordMethod.off,
-                  label: Text(l10n.retellKeywordMethodOff),
-                ),
-                ButtonSegment(
-                  value: KeywordMethod.random,
-                  label: Text(l10n.retellKeywordMethodRandom),
-                ),
-                // TODO: AI 关键词提取功能尚未实现，暂时隐藏
-                // ButtonSegment(
-                //   value: KeywordMethod.ai,
-                //   label: Tooltip(
-                //     message: l10n.retellKeywordMethodAiComingSoon,
-                //     child: Text(l10n.retellKeywordMethodAi),
-                //   ),
-                //   enabled: false,
-                // ),
-              ],
-              selected: {settings.keywordMethod},
-              onSelectionChanged: (selected) {
-                ref.read(retellPlayerProvider.notifier).updateSettings(
-                      settings.copyWith(keywordMethod: selected.first),
-                    );
-              },
-            ),
+                showSelectedIcon: false,
+                segments: [
+                  ButtonSegment(
+                    value: KeywordMethod.off,
+                    label: Text(l10n.retellKeywordMethodOff),
+                  ),
+                  ButtonSegment(
+                    value: KeywordMethod.random,
+                    label: Text(l10n.retellKeywordMethodRandom),
+                  ),
+                  // TODO: AI 关键词提取功能尚未实现，暂时隐藏
+                  // ButtonSegment(
+                  //   value: KeywordMethod.ai,
+                  //   label: Tooltip(
+                  //     message: l10n.retellKeywordMethodAiComingSoon,
+                  //     child: Text(l10n.retellKeywordMethodAi),
+                  //   ),
+                  //   enabled: false,
+                  // ),
+                ],
+                selected: {settings.keywordMethod},
+                onSelectionChanged: (selected) {
+                  ref
+                      .read(retellPlayerProvider.notifier)
+                      .updateSettings(
+                        settings.copyWith(keywordMethod: selected.first),
+                      );
+                },
+              ),
             ),
 
             // 可见词比例（关闭时隐藏）
@@ -202,7 +209,9 @@ class _RetellSettingsSheet extends ConsumerWidget {
             ],
             selected: {settings.controlMode},
             onSelectionChanged: (selected) {
-              ref.read(retellPlayerProvider.notifier).updateSettings(
+              ref
+                  .read(retellPlayerProvider.notifier)
+                  .updateSettings(
                     settings.copyWith(controlMode: selected.first),
                   );
             },
@@ -214,8 +223,8 @@ class _RetellSettingsSheet extends ConsumerWidget {
           children: [
             Icon(
               Icons.info_outline,
-              size: 16,
-              color: theme.colorScheme.onSurfaceVariant,
+              size: 14,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
             ),
             const SizedBox(width: AppSpacing.xs),
             Expanded(
@@ -223,8 +232,10 @@ class _RetellSettingsSheet extends ConsumerWidget {
                 settings.isManualMode
                     ? l10n.listenAndRepeatControlModeManualDesc
                     : l10n.listenAndRepeatControlModeAutoDesc,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.6,
+                  ),
                 ),
               ),
             ),
@@ -255,16 +266,13 @@ class _RetellSettingsSheet extends ConsumerWidget {
           underline: const SizedBox.shrink(),
           items: List.generate(5, (i) {
             final count = i + 1;
-            return DropdownMenuItem(
-              value: count,
-              child: Text('$count'),
-            );
+            return DropdownMenuItem(value: count, child: Text('$count'));
           }),
           onChanged: (value) {
             if (value != null) {
-              ref.read(retellPlayerProvider.notifier).updateSettings(
-                    settings.copyWith(repeatCount: value),
-                  );
+              ref
+                  .read(retellPlayerProvider.notifier)
+                  .updateSettings(settings.copyWith(repeatCount: value));
             }
           },
         ),
@@ -298,9 +306,9 @@ class _RetellSettingsSheet extends ConsumerWidget {
         ],
         selected: {settings.pauseMode},
         onSelectionChanged: (selected) {
-          ref.read(retellPlayerProvider.notifier).updateSettings(
-                settings.copyWith(pauseMode: selected.first),
-              );
+          ref
+              .read(retellPlayerProvider.notifier)
+              .updateSettings(settings.copyWith(pauseMode: selected.first));
         },
       ),
     );
@@ -315,33 +323,34 @@ class _RetellSettingsSheet extends ConsumerWidget {
   ) {
     return switch (settings.pauseMode) {
       PauseMode.smart => Row(
-          children: [
-            Icon(
-              Icons.info_outline,
-              size: 16,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            Expanded(
-              child: Text(
-                l10n.listenAndRepeatPauseSmartDesc,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 14,
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              l10n.listenAndRepeatPauseSmartDesc,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.6,
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
       PauseMode.fixed => _buildFixedPauseSlider(theme, settings, ref),
       PauseMode.multiplier => _buildChipGrid(
-          items: RetellSettings.multiplierOptions,
-          labelBuilder: (v) =>
-              v == v.roundToDouble() ? '${v.toInt()}x' : '${v}x',
-          selected: (v) => settings.pauseMultiplier == v,
-          onSelected: (v) => ref
-              .read(retellPlayerProvider.notifier)
-              .updateSettings(settings.copyWith(pauseMultiplier: v)),
-        ),
+        items: RetellSettings.multiplierOptions,
+        labelBuilder: (v) => v == v.roundToDouble() ? '${v.toInt()}x' : '${v}x',
+        selected: (v) => settings.pauseMultiplier == v,
+        onSelected: (v) => ref
+            .read(retellPlayerProvider.notifier)
+            .updateSettings(settings.copyWith(pauseMultiplier: v)),
+      ),
     };
   }
 
@@ -364,10 +373,10 @@ class _RetellSettingsSheet extends ConsumerWidget {
             divisions: options.length - 1,
             label: '${options[idx]}s',
             onChanged: (v) {
-              ref.read(retellPlayerProvider.notifier).updateSettings(
-                    settings.copyWith(
-                      fixedPauseSeconds: options[v.round()],
-                    ),
+              ref
+                  .read(retellPlayerProvider.notifier)
+                  .updateSettings(
+                    settings.copyWith(fixedPauseSeconds: options[v.round()]),
                   );
             },
           ),

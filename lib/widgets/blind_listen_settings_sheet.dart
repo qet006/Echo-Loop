@@ -39,7 +39,10 @@ class _BlindListenSettingsSheet extends ConsumerWidget {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
-          AppSpacing.l, AppSpacing.s, AppSpacing.l, AppSpacing.l,
+          AppSpacing.l,
+          AppSpacing.s,
+          AppSpacing.l,
+          AppSpacing.l,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -72,8 +75,10 @@ class _BlindListenSettingsSheet extends ConsumerWidget {
             // 本次生效提示
             Text(
               l10n.settingsSessionOnly,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.6,
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.l),
@@ -202,7 +207,9 @@ class _BlindListenSettingsSheet extends ConsumerWidget {
             ],
             selected: {settings.controlMode},
             onSelectionChanged: (selected) {
-              ref.read(blindListenPlayerProvider.notifier).updateSettings(
+              ref
+                  .read(blindListenPlayerProvider.notifier)
+                  .updateSettings(
                     settings.copyWith(controlMode: selected.first),
                   );
             },
@@ -214,8 +221,8 @@ class _BlindListenSettingsSheet extends ConsumerWidget {
           children: [
             Icon(
               Icons.info_outline,
-              size: 16,
-              color: theme.colorScheme.onSurfaceVariant,
+              size: 14,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
             ),
             const SizedBox(width: AppSpacing.xs),
             Expanded(
@@ -223,8 +230,10 @@ class _BlindListenSettingsSheet extends ConsumerWidget {
                 settings.isManualMode
                     ? l10n.blindListenControlModeManualDesc
                     : l10n.blindListenControlModeAutoDesc,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.6,
+                  ),
                 ),
               ),
             ),
@@ -243,69 +252,70 @@ class _BlindListenSettingsSheet extends ConsumerWidget {
   ) {
     return switch (settings.pauseMode) {
       PauseMode.smart => Row(
-          children: [
-            Icon(
-              Icons.info_outline,
-              size: 16,
-              color: theme.colorScheme.onSurfaceVariant,
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 14,
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              l10n.listenAndRepeatPauseSmartDesc,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.6,
+                ),
+              ),
             ),
-            const SizedBox(width: AppSpacing.xs),
+          ),
+        ],
+      ),
+      PauseMode.multiplier => _buildChipGrid(
+        items: BlindListenSettings.multiplierOptions,
+        labelBuilder: (v) => v == v.roundToDouble() ? '${v.toInt()}x' : '${v}x',
+        selected: (v) => settings.pauseMultiplier == v,
+        onSelected: (v) => ref
+            .read(blindListenPlayerProvider.notifier)
+            .updateSettings(settings.copyWith(pauseMultiplier: v)),
+      ),
+      PauseMode.fixed => () {
+        final options = BlindListenSettings.fixedPauseOptions;
+        var idx = options.indexOf(settings.fixedPauseSeconds);
+        if (idx < 0) idx = 2; // 回退到 15s
+        return Row(
+          children: [
             Expanded(
+              child: Slider(
+                value: idx.toDouble(),
+                min: 0,
+                max: (options.length - 1).toDouble(),
+                divisions: options.length - 1,
+                label: '${options[idx]}s',
+                onChanged: (v) {
+                  ref
+                      .read(blindListenPlayerProvider.notifier)
+                      .updateSettings(
+                        settings.copyWith(
+                          fixedPauseSeconds: options[v.round()],
+                        ),
+                      );
+                },
+              ),
+            ),
+            SizedBox(
+              width: 36,
               child: Text(
-                l10n.listenAndRepeatPauseSmartDesc,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                '${settings.fixedPauseSeconds}s',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           ],
-        ),
-      PauseMode.multiplier => _buildChipGrid(
-          items: BlindListenSettings.multiplierOptions,
-          labelBuilder: (v) =>
-              v == v.roundToDouble() ? '${v.toInt()}x' : '${v}x',
-          selected: (v) => settings.pauseMultiplier == v,
-          onSelected: (v) => ref
-              .read(blindListenPlayerProvider.notifier)
-              .updateSettings(settings.copyWith(pauseMultiplier: v)),
-        ),
-      PauseMode.fixed => () {
-          final options = BlindListenSettings.fixedPauseOptions;
-          var idx = options.indexOf(settings.fixedPauseSeconds);
-          if (idx < 0) idx = 2; // 回退到 15s
-          return Row(
-            children: [
-              Expanded(
-                child: Slider(
-                  value: idx.toDouble(),
-                  min: 0,
-                  max: (options.length - 1).toDouble(),
-                  divisions: options.length - 1,
-                  label: '${options[idx]}s',
-                  onChanged: (v) {
-                    ref
-                        .read(blindListenPlayerProvider.notifier)
-                        .updateSettings(
-                          settings.copyWith(
-                            fixedPauseSeconds: options[v.round()],
-                          ),
-                        );
-                  },
-                ),
-              ),
-              SizedBox(
-                width: 36,
-                child: Text(
-                  '${settings.fixedPauseSeconds}s',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          );
-        }(),
+        );
+      }(),
     };
   }
 

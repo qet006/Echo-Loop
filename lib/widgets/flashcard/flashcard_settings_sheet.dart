@@ -88,8 +88,10 @@ class _FlashcardSettingsSheetState extends State<FlashcardSettingsSheet> {
             // 副标题
             Text(
               l10n.flashcardSettingsSubtitle,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.6,
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.l),
@@ -132,7 +134,9 @@ class _FlashcardSettingsSheetState extends State<FlashcardSettingsSheet> {
                   ? l10n.flashcardControlModeManualDesc
                   : l10n.flashcardControlModeAutoDesc,
               style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.6,
+                ),
               ),
             ),
 
@@ -176,7 +180,9 @@ class _FlashcardSettingsSheetState extends State<FlashcardSettingsSheet> {
                     ? l10n.flashcardTimerSmartDesc
                     : l10n.flashcardTimerFixedDesc,
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.6,
+                  ),
                 ),
               ),
 
@@ -188,9 +194,7 @@ class _FlashcardSettingsSheetState extends State<FlashcardSettingsSheet> {
                   label: l10n.flashcardTimerFrontDuration,
                   value: _settings.fixedTimerSeconds,
                   onChanged: (value) {
-                    _update(
-                      _settings.copyWith(fixedTimerSeconds: value),
-                    );
+                    _update(_settings.copyWith(fixedTimerSeconds: value));
                   },
                 ),
                 const SizedBox(height: AppSpacing.xs),
@@ -199,13 +203,10 @@ class _FlashcardSettingsSheetState extends State<FlashcardSettingsSheet> {
                   label: l10n.flashcardTimerBackDuration,
                   value: _settings.fixedTimerBackSeconds,
                   onChanged: (value) {
-                    _update(
-                      _settings.copyWith(fixedTimerBackSeconds: value),
-                    );
+                    _update(_settings.copyWith(fixedTimerBackSeconds: value));
                   },
                 ),
               ],
-
             ],
 
             const SizedBox(height: AppSpacing.l),
@@ -290,7 +291,9 @@ class _FlashcardSettingsSheetState extends State<FlashcardSettingsSheet> {
                 FlashcardSortMode.timeDesc => l10n.flashcardSortTimeDescDesc,
               },
               style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.6,
+                ),
               ),
             ),
 
@@ -373,7 +376,8 @@ class _TimerSlider extends StatelessWidget {
             value: value.toDouble(),
             min: FlashcardSettings.fixedTimerOptions.first.toDouble(),
             max: FlashcardSettings.fixedTimerOptions.last.toDouble(),
-            divisions: FlashcardSettings.fixedTimerOptions.last -
+            divisions:
+                FlashcardSettings.fixedTimerOptions.last -
                 FlashcardSettings.fixedTimerOptions.first,
             label: '${value}s',
             onChanged: (v) => onChanged(v.round()),

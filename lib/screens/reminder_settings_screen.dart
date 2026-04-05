@@ -46,9 +46,10 @@ class ReminderSettingsScreen extends ConsumerWidget {
                   iconColor: colorScheme.primary,
                   title: l10n.savedReviewReminderToggle,
                   value: settings.savedReviewReminderEnabled,
-                  onChanged: (v) => _update(ref, settings.copyWith(
-                    savedReviewReminderEnabled: v,
-                  )),
+                  onChanged: (v) => _update(
+                    ref,
+                    settings.copyWith(savedReviewReminderEnabled: v),
+                  ),
                 ),
                 // 开关开启时显示时间选择
                 if (settings.savedReviewReminderEnabled) ...[
@@ -56,9 +57,7 @@ class ReminderSettingsScreen extends ConsumerWidget {
                   _TimeRow(
                     title: l10n.savedReviewReminderTime,
                     formattedTime: settings.formattedTime,
-                    onTap: () => _showTimePickerSheet(
-                      context, ref, settings,
-                    ),
+                    onTap: () => _showTimePickerSheet(context, ref, settings),
                   ),
                 ],
               ],
@@ -77,9 +76,8 @@ class ReminderSettingsScreen extends ConsumerWidget {
               iconColor: colorScheme.primary,
               title: l10n.audioReviewReminderToggle,
               value: settings.perAudioReminderEnabled,
-              onChanged: (v) => _update(ref, settings.copyWith(
-                perAudioReminderEnabled: v,
-              )),
+              onChanged: (v) =>
+                  _update(ref, settings.copyWith(perAudioReminderEnabled: v)),
             ),
           ),
           _DescriptionText(text: l10n.audioReviewReminderDescription),
@@ -99,7 +97,9 @@ class ReminderSettingsScreen extends ConsumerWidget {
     ReminderSettings settings,
   ) async {
     var selectedHour = settings.savedReviewReminderHour;
-    var selectedMinuteIndex = _nearestMinuteIndex(settings.savedReviewReminderMinute);
+    var selectedMinuteIndex = _nearestMinuteIndex(
+      settings.savedReviewReminderMinute,
+    );
 
     await showModalBottomSheet<void>(
       context: context,
@@ -122,12 +122,14 @@ class ReminderSettingsScreen extends ConsumerWidget {
     final newMinute = _minuteOptions[selectedMinuteIndex];
     if (selectedHour != settings.savedReviewReminderHour ||
         newMinute != settings.savedReviewReminderMinute) {
-      ref.read(reminderSettingsNotifierProvider.notifier).update(
-        settings.copyWith(
-          savedReviewReminderHour: selectedHour,
-          savedReviewReminderMinute: newMinute,
-        ),
-      );
+      ref
+          .read(reminderSettingsNotifierProvider.notifier)
+          .update(
+            settings.copyWith(
+              savedReviewReminderHour: selectedHour,
+              savedReviewReminderMinute: newMinute,
+            ),
+          );
     }
   }
 
@@ -159,7 +161,10 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.m, AppSpacing.s, AppSpacing.m, AppSpacing.s,
+        AppSpacing.m,
+        AppSpacing.s,
+        AppSpacing.m,
+        AppSpacing.s,
       ),
       child: Text(
         title,
@@ -253,13 +258,17 @@ class _DescriptionText extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.m + AppSpacing.xs, AppSpacing.s,
-        AppSpacing.m, 0,
+        AppSpacing.m + AppSpacing.xs,
+        AppSpacing.s,
+        AppSpacing.m,
+        0,
       ),
       child: Text(
         text,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: Theme.of(
+            context,
+          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
         ),
       ),
     );
@@ -299,9 +308,7 @@ class _TimePickerSheetState extends State<_TimePickerSheet> {
     super.initState();
     _selectedHour = widget.initialHour;
     _selectedMinuteIndex = widget.initialMinuteIndex;
-    _hourController = FixedExtentScrollController(
-      initialItem: _selectedHour,
-    );
+    _hourController = FixedExtentScrollController(initialItem: _selectedHour);
     _minuteController = FixedExtentScrollController(
       initialItem: _selectedMinuteIndex,
     );
@@ -322,7 +329,10 @@ class _TimePickerSheetState extends State<_TimePickerSheet> {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
-          AppSpacing.l, AppSpacing.s, AppSpacing.l, AppSpacing.l,
+          AppSpacing.l,
+          AppSpacing.s,
+          AppSpacing.l,
+          AppSpacing.l,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -371,7 +381,8 @@ class _TimePickerSheetState extends State<_TimePickerSheet> {
                           onSelectedItemChanged: (index) {
                             setState(() => _selectedHour = index);
                             widget.onChanged(
-                              _selectedHour, _selectedMinuteIndex,
+                              _selectedHour,
+                              _selectedMinuteIndex,
                             );
                           },
                           itemBuilder: (_, index) => Center(
@@ -383,8 +394,9 @@ class _TimePickerSheetState extends State<_TimePickerSheet> {
                                     : FontWeight.w400,
                                 color: index == _selectedHour
                                     ? colorScheme.onSurface
-                                    : colorScheme.onSurface
-                                        .withValues(alpha: 0.35),
+                                    : colorScheme.onSurface.withValues(
+                                        alpha: 0.35,
+                                      ),
                               ),
                             ),
                           ),
@@ -414,22 +426,22 @@ class _TimePickerSheetState extends State<_TimePickerSheet> {
                           onSelectedItemChanged: (index) {
                             setState(() => _selectedMinuteIndex = index);
                             widget.onChanged(
-                              _selectedHour, _selectedMinuteIndex,
+                              _selectedHour,
+                              _selectedMinuteIndex,
                             );
                           },
                           itemBuilder: (_, index) => Center(
                             child: Text(
-                              _minuteOptions[index]
-                                  .toString()
-                                  .padLeft(2, '0'),
+                              _minuteOptions[index].toString().padLeft(2, '0'),
                               style: theme.textTheme.titleLarge?.copyWith(
                                 fontWeight: index == _selectedMinuteIndex
                                     ? FontWeight.w600
                                     : FontWeight.w400,
                                 color: index == _selectedMinuteIndex
                                     ? colorScheme.onSurface
-                                    : colorScheme.onSurface
-                                        .withValues(alpha: 0.35),
+                                    : colorScheme.onSurface.withValues(
+                                        alpha: 0.35,
+                                      ),
                               ),
                             ),
                           ),
