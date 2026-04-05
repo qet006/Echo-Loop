@@ -24,6 +24,7 @@ import '../screens/listen_and_repeat_player_screen.dart';
 import '../screens/retell_player_screen.dart';
 import '../screens/review_difficult_practice_screen.dart';
 import '../screens/bookmark_review_screen.dart';
+import '../screens/bookmark_sentence_detail_screen.dart';
 import '../screens/flashcard_screen.dart';
 import '../screens/activity_calendar_screen.dart';
 import 'main_shell.dart';
@@ -96,6 +97,9 @@ abstract class AppRoutes {
 
   /// 收藏句子复习页路径
   static const bookmarkReview = '/bookmark-review';
+
+  /// 收藏句子详情页路径（单句精听）
+  static const bookmarkSentenceDetail = '/bookmark-sentence-detail';
 
   /// Flashcard 单词卡片复习页路径
   static const flashcard = '/flashcard';
@@ -177,6 +181,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/bookmark-review',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const BookmarkReviewScreen(),
+      ),
+      // 收藏句子详情（单句精听，全屏）
+      GoRoute(
+        path: '/bookmark-sentence-detail',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final args = state.extra! as BookmarkSentenceDetailArgs;
+          return BookmarkSentenceDetailScreen(args: args);
+        },
       ),
       // Flashcard 单词卡片复习（全屏）
       GoRoute(

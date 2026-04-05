@@ -4,10 +4,10 @@
 /// 通过 SegmentedButton 在句子/单词视图间切换。
 library;
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../database/app_database.dart';
 import '../database/daos/bookmark_dao.dart';
@@ -15,7 +15,7 @@ import '../database/providers.dart';
 import '../l10n/app_localizations.dart';
 import '../models/audio_item.dart' as model;
 import '../models/dict_entry.dart';
-import '../models/sentence_ai_result.dart';
+import '../screens/bookmark_sentence_detail_screen.dart';
 import '../providers/audio_engine/audio_engine_provider.dart';
 import '../services/tts_service.dart';
 import '../providers/flashcard/flashcard_provider.dart';
@@ -23,14 +23,11 @@ import '../providers/learning_session/bookmark_review_provider.dart';
 import '../models/flashcard_item.dart';
 import '../providers/saved_sense_group_provider.dart';
 import '../providers/saved_word_provider.dart';
-import '../providers/sentence_ai_provider.dart';
 import '../services/dictionary_service.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
-import '../widgets/common/ai_content_section.dart';
 import '../widgets/favorites/sentence_recycle_bin_sheet.dart';
 import '../widgets/favorites/vocabulary_recycle_bin_sheet.dart';
-import '../widgets/intensive_listen/word_dictionary_sheet.dart';
 
 /// 收藏页面视图模式
 enum _FavoritesView { sentences, words }
@@ -217,7 +214,7 @@ class _FloatingSentenceReviewButton extends ConsumerWidget {
     if (validBookmarks.isEmpty) return const SizedBox.shrink();
 
     return _FloatingReviewButton(
-      icon: Icons.headphones,
+      icon: Symbols.exercise,
       label: AppLocalizations.of(
         context,
       )!.bookmarkReviewStartCount(validBookmarks.length),
@@ -402,7 +399,7 @@ class _AudioBookmarkGroup extends ConsumerWidget {
               width: 32,
               height: 32,
               child: IconButton(
-                icon: const Icon(Icons.headphones, size: 18),
+                icon: const Icon(Symbols.exercise, size: 18),
                 color: theme.colorScheme.primary,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -434,6 +431,7 @@ class _AudioBookmarkGroup extends ConsumerWidget {
             _BookmarkSentenceTile(
               bookmark: bookmarks[i].bookmark,
               audioId: audioId,
+              audioName: audioName,
             ),
           ],
         ],
@@ -446,8 +444,13 @@ class _AudioBookmarkGroup extends ConsumerWidget {
 class _BookmarkSentenceTile extends ConsumerStatefulWidget {
   final Bookmark bookmark;
   final String audioId;
+  final String audioName;
 
-  const _BookmarkSentenceTile({required this.bookmark, required this.audioId});
+  const _BookmarkSentenceTile({
+    required this.bookmark,
+    required this.audioId,
+    required this.audioName,
+  });
 
   @override
   ConsumerState<_BookmarkSentenceTile> createState() =>
@@ -456,22 +459,6 @@ class _BookmarkSentenceTile extends ConsumerStatefulWidget {
 
 class _BookmarkSentenceTileState extends ConsumerState<_BookmarkSentenceTile> {
   bool _isPlaying = false;
-  bool _isExpanded = false;
-  final List<TapGestureRecognizer> _recognizers = [];
-
-  @override
-  void dispose() {
-    for (final r in _recognizers) {
-      r.dispose();
-    }
-    super.dispose();
-  }
-
-  String _formatTime(double seconds) {
-    final m = seconds ~/ 60;
-    final s = (seconds % 60).toInt();
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
 
   /// 播放该句子的原声片段
   Future<void> _playSentence() async {
@@ -535,51 +522,22 @@ class _BookmarkSentenceTileState extends ConsumerState<_BookmarkSentenceTile> {
     }
   }
 
-  /// 构建可点击单词的 InlineSpan 列表
-  List<InlineSpan> _buildWordSpans(ThemeData theme) {
-    for (final r in _recognizers) {
-      r.dispose();
-    }
-    _recognizers.clear();
-
-    final words = widget.bookmark.sentenceText.split(RegExp(r'(\s+)'));
-    return words.map((word) {
-      if (word.trim().isEmpty) {
-        return TextSpan(text: word);
-      }
-      final recognizer = TapGestureRecognizer()
-        ..onTap = () {
-          final cleanWord = word.replaceAll(RegExp(r'[.,!?;:\-—…、，。！？；：]'), '');
-          if (cleanWord.isNotEmpty) {
-            showWordDictionarySheet(
-              context: context,
-              word: cleanWord,
-              audioItemId: widget.audioId,
-              sentenceIndex: widget.bookmark.sentenceIndex,
-              sentenceText: widget.bookmark.sentenceText,
-              sentenceStartMs: (widget.bookmark.startTime * 1000).round(),
-              sentenceEndMs: (widget.bookmark.endTime * 1000).round(),
-            );
-          }
-        };
-      _recognizers.add(recognizer);
-      return TextSpan(text: '$word ', recognizer: recognizer);
-    }).toList();
+  /// 跳转到句子详情页（单句精听）
+  void _openDetail() {
+    context.push(
+      AppRoutes.bookmarkSentenceDetail,
+      extra: BookmarkSentenceDetailArgs(
+        bookmark: widget.bookmark,
+        audioId: widget.audioId,
+        audioName: widget.audioName,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context)!;
     final bm = widget.bookmark;
-
-    // 从 AI 缓存获取已有内容
-    final ai = ref.read(sentenceAiNotifierProvider);
-    final cachedTranslation = ai
-        .getCachedTranslation(bm.sentenceText)
-        ?.translation;
-    final cachedAnalysis = ai.getCachedAnalysis(bm.sentenceText);
-    final cachedAnalysisText = cachedAnalysis?.toDisplayString();
 
     // 提前捕获 DAO，避免 Dismissible 销毁 widget 后 ref 失效
     final bookmarkDao = ref.read(bookmarkDaoProvider);
@@ -596,157 +554,46 @@ class _BookmarkSentenceTileState extends ConsumerState<_BookmarkSentenceTile> {
       onDismissed: (_) {
         bookmarkDao.removeBookmark(widget.audioId, bm.sentenceIndex);
       },
-      child: Column(
-        children: [
-          // 主行：播放按钮 + 句子文本 + 展开箭头
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s,
-            ),
-            leading: IconButton(
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              icon: Icon(
-                _isPlaying
-                    ? Icons.stop_circle_outlined
-                    : Icons.play_circle_outline,
-                size: 28,
-              ),
-              color: _isPlaying
-                  ? theme.colorScheme.error
-                  : theme.colorScheme.primary,
-              onPressed: _playSentence,
-            ),
-            title: _isExpanded
-                ? RichText(
-                    text: TextSpan(
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        height: 1.6,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                      children: _buildWordSpans(theme),
-                    ),
-                  )
-                : Text(
-                    bm.sentenceText,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium,
-                  ),
-            subtitle: Text(
-              '${_formatTime(bm.startTime)} - ${_formatTime(bm.endTime)}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            trailing: Icon(
-              _isExpanded ? Icons.expand_less : Icons.expand_more,
-              size: 20,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s,
+        ),
+        leading: IconButton(
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+          icon: Icon(
+            _isPlaying
+                ? Icons.stop_circle_outlined
+                : Icons.play_circle_outline,
+            size: 28,
+          ),
+          color: _isPlaying
+              ? theme.colorScheme.error
+              : theme.colorScheme.primary,
+          onPressed: _playSentence,
+        ),
+        title: Text(
+          bm.sentenceText,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodyMedium,
+        ),
+        trailing: SizedBox(
+          width: 40,
+          height: 40,
+          child: IconButton(
+            padding: EdgeInsets.zero,
+            icon: Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
               color: theme.colorScheme.onSurfaceVariant,
             ),
-            onTap: () => setState(() => _isExpanded = !_isExpanded),
+            onPressed: _openDetail,
           ),
-
-          // 展开内容：可点击单词 + AI 翻译 + AI 解析
-          if (_isExpanded)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.m,
-                0,
-                AppSpacing.m,
-                AppSpacing.m,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // AI 翻译
-                  AiContentSection(
-                    icon: Icons.translate,
-                    title: l10n.aiTranslation,
-                    cachedContent: cachedTranslation,
-                    onRequest: () async {
-                      final result = await ai.getTranslation(bm.sentenceText);
-                      return result.translation;
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.s),
-
-                  // AI 解析
-                  AiContentSection(
-                    icon: Icons.auto_awesome,
-                    title: l10n.aiAnalysis,
-                    cachedContent: cachedAnalysisText,
-                    onRequest: () async {
-                      final result = await ai.getAnalysis(bm.sentenceText);
-                      return result.toDisplayString();
-                    },
-                    contentBuilder: (content) =>
-                        _AnalysisContent(content: content),
-                  ),
-                ],
-              ),
-            ),
-        ],
+        ),
+        onTap: _playSentence,
       ),
     );
-  }
-}
-
-/// 解析内容结构化展示（复用精听页面的 3 段式布局）
-///
-/// 使用 [SentenceAnalysis.parseDisplayString] 按字段分隔符拆分，
-/// vocabulary 和 listening 字段内按 `\n` 拆分为多条并加 bullet。
-class _AnalysisContent extends StatelessWidget {
-  final String content;
-
-  const _AnalysisContent({required this.content});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context)!;
-    final fields = SentenceAnalysis.parseDisplayString(content);
-    final labels = [l10n.aiGrammar, l10n.aiVocabulary, l10n.aiListening];
-
-    final bodyStyle = theme.textTheme.bodySmall?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-      height: 1.5,
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (var i = 0; i < fields.length && i < labels.length; i++) ...[
-          if (i > 0) const SizedBox(height: AppSpacing.s),
-          Text(
-            labels[i],
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 2),
-          if (i == 0)
-            Text(fields[i], style: bodyStyle)
-          else
-            ..._buildBulletItems(fields[i], bodyStyle),
-        ],
-      ],
-    );
-  }
-
-  List<Widget> _buildBulletItems(String field, TextStyle? style) {
-    final items = field.split('\n').where((s) => s.trim().isNotEmpty).toList();
-    if (items.length <= 1) {
-      return [Text(field, style: style)];
-    }
-    return [
-      for (final item in items)
-        Padding(
-          padding: const EdgeInsets.only(left: 4),
-          child: Text('· $item', style: style),
-        ),
-    ];
   }
 }
 
