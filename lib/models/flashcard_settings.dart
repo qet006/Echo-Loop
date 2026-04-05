@@ -189,10 +189,10 @@ class FlashcardSettings {
     return overdue.clamp(0.0, _maxOverdue);
   }
 
-  /// 2 的整数次幂（避免 dart:math 依赖）
+  /// 2 的整数次幂，clamp 到 30 防止整数溢出
   static double _pow2(int exponent) {
-    if (exponent <= 0) return 1.0;
-    return (1 << exponent).toDouble();
+    final e = exponent.clamp(0, 30);
+    return (1 << e).toDouble();
   }
 
   /// 解析控制模式：非法值回退 auto

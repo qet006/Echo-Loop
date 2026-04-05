@@ -529,19 +529,56 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   }
 
   /// 重新开始（再来一遍）
+  ///
+  /// 从 DB 重新读取最新数据重建 FlashcardItem 列表，确保
+  /// practiceCount / lastPracticedAt 等字段反映本轮练习结果。
   Future<void> reset() async {
     _countdown.cancel();
-    // [DEBUG] reset 时检查内存中 items 是否已更新
-    debugPrint('[FLASHCARD] reset: ${state.words.length} items');
-    for (var i = 0; i < state.words.length && i < 5; i++) {
-      final it = state.words[i];
-      debugPrint('[FLASHCARD]   reset [$i] ${it.displayText}: '
-          'practiceCount=${it.practiceCount}, '
-          'lastPracticedAt=${it.lastPracticedAt}');
-    }
     // 先保存已累计时间
     await _saveAndRefreshStudyTime();
-    await initialize(state.words);
+
+    // 从 DB 重新读取最新数据
+    final freshItems = await _refreshItemsFromDb();
+    await initialize(freshItems);
+  }
+
+  /// 从 DB 重新读取当前闪卡列表的最新数据
+  ///
+  /// 根据现有 items 的 dbKey 集合，从 DAO 获取最新记录并重建 FlashcardItem。
+  Future<List<FlashcardItem>> _refreshItemsFromDb() async {
+    final wordKeys = <String>{};
+    final phraseKeys = <String>{};
+    for (final item in state.words) {
+      switch (item) {
+        case FlashcardWordItem():
+          wordKeys.add(item.dbKey);
+        case FlashcardPhraseItem():
+          phraseKeys.add(item.dbKey);
+      }
+    }
+
+    final items = <FlashcardItem>[];
+
+    if (wordKeys.isNotEmpty) {
+      final allWords = await ref.read(savedWordDaoProvider).getAll();
+      for (final w in allWords) {
+        if (wordKeys.contains(w.word)) {
+          items.add(FlashcardWordItem(savedWord: w));
+        }
+      }
+    }
+
+    if (phraseKeys.isNotEmpty) {
+      final allPhrases =
+          await ref.read(savedSenseGroupDaoProvider).watchAll().first;
+      for (final p in allPhrases) {
+        if (phraseKeys.contains(p.phraseText)) {
+          items.add(FlashcardPhraseItem(savedPhrase: p));
+        }
+      }
+    }
+
+    return items;
   }
 
   /// 释放资源
@@ -727,7 +764,10 @@ class FlashcardNotifier extends _$FlashcardNotifier {
             practiceCount: b.practiceCount,
             lastPracticedAt: b.lastPracticedAt,
           );
-          return scoreB.compareTo(scoreA);
+          final cmp = scoreB.compareTo(scoreA);
+          // 分数相同时按收藏时间降序，保证排序稳定
+          if (cmp != 0) return cmp;
+          return b.createdAt.compareTo(a.createdAt);
         });
     }
     return sorted;
