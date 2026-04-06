@@ -175,3 +175,12 @@ flutter test integration_test -d macos
 - **规则**：识别回调的 error 分支**不做资源清理**，资源清理统一由 stop/cancel/shutdown 发起
 - **相关代码**：`ios/Runner/AppDelegate.swift` → `IOSSpeechPracticeHandler`
 - **修复时间**：2026-03-27
+
+### 7.2 flutter_tts：快速 stop→speak 导致 awaitSpeakCompletion 失效
+
+- **现象**：闪卡快速切换单词时，TTS 在 3-9ms 内"完成"（实际还在朗读），倒计时和 TTS 声音同时出现
+- **根因**：`_tts.stop()` 触发平台两个响应：① method channel result（解除 await）② cancel handler（异步到达）。cancel handler 在新 `speak()` 的 Completer 创建后才到达，错误地完成了新的 Completer。平台层报错 `Message responses can be sent only once`
+- **解法**：不依赖 `awaitSpeakCompletion`，改用自管理 Completer + `setStartHandler` 标志。start handler 到达前的 completion/cancel 回调视为 stale 直接忽略。method channel FIFO 保证顺序：旧 cancel → 新 start → 新 completion
+- **规则**：TTS 的 stop 和 speak 之间不能依赖 flutter_tts 内部的完成信号隔离，必须自行管理
+- **相关代码**：`lib/services/tts_service.dart`
+- **修复时间**：2026-04-06

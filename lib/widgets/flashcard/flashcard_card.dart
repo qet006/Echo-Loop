@@ -26,6 +26,9 @@ import '../common/text_context_menu.dart';
 
 /// Flashcard 翻转卡片
 class FlashcardCard extends StatefulWidget {
+  /// 翻转动画时长
+  static const flipDuration = Duration(milliseconds: 400);
+
   /// 卡片数据
   final FlashcardItem item;
 
@@ -65,7 +68,7 @@ class _FlashcardCardState extends State<FlashcardCard>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: FlashcardCard.flipDuration,
     );
     _animation = Tween<double>(
       begin: 0,

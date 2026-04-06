@@ -173,10 +173,7 @@ void main() {
 
   group('背面自动流程', () {
     test('TTS + Sentence → Countdown', () async {
-      unawaited(h.engine.startBackAutoPlay(
-        word: 'hello',
-        hasSentence: true,
-      ));
+      unawaited(h.engine.startBackAutoPlay(word: 'hello', hasSentence: true));
       await Future<void>.delayed(Duration.zero);
 
       // TTS 播放中
@@ -197,10 +194,7 @@ void main() {
     });
 
     test('无例句 → TTS → Countdown（跳过 PlayingSentence）', () async {
-      unawaited(h.engine.startBackAutoPlay(
-        word: 'hello',
-        hasSentence: false,
-      ));
+      unawaited(h.engine.startBackAutoPlay(word: 'hello', hasSentence: false));
       await Future<void>.delayed(Duration.zero);
 
       // TTS
@@ -216,10 +210,7 @@ void main() {
       h.autoPlaySentence = false;
       h.syncConfig();
 
-      unawaited(h.engine.startBackAutoPlay(
-        word: 'hello',
-        hasSentence: true,
-      ));
+      unawaited(h.engine.startBackAutoPlay(word: 'hello', hasSentence: true));
       await Future<void>.delayed(Duration.zero);
 
       h.tts.completeSpeaking();
@@ -235,10 +226,7 @@ void main() {
       h.autoPlaySentence = false;
       h.syncConfig();
 
-      unawaited(h.engine.startBackAutoPlay(
-        word: 'hello',
-        hasSentence: false,
-      ));
+      unawaited(h.engine.startBackAutoPlay(word: 'hello', hasSentence: false));
       await Future<void>.delayed(const Duration(milliseconds: 1200));
 
       expect(h.autoNextCount, 1);
@@ -275,10 +263,7 @@ void main() {
     });
 
     test('PlayingSentence 中 enterWaitingForUser → WaitingForUser', () async {
-      unawaited(h.engine.startBackAutoPlay(
-        word: 'hello',
-        hasSentence: true,
-      ));
+      unawaited(h.engine.startBackAutoPlay(word: 'hello', hasSentence: true));
       await Future<void>.delayed(Duration.zero);
       h.tts.completeSpeaking();
       await Future<void>.delayed(Duration.zero);
@@ -464,10 +449,7 @@ void main() {
       h.manualMode = true;
       h.syncConfig();
 
-      unawaited(h.engine.startBackAutoPlay(
-        word: 'hello',
-        hasSentence: true,
-      ));
+      unawaited(h.engine.startBackAutoPlay(word: 'hello', hasSentence: true));
       await Future<void>.delayed(Duration.zero);
 
       // TTS 播放
@@ -524,10 +506,7 @@ void main() {
     });
 
     test('句子播放中翻转不中断播放', () async {
-      unawaited(h.engine.startBackAutoPlay(
-        word: 'hello',
-        hasSentence: true,
-      ));
+      unawaited(h.engine.startBackAutoPlay(word: 'hello', hasSentence: true));
       await Future<void>.delayed(Duration.zero);
       h.tts.completeSpeaking();
       await Future<void>.delayed(Duration.zero);
@@ -593,10 +572,7 @@ void main() {
 
     test('userFlipCard 使背面自动流程的后续步骤失效', () async {
       // 背面 TTS 播放中
-      unawaited(h.engine.startBackAutoPlay(
-        word: 'hello',
-        hasSentence: true,
-      ));
+      unawaited(h.engine.startBackAutoPlay(word: 'hello', hasSentence: true));
       await Future<void>.delayed(Duration.zero);
       expect(h.phase, isA<FlashcardPlayingTts>());
 
@@ -613,10 +589,7 @@ void main() {
 
     test('userFlipCard 使背面句子播放后的倒计时失效', () async {
       // 背面句子播放中
-      unawaited(h.engine.startBackAutoPlay(
-        word: 'hello',
-        hasSentence: true,
-      ));
+      unawaited(h.engine.startBackAutoPlay(word: 'hello', hasSentence: true));
       await Future<void>.delayed(Duration.zero);
       h.tts.completeSpeaking();
       await Future<void>.delayed(Duration.zero);
@@ -640,10 +613,7 @@ void main() {
       h.autoPlayWord = false;
       h.syncConfig();
 
-      unawaited(h.engine.startBackAutoPlay(
-        word: 'hello',
-        hasSentence: true,
-      ));
+      unawaited(h.engine.startBackAutoPlay(word: 'hello', hasSentence: true));
       await Future<void>.delayed(Duration.zero);
 
       // 跳过 TTS，直接句子
@@ -669,17 +639,13 @@ void main() {
       expect(h.sentencePlayer.callCount, 0);
     });
 
-    test('手动模式 + autoPlayWord=false + autoPlaySentence=false → 直接等待',
-        () async {
+    test('手动模式 + autoPlayWord=false + autoPlaySentence=false → 直接等待', () async {
       h.manualMode = true;
       h.autoPlayWord = false;
       h.autoPlaySentence = false;
       h.syncConfig();
 
-      unawaited(h.engine.startBackAutoPlay(
-        word: 'hello',
-        hasSentence: true,
-      ));
+      unawaited(h.engine.startBackAutoPlay(word: 'hello', hasSentence: true));
       await Future<void>.delayed(Duration.zero);
 
       // 什么都不播，直接等待
@@ -737,10 +703,7 @@ void main() {
       h.autoPlayWord = false;
       h.autoPlaySentence = false;
       h.syncConfig();
-      unawaited(h.engine.startBackAutoPlay(
-        word: 'hello',
-        hasSentence: false,
-      ));
+      unawaited(h.engine.startBackAutoPlay(word: 'hello', hasSentence: false));
       await Future<void>.delayed(Duration.zero);
       expect(h.state.isSentencePlaying, false);
     });
@@ -791,6 +754,223 @@ void main() {
       h.engine.userFlipCard();
       expect(h.state.isShowingBack, false);
       expect(h.phase, isA<FlashcardWaitingForUser>());
+    });
+  });
+
+  // ========== 卡片切换状态隔离 ==========
+
+  group('卡片切换状态隔离', () {
+    test('TTS 播放中切卡 → 新卡片 phase 不残留旧 TTS 状态', () async {
+      // 卡片 A：TTS 播放中
+      unawaited(h.engine.startCard(word: 'apple', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+      expect(h.phase, isA<FlashcardPlayingTts>());
+      expect(h.tts.lastWord, 'apple');
+
+      // 立即切到卡片 B（A 的 TTS 还没完成）
+      unawaited(h.engine.startCard(word: 'banana', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+
+      // B 应该在 PlayingTts，不是 A 的 PlayingTts
+      expect(h.phase, isA<FlashcardPlayingTts>());
+      expect(h.tts.lastWord, 'banana');
+
+      // A 的 TTS 回调返回 → 不应影响 B 的状态
+      h.tts.completeSpeaking();
+      await Future<void>.delayed(Duration.zero);
+
+      // B 的流程正常继续：TTS 完成 → Countdown
+      expect(h.phase, isA<FlashcardCountdown>());
+    });
+
+    test('倒计时中切卡 → 新卡片不显示旧倒计时', () async {
+      h.autoPlayWord = false;
+      h.syncConfig();
+
+      // 卡片 A：直接进入倒计时
+      unawaited(h.engine.startCard(word: 'apple', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+      expect(h.phase, isA<FlashcardCountdown>());
+
+      // 切到卡片 B
+      unawaited(h.engine.startCard(word: 'banana', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+
+      // B 应该有自己的倒计时，不是 A 的残留
+      expect(h.phase, isA<FlashcardCountdown>());
+      // flowToken 已递增，旧回调不会干扰
+      expect(h.state.flowToken, greaterThan(1));
+    });
+
+    test('倒计时中切卡 → 旧倒计时 tick 不更新新卡片 phase', () async {
+      h.autoPlayWord = false;
+      h.frontTimerSeconds = 3;
+      h.syncConfig();
+
+      // 卡片 A：进入倒计时（autoPlayWord=false → 直接倒计时）
+      unawaited(h.engine.startCard(word: 'apple', hasSentence: false));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(h.phase, isA<FlashcardCountdown>());
+      final tokenA = h.state.flowToken;
+
+      // 切到卡片 B（开启 autoPlayWord，B 会走 TTS 流程）
+      h.autoPlayWord = true;
+      h.syncConfig();
+      unawaited(h.engine.startCard(word: 'banana', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+      expect(h.state.flowToken, greaterThan(tokenA));
+
+      // 等待足够时间，确保 A 的旧 tick（如果有残留）不会干扰
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      // B 仍在 PlayingTts（TTS 还没完成），不应被 A 的倒计时干扰
+      expect(h.phase, isA<FlashcardPlayingTts>());
+      expect(h.tts.lastWord, 'banana');
+    });
+
+    test('背面句子播放中切卡 → 新卡片 phase 干净', () async {
+      // 卡片 A 背面：句子播放中
+      unawaited(h.engine.startBackAutoPlay(word: 'apple', hasSentence: true));
+      await Future<void>.delayed(Duration.zero);
+      h.tts.completeSpeaking();
+      await Future<void>.delayed(Duration.zero);
+      expect(h.phase, isA<FlashcardPlayingSentence>());
+
+      // 切到卡片 B
+      unawaited(h.engine.startCard(word: 'banana', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+
+      // B 应该在自己的 TTS 阶段
+      expect(h.phase, isA<FlashcardPlayingTts>());
+      expect(h.tts.lastWord, 'banana');
+      expect(h.state.isShowingBack, false);
+      expect(h.state.isSentencePlaying, false);
+
+      // A 的句子播放完成 → 不应影响 B
+      h.sentencePlayer.completePlayback();
+      await Future<void>.delayed(Duration.zero);
+      expect(h.phase, isA<FlashcardPlayingTts>());
+    });
+
+    test('正面倒计时到期后 → phase 立即清除为 Idle', () async {
+      h.autoPlayWord = false;
+      h.frontTimerSeconds = 1;
+      h.syncConfig();
+
+      unawaited(h.engine.startCard(word: 'apple', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+      expect(h.phase, isA<FlashcardCountdown>());
+
+      // 等待倒计时到期
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+
+      // 到期后 phase 应为 Idle（不再是 FlashcardCountdown）
+      expect(h.phase, isA<FlashcardIdle>());
+      expect(h.autoFlipCount, 1);
+    });
+
+    test('背面倒计时到期后 → phase 立即清除为 Idle', () async {
+      h.autoPlayWord = false;
+      h.autoPlaySentence = false;
+      h.backTimerSeconds = 1;
+      h.syncConfig();
+
+      unawaited(h.engine.startBackAutoPlay(word: 'apple', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+      expect(h.phase, isA<FlashcardCountdown>());
+
+      // 等待倒计时到期
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+
+      // 到期后 phase 应为 Idle
+      expect(h.phase, isA<FlashcardIdle>());
+      expect(h.autoNextCount, 1);
+    });
+
+    test('快速连续切卡 → 只有最后一张卡的流程在运行', () async {
+      // 快速切 3 张卡
+      unawaited(h.engine.startCard(word: 'a', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+      unawaited(h.engine.startCard(word: 'b', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+      unawaited(h.engine.startCard(word: 'c', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+
+      // 只有最后一张的 TTS 应该生效
+      expect(h.tts.lastWord, 'c');
+      expect(h.phase, isA<FlashcardPlayingTts>());
+
+      // 完成 TTS → 应该进入 C 的倒计时
+      h.tts.completeSpeaking();
+      await Future<void>.delayed(Duration.zero);
+      expect(h.phase, isA<FlashcardCountdown>());
+    });
+
+    test('切卡时 flowToken 递增 → 旧自动流程全部失效', () async {
+      unawaited(h.engine.startCard(word: 'apple', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+      final tokenA = h.state.flowToken;
+
+      unawaited(h.engine.startCard(word: 'banana', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+      final tokenB = h.state.flowToken;
+
+      expect(tokenB, greaterThan(tokenA));
+    });
+
+    test('WaitingForUser 中切卡 → 新卡片正常启动', () async {
+      // 卡片 A：进入 WaitingForUser
+      unawaited(h.engine.startCard(word: 'apple', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+      h.engine.enterWaitingForUser(FlashcardWaitingReason.userTappedCountdown);
+      expect(h.phase, isA<FlashcardWaitingForUser>());
+
+      // 切到卡片 B
+      unawaited(h.engine.startCard(word: 'banana', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+
+      // B 正常启动，不残留 WaitingForUser
+      expect(h.phase, isA<FlashcardPlayingTts>());
+      expect(h.tts.lastWord, 'banana');
+      expect(h.state.isShowingBack, false);
+    });
+
+    test('userFlipCard 中切卡 → 翻转状态重置', () async {
+      h.autoPlayWord = false;
+      h.syncConfig();
+
+      // 卡片 A：翻到背面
+      unawaited(h.engine.startCard(word: 'apple', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+      h.engine.userFlipCard();
+      expect(h.state.isShowingBack, true);
+
+      // 切到卡片 B
+      unawaited(h.engine.startCard(word: 'banana', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+
+      // B 应该显示正面
+      expect(h.state.isShowingBack, false);
+      expect(h.phase, isA<FlashcardCountdown>());
+    });
+
+    test('isSentencePlaying 在切卡后重置', () async {
+      h.autoPlayWord = false;
+      h.syncConfig();
+
+      // 通过手动播放使 isSentencePlaying=true
+      unawaited(h.engine.startCard(word: 'apple', hasSentence: true));
+      await Future<void>.delayed(Duration.zero);
+      unawaited(h.engine.userToggleSentence());
+      await Future<void>.delayed(Duration.zero);
+      expect(h.state.isSentencePlaying, true);
+
+      // 切到卡片 B
+      unawaited(h.engine.startCard(word: 'banana', hasSentence: false));
+      await Future<void>.delayed(Duration.zero);
+
+      // isSentencePlaying 必须为 false
+      expect(h.state.isSentencePlaying, false);
     });
   });
 }

@@ -129,6 +129,11 @@ class FlashcardFlowEngine {
   }) async {
     if (_disposed) return;
 
+    AppLogger.log(
+      logTag,
+      '→ startCard("$word", oldToken=${_state.flowToken}, '
+      'oldPhase=${_state.phase.runtimeType})',
+    );
     _stopActiveResources();
     _updateState(
       FlashcardFlowState(
@@ -350,6 +355,11 @@ class FlashcardFlowEngine {
 
     final seconds = _config.getTimerSeconds(isBack: isBack);
     final total = Duration(seconds: seconds);
+    AppLogger.log(
+      logTag,
+      '→ Countdown(${isBack ? "back" : "front"}, ${seconds}s, '
+      'token=${_state.flowToken})',
+    );
     _updateState(
       _state.copyWith(
         phase: FlashcardCountdown(remaining: total, total: total),
@@ -375,6 +385,9 @@ class FlashcardFlowEngine {
 
   /// 倒计时到期
   void _onCountdownExpired(bool isBack) {
+    // 立即清除倒计时 phase，防止回调执行期间残留
+    _updateState(_state.copyWith(phase: const FlashcardIdle()));
+
     if (isBack) {
       // 背面到期 → 通知自动下一张
       AppLogger.log(logTag, '背面倒计时到期 → autoNext');

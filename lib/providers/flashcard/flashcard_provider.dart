@@ -27,6 +27,7 @@ import '../../services/app_logger.dart';
 import '../../services/dictionary_service.dart';
 import '../../services/study_time_service.dart';
 import '../../services/tts_service.dart';
+import '../../widgets/flashcard/flashcard_card.dart';
 import '../daily_study_time_provider.dart';
 import 'flashcard_flow_engine.dart';
 import 'flashcard_flow_phase.dart';
@@ -248,20 +249,32 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   /// 但不启动倒计时。
   Future<void> userFlipCard() async {
     if (state.isCompleted || state.words.isEmpty) return;
+    AppLogger.log(
+      'FC',
+      'userFlipCard: ${state.isShowingBack ? "back→front" : "front→back"}, '
+          'phase=${state.phase.runtimeType}, '
+          'word=${state.currentWord?.displayText}',
+    );
 
     final flippingToBack = !state.isShowingBack;
     if (flippingToBack) _recordPracticeStats();
 
     // 1. 先同步翻转 → UI 立即开始动画（不被平台通道阻塞）
     _engine.userFlipCard();
+    final token = _engine.state.flowToken;
     if (!flippingToBack) {
       state = state.copyWith(isSentencePlaying: false);
     }
 
-    // 2. 异步停止旧播放（不阻塞翻转动画）
-    await _stopAllPlayback();
+    // 2. 停止旧播放（不 await，避免平台通道阻塞动画帧）
+    // flowToken 已递增，旧播放回调会通过 token 检查自行丢弃
+    unawaited(_stopAllPlayback());
 
-    // 3. 自动播放新内容
+    // 3. 等待翻转动画完成后再播放
+    await Future<void>.delayed(FlashcardCard.flipDuration);
+    if (token != _engine.state.flowToken) return;
+
+    // 4. 自动播放新内容
     final item = state.currentWord;
     if (item != null) {
       await _autoPlayAfterFlip(item, flippingToBack);
@@ -277,9 +290,19 @@ class FlashcardNotifier extends _$FlashcardNotifier {
 
     // TTS 朗读单词
     if (state.settings.autoPlayWord) {
+      AppLogger.log(
+        'FC',
+        'flipTTS start: "${item.displayText}" (token=$token)',
+      );
       if (!_inputStopwatch.isRunning) _inputStopwatch.start();
       await TtsService.instance.speak(item.displayText);
       _inputStopwatch.stop();
+      AppLogger.log(
+        'FC',
+        'flipTTS done: "${item.displayText}" (token=$token, '
+            'current=${_engine.state.flowToken}, '
+            'stale=${token != _engine.state.flowToken})',
+      );
       if (token != _engine.state.flowToken) return;
       await _addInputWords(1);
     }
@@ -302,6 +325,12 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   /// 用户点击下一张（恢复自动流程）
   Future<void> userNextCard() async {
     if (state.isCompleted || state.words.isEmpty) return;
+    AppLogger.log(
+      'FC',
+      'userNextCard: idx=${state.currentIndex} → ${state.currentIndex + 1}, '
+          'phase=${state.phase.runtimeType}, '
+          'word=${state.currentWord?.displayText}',
+    );
 
     if (state.currentIndex >= state.words.length - 1) {
       // 最后一张 → 完成
@@ -332,6 +361,11 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   /// 用户点击上一张（恢复自动流程）
   Future<void> userPreviousCard() async {
     if (state.currentIndex <= 0) return;
+    AppLogger.log(
+      'FC',
+      'userPreviousCard: idx=${state.currentIndex} → ${state.currentIndex - 1}, '
+          'phase=${state.phase.runtimeType}',
+    );
 
     _saveStudyTime();
     final prevIndex = state.currentIndex - 1;
@@ -506,6 +540,16 @@ class FlashcardNotifier extends _$FlashcardNotifier {
 
   /// 引擎状态变化回调 → 同步到 UI state
   void _onEngineStateChanged(FlashcardFlowState engineState) {
+    final oldPhase = state.phase.runtimeType;
+    final newPhase = engineState.phase.runtimeType;
+    if (oldPhase != newPhase) {
+      AppLogger.log(
+        'FC',
+        'phase: $oldPhase → $newPhase '
+            '(word=${state.currentWord?.displayText}, '
+            'idx=${state.currentIndex}, token=${engineState.flowToken})',
+      );
+    }
     state = state.copyWith(
       phase: engineState.phase,
       isShowingBack: engineState.isShowingBack,
@@ -536,9 +580,16 @@ class FlashcardNotifier extends _$FlashcardNotifier {
 
   /// TTS 回调：朗读单词
   Future<void> _onSpeakWord(String word, int token) async {
+    AppLogger.log('FC', 'TTS start: "$word" (token=$token)');
     if (!_inputStopwatch.isRunning) _inputStopwatch.start();
     await TtsService.instance.speak(word);
     _inputStopwatch.stop();
+    AppLogger.log(
+      'FC',
+      'TTS done: "$word" (token=$token, '
+          'current=${_engine.state.flowToken}, '
+          'stale=${token != _engine.state.flowToken})',
+    );
     await _addInputWords(1);
   }
 
@@ -555,12 +606,22 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   /// 自动翻转回调（正面倒计时到期）
   Future<void> _onAutoFlip() async {
     if (state.isCompleted || state.words.isEmpty) return;
+    AppLogger.log(
+      'FC',
+      '_onAutoFlip: phase=${state.phase.runtimeType}, '
+          'word=${state.currentWord?.displayText}',
+    );
 
     // 记录练习统计
     _recordPracticeStats();
 
     // 更新 UI 翻转状态
     state = state.copyWith(isShowingBack: true);
+    final token = _engine.state.flowToken;
+
+    // 等待翻转动画完成后再播放
+    await Future<void>.delayed(FlashcardCard.flipDuration);
+    if (token != _engine.state.flowToken) return;
 
     // 启动背面自动播放
     final item = state.currentWord;
@@ -574,6 +635,11 @@ class FlashcardNotifier extends _$FlashcardNotifier {
 
   /// 自动下一张回调（背面倒计时到期）
   Future<void> _onAutoNext() async {
+    AppLogger.log(
+      'FC',
+      '_onAutoNext: phase=${state.phase.runtimeType}, '
+          'word=${state.currentWord?.displayText}',
+    );
     await userNextCard();
   }
 
