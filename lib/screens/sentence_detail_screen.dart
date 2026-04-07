@@ -68,6 +68,9 @@ class _SentenceDetailScreenState extends ConsumerState<SentenceDetailScreen> {
   bool _bookmarkLoaded = false;
   bool _isTogglingBookmark = false;
 
+  /// 缓存 engine 引用，dispose 时 ref 已不可用
+  late final _engine = ref.read(audioEngineProvider.notifier);
+
   @override
   void initState() {
     super.initState();
@@ -76,8 +79,7 @@ class _SentenceDetailScreenState extends ConsumerState<SentenceDetailScreen> {
 
   @override
   void dispose() {
-    // 退出时停止播放，覆盖返回按钮和系统滑动返回手势
-    ref.read(audioEngineProvider.notifier).stop();
+    _engine.stop();
     super.dispose();
   }
 
