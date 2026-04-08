@@ -4141,6 +4141,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} items'**
   String recycleBinItemCount(int count);
+
+  /// No description provided for @filesSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} files selected'**
+  String filesSelected(int count);
+
+  /// No description provided for @processingFileOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing {current} of {total}...'**
+  String processingFileOf(int current, int total);
+
+  /// No description provided for @multipleAudioAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} audio files added'**
+  String multipleAudioAdded(int count);
+
+  /// No description provided for @duplicatesSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped {count} duplicates'**
+  String duplicatesSkipped(int count);
+
+  /// No description provided for @duplicatesSkippedDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The following audio files already exist in the library and were skipped:'**
+  String get duplicatesSkippedDetail;
+
+  /// No description provided for @removeFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get removeFile;
 }
 
 class _AppLocalizationsDelegate

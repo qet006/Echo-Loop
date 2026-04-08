@@ -2241,4 +2241,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String recycleBinItemCount(int count) {
     return '$count 条';
   }
+
+  @override
+  String filesSelected(int count) {
+    return '已选择 $count 个文件';
+  }
+
+  @override
+  String processingFileOf(int current, int total) {
+    return '正在处理 $current/$total...';
+  }
+
+  @override
+  String multipleAudioAdded(int count) {
+    return '已添加 $count 个音频';
+  }
+
+  @override
+  String duplicatesSkipped(int count) {
+    return '跳过 $count 个重复项';
+  }
+
+  @override
+  String get duplicatesSkippedDetail => '以下音频在库中已存在，已跳过：';
+
+  @override
+  String get removeFile => '移除';
 }

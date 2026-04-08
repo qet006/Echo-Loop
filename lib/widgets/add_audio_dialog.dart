@@ -4,7 +4,9 @@
 // - 有 collectionId：添加音频后自动关联到指定合集
 // - 无 collectionId：显示合集下拉框，可选择归入合集
 //
-// 添加成功后弹出字幕确认对话框，返回 AudioItem 表示用户选择添加字幕。
+// 支持一次选择多个音频文件批量添加。
+// 单文件添加成功后返回 [AudioItem] 供调用方弹出字幕确认；
+// 多文件直接添加，不弹字幕确认。
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,18 +14,26 @@ import 'package:universal_io/io.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
+import 'package:uuid/uuid.dart';
 import '../models/audio_item.dart';
 import '../providers/collection_provider.dart';
 import '../providers/audio_library_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../utils/audio_duration.dart';
 
-/// 添加音频对话框 — collectionId 可选
-///
+/// 已选中的音频文件信息
+typedef _PickedAudio = ({
+  String path,
+  String name,
+  String fileName,
+  int fileSize,
+});
+
+/// 添加音频对话框 — 支持批量选择
 ///
 /// 返回值：
-/// - `AudioItem` — 用户选择"添加字幕"
-/// - `null` — 取消或选择"不需要"
+/// - `List<AudioItem>` — 成功添加的音频列表
+/// - `null` — 用户取消
 class AddAudioDialog extends ConsumerStatefulWidget {
   /// 合集 ID（为 null 时显示合集下拉框）
   final String? collectionId;
@@ -35,9 +45,13 @@ class AddAudioDialog extends ConsumerStatefulWidget {
 }
 
 class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
-  String? _audioPath;
-  String _audioName = '';
+  /// 已选中的音频文件列表
+  List<_PickedAudio> _pickedFiles = [];
+
   bool _isLoading = false;
+
+  /// 批量添加时的进度
+  int _processedCount = 0;
 
   /// 用户选择的合集 ID（仅 collectionId == null 时使用）
   String? _selectedCollectionId;
@@ -45,6 +59,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final colorScheme = Theme.of(context).colorScheme;
     return AlertDialog(
       title: Text(
         widget.collectionId != null ? l10n.addAudioToCollection : l10n.addAudio,
@@ -56,14 +71,52 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ElevatedButton.icon(
-              onPressed: _isLoading ? null : _pickAudioFile,
+              onPressed: _isLoading ? null : _pickAudioFiles,
               icon: const Icon(Icons.audiotrack),
               label: Text(l10n.selectAudioFile),
             ),
-            if (_audioPath != null) ...[
+            // 已选文件列表
+            if (_pickedFiles.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              // 文件数量 + 总大小
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  _pickedFiles.length == 1
+                      ? _formatFileSize(_pickedFiles.first.fileSize)
+                      : '${l10n.filesSelected(_pickedFiles.length)}'
+                          '  ·  ${_formatFileSize(_pickedFiles.fold<int>(0, (sum, f) => sum + f.fileSize))}',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 240),
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: _pickedFiles.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 4),
+                    itemBuilder: (context, index) {
+                      final file = _pickedFiles[index];
+                      return _buildFileRow(file, index, colorScheme);
+                    },
+                  ),
+                ),
+              ),
+            ],
+            // 加载进度
+            if (_isLoading && _pickedFiles.length > 1) ...[
               const SizedBox(height: 8),
+              LinearProgressIndicator(
+                value: _processedCount / _pickedFiles.length,
+              ),
+              const SizedBox(height: 4),
               Text(
-                path.basename(_audioPath!),
+                AppLocalizations.of(context)!
+                    .processingFileOf(_processedCount + 1, _pickedFiles.length),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
@@ -81,7 +134,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
           child: Text(l10n.cancel),
         ),
         ElevatedButton(
-          onPressed: _audioPath == null || _isLoading ? null : _addAudio,
+          onPressed: _pickedFiles.isEmpty || _isLoading ? null : _addAudio,
           child: _isLoading
               ? const SizedBox(
                   width: 16,
@@ -94,10 +147,77 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     );
   }
 
+  /// 构建单个文件行（单行：图标 + 文件名 + 大小 + 删除）
+  Widget _buildFileRow(
+    _PickedAudio file,
+    int index,
+    ColorScheme colorScheme,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.only(left: 10, top: 6, bottom: 6, right: 4),
+      child: Row(
+        children: [
+          Icon(
+            Icons.audio_file_outlined,
+            size: 18,
+            color: colorScheme.primary,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              file.fileName,
+              style: Theme.of(context).textTheme.bodySmall,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              _formatFileSize(file.fileSize),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: Icon(
+                  Icons.close,
+                  size: 16,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+                onPressed: _isLoading
+                    ? null
+                    : () => setState(() {
+                          _pickedFiles = List.of(_pickedFiles)..removeAt(index);
+                        }),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 格式化文件大小
+  static String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
   /// 构建合集下拉选择框
   Widget _buildCollectionDropdown(AppLocalizations l10n) {
-    final collections =
-        ref.watch(collectionListProvider).rawCollections;
+    final collections = ref.watch(collectionListProvider).rawCollections;
     return DropdownButtonFormField<String?>(
       initialValue: _selectedCollectionId,
       decoration: InputDecoration(
@@ -122,14 +242,17 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     );
   }
 
-  Future<void> _pickAudioFile() async {
+  /// 选择音频文件（支持多选）
+  Future<void> _pickAudioFiles() async {
     try {
       final FilePickerResult? result;
+      const extensions = ['mp3', 'wav', 'm4a', 'aac', 'flac'];
 
       if (!kIsWeb && Platform.isIOS) {
         result = await FilePicker.platform.pickFiles(
           type: FileType.custom,
-          allowedExtensions: ['mp3', 'wav', 'm4a', 'aac', 'flac'],
+          allowedExtensions: extensions,
+          allowMultiple: true,
         );
       } else {
         final initialDir = !kIsWeb && Platform.isMacOS
@@ -137,19 +260,25 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
             : null;
         result = await FilePicker.platform.pickFiles(
           type: FileType.custom,
-          allowedExtensions: ['mp3', 'wav', 'm4a', 'aac', 'flac'],
+          allowedExtensions: extensions,
+          allowMultiple: true,
           initialDirectory: initialDir,
         );
       }
 
       if (result != null && result.files.isNotEmpty) {
-        final file = result.files.single;
-        final dest = await _savePickedFileToSandbox(file, 'audios');
+        final List<_PickedAudio> picked = [];
+        for (final file in result.files) {
+          final dest = await _savePickedFileToSandbox(file, 'audios');
+          picked.add((
+            path: dest,
+            name: path.basenameWithoutExtension(dest),
+            fileName: path.basename(dest),
+            fileSize: file.size,
+          ));
+        }
         if (!mounted) return;
-        setState(() {
-          _audioPath = dest;
-          _audioName = path.basenameWithoutExtension(dest);
-        });
+        setState(() => _pickedFiles = picked);
       }
     } catch (e) {
       if (mounted) {
@@ -208,112 +337,121 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     return path.join(subdir, baseName);
   }
 
+  /// 批量添加音频
   Future<void> _addAudio() async {
-    if (_audioPath == null) return;
+    if (_pickedFiles.isEmpty) return;
 
     final l10n = AppLocalizations.of(context)!;
-    // 确定最终使用的合集 ID（外部传入优先，否则使用下拉框选择）
     final collectionId = widget.collectionId ?? _selectedCollectionId;
+    final library = ref.read(audioLibraryProvider.notifier);
+    final libraryState = ref.read(audioLibraryProvider);
+    final collectionState = ref.read(collectionListProvider);
 
-    // 有合集时检查合集中是否已存在同名音频
-    if (collectionId != null) {
-      final collectionState = ref.read(collectionListProvider);
-      final collection = collectionState.rawCollections
-          .where((c) => c.id == collectionId)
-          .firstOrNull;
-      if (collection != null) {
-        final libraryNotifier = ref.read(audioLibraryProvider.notifier);
-        final existingAudioIds = collectionState.getAudioIds(collectionId);
-        for (final existingId in existingAudioIds) {
-          final existingAudio = libraryNotifier.getItemById(existingId);
-          if (existingAudio != null && existingAudio.name == _audioName) {
-            if (mounted) {
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: Text(l10n.audioAlreadyInCollection),
-                  content: Text(
-                    l10n.audioAlreadyInCollectionMessage(_audioName),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: Text(l10n.ok),
-                    ),
-                  ],
-                ),
-              );
-            }
-            return;
+    setState(() {
+      _isLoading = true;
+      _processedCount = 0;
+    });
+
+    final List<AudioItem> results = [];
+    final List<String> skippedDuplicates = [];
+    const uuid = Uuid();
+
+    for (var i = 0; i < _pickedFiles.length; i++) {
+      final file = _pickedFiles[i];
+
+      // 检查合集中是否已存在同名音频
+      if (collectionId != null) {
+        final collection = collectionState.rawCollections
+            .where((c) => c.id == collectionId)
+            .firstOrNull;
+        if (collection != null) {
+          final existingAudioIds = collectionState.getAudioIds(collectionId);
+          final isDupInCollection = existingAudioIds.any((id) {
+            final item = library.getItemById(id);
+            return item != null && item.name == file.name;
+          });
+          if (isDupInCollection) {
+            skippedDuplicates.add(file.name);
+            setState(() => _processedCount = i + 1);
+            continue;
           }
         }
       }
-    }
 
-    // 检查音频库中是否已存在同名音频
-    final library = ref.read(audioLibraryProvider.notifier);
-    final libraryState = ref.read(audioLibraryProvider);
-    final existingItem = libraryState.audioItems
-        .where((item) => item.name == _audioName)
-        .firstOrNull;
+      // 检查音频库中是否已存在同名音频
+      final existingItem = libraryState.audioItems
+          .where((item) => item.name == file.name)
+          .firstOrNull;
 
-    String audioId;
-    AudioItem resultItem;
+      String audioId;
+      AudioItem resultItem;
 
-    if (existingItem != null) {
-      if (collectionId != null) {
-        // 有合集：音频已存在于库中，直接关联
-        audioId = existingItem.id;
-        resultItem = existingItem;
-      } else {
-        // 无合集：提示重复，拒绝上传
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: Text(l10n.audioAlreadyInLibrary),
-              content: Text(l10n.audioAlreadyInLibraryMessage(_audioName)),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text(l10n.ok),
-                ),
-              ],
-            ),
-          );
+      if (existingItem != null) {
+        if (collectionId != null) {
+          // 有合集：音频已存在于库中，直接关联
+          audioId = existingItem.id;
+          resultItem = existingItem;
+        } else {
+          // 无合集：跳过重复
+          skippedDuplicates.add(file.name);
+          setState(() => _processedCount = i + 1);
+          continue;
         }
-        return;
+      } else {
+        // 新音频，添加到音频库
+        final duration = await getAudioDurationSeconds(file.path);
+        final audioItem = AudioItem(
+          id: uuid.v4(),
+          name: file.name,
+          audioPath: file.path,
+          addedDate: DateTime.now(),
+          totalDuration: duration,
+        );
+        await library.addAudioItem(audioItem);
+        audioId = audioItem.id;
+        resultItem = audioItem;
       }
-    } else {
-      // 新音频，先添加到音频库
-      setState(() {
-        _isLoading = true;
-      });
 
-      final duration = await getAudioDurationSeconds(_audioPath!);
+      // 关联到合集
+      if (collectionId != null && mounted) {
+        await ref
+            .read(collectionListProvider.notifier)
+            .addAudioToCollection(collectionId, audioId);
+      }
 
-      final audioItem = AudioItem(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: _audioName,
-        audioPath: _audioPath!,
-        addedDate: DateTime.now(),
-        totalDuration: duration,
-      );
-
-      await library.addAudioItem(audioItem);
-      audioId = audioItem.id;
-      resultItem = audioItem;
+      results.add(resultItem);
+      setState(() => _processedCount = i + 1);
     }
 
-    // 有合集时关联到合集
-    if (collectionId != null && mounted) {
-      await ref
-          .read(collectionListProvider.notifier)
-          .addAudioToCollection(collectionId, audioId);
+    if (!mounted) return;
+
+    // 有跳过项时弹窗提示
+    if (skippedDuplicates.isNotEmpty) {
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.duplicatesSkipped(skippedDuplicates.length)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.duplicatesSkippedDetail),
+              const SizedBox(height: 8),
+              ...skippedDuplicates.map((name) => Text('• $name')),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.ok),
+            ),
+          ],
+        ),
+      );
     }
 
     if (mounted) {
-      Navigator.pop(context, resultItem);
+      Navigator.pop(context, results);
     }
   }
 }

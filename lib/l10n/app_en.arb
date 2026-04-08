@@ -1241,5 +1241,32 @@
     "placeholders": {
       "count": {"type": "int"}
     }
-  }
+  },
+  "filesSelected": "{count} files selected",
+  "@filesSelected": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "processingFileOf": "Processing {current} of {total}...",
+  "@processingFileOf": {
+    "placeholders": {
+      "current": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "multipleAudioAdded": "{count} audio files added",
+  "@multipleAudioAdded": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "duplicatesSkipped": "Skipped {count} duplicates",
+  "@duplicatesSkipped": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "duplicatesSkippedDetail": "The following audio files already exist in the library and were skipped:",
+  "removeFile": "Remove"
 }

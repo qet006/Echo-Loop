@@ -2305,4 +2305,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String recycleBinItemCount(int count) {
     return '$count items';
   }
+
+  @override
+  String filesSelected(int count) {
+    return '$count files selected';
+  }
+
+  @override
+  String processingFileOf(int current, int total) {
+    return 'Processing $current of $total...';
+  }
+
+  @override
+  String multipleAudioAdded(int count) {
+    return '$count audio files added';
+  }
+
+  @override
+  String duplicatesSkipped(int count) {
+    return 'Skipped $count duplicates';
+  }
+
+  @override
+  String get duplicatesSkippedDetail =>
+      'The following audio files already exist in the library and were skipped:';
+
+  @override
+  String get removeFile => 'Remove';
 }

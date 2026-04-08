@@ -106,20 +106,31 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   Future<void> _handleAddAudio() async {
-    final result = await showDialog<AudioItem>(
+    final results = await showDialog<List<AudioItem>>(
       context: context,
       builder: (dialogContext) => const AddAudioDialog(),
     );
-    if (result == null || !mounted) return;
+    if (results == null || results.isEmpty || !mounted) return;
 
-    final l10n = AppLocalizations.of(context)!;
-    final wantSubtitle = await _showSubtitlePrompt(context, l10n);
-    if (!mounted || !wantSubtitle) return;
+    if (results.length == 1) {
+      // 单文件：保持字幕提示流程
+      final l10n = AppLocalizations.of(context)!;
+      final wantSubtitle = await _showSubtitlePrompt(context, l10n);
+      if (!mounted || !wantSubtitle) return;
 
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => ManageSubtitlesSheet(audioItem: result),
-    );
+      showModalBottomSheet(
+        context: context,
+        builder: (_) => ManageSubtitlesSheet(audioItem: results.first),
+      );
+    } else {
+      // 多文件：显示成功提示
+      if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.multipleAudioAdded(results.length))),
+        );
+      }
+    }
   }
 }
 

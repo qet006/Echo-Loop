@@ -921,5 +921,11 @@
   "recycleBinDelete": "删除",
   "recycleBinSortTimeDesc": "最近移除",
   "recycleBinSortTimeAsc": "最早移除",
-  "recycleBinItemCount": "{count} 条"
+  "recycleBinItemCount": "{count} 条",
+  "filesSelected": "已选择 {count} 个文件",
+  "processingFileOf": "正在处理 {current}/{total}...",
+  "multipleAudioAdded": "已添加 {count} 个音频",
+  "duplicatesSkipped": "跳过 {count} 个重复项",
+  "duplicatesSkippedDetail": "以下音频在库中已存在，已跳过：",
+  "removeFile": "移除"
 }
