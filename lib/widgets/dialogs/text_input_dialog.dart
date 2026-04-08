@@ -103,7 +103,7 @@ class _TextInputDialogState extends State<_TextInputDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.title),
+      title: Text(widget.title, textAlign: TextAlign.center),
       content: TextField(
         controller: _controller,
         autofocus: true,
@@ -114,18 +114,32 @@ class _TextInputDialogState extends State<_TextInputDialog> {
         ),
         onSubmitted: (_) => _submit(),
         onChanged: (_) {
-          // 清除之前的错误
-          if (_errorText != null) {
-            setState(() => _errorText = null);
-          }
+          setState(() {
+            // 清除之前的错误 + 刷新按钮状态
+            _errorText = null;
+          });
         },
       ),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(widget.cancelLabel),
+        Row(
+          children: [
+            Expanded(
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(widget.cancelLabel),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton(
+                onPressed:
+                    _controller.text.trim().isEmpty ? null : _submit,
+                child: Text(widget.confirmLabel),
+              ),
+            ),
+          ],
         ),
-        ElevatedButton(onPressed: _submit, child: Text(widget.confirmLabel)),
       ],
     );
   }

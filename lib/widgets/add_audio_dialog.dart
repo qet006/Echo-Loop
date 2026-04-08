@@ -63,6 +63,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     return AlertDialog(
       title: Text(
         widget.collectionId != null ? l10n.addAudioToCollection : l10n.addAudio,
+        textAlign: TextAlign.center,
       ),
       content: SizedBox(
         width: 400,
@@ -70,27 +71,28 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : _pickAudioFiles,
-              icon: const Icon(Icons.audiotrack),
-              label: Text(l10n.selectAudioFile),
+            Center(
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : _pickAudioFiles,
+                icon: const Icon(Icons.audiotrack),
+                label: Text(l10n.selectAudioFile),
+              ),
             ),
             // 已选文件列表
             if (_pickedFiles.isNotEmpty) ...[
               const SizedBox(height: 12),
-              // 文件数量 + 总大小
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  _pickedFiles.length == 1
-                      ? _formatFileSize(_pickedFiles.first.fileSize)
-                      : '${l10n.filesSelected(_pickedFiles.length)}'
-                          '  ·  ${_formatFileSize(_pickedFiles.fold<int>(0, (sum, f) => sum + f.fileSize))}',
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+              // 多文件时显示文件数量 + 总大小
+              if (_pickedFiles.length > 1)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    '${l10n.filesSelected(_pickedFiles.length)}'
+                    '  ·  ${_formatFileSize(_pickedFiles.fold<int>(0, (sum, f) => sum + f.fileSize))}',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                  ),
                 ),
-              ),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 240),
                 child: Material(
@@ -98,7 +100,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
                   child: ListView.separated(
                     shrinkWrap: true,
                     itemCount: _pickedFiles.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 4),
+                    separatorBuilder: (_, __) => const SizedBox(height: 2),
                     itemBuilder: (context, index) {
                       final file = _pickedFiles[index];
                       return _buildFileRow(file, index, colorScheme);
@@ -128,20 +130,31 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
           ],
         ),
       ),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
       actions: [
-        TextButton(
-          onPressed: _isLoading ? null : () => Navigator.pop(context),
-          child: Text(l10n.cancel),
-        ),
-        ElevatedButton(
-          onPressed: _pickedFiles.isEmpty || _isLoading ? null : _addAudio,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(l10n.add),
+        Row(
+          children: [
+            Expanded(
+              child: TextButton(
+                onPressed: _isLoading ? null : () => Navigator.pop(context),
+                child: Text(l10n.cancel),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton(
+                onPressed:
+                    _pickedFiles.isEmpty || _isLoading ? null : _addAudio,
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(l10n.add),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -158,7 +171,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
       ),
-      padding: const EdgeInsets.only(left: 10, top: 6, bottom: 6, right: 4),
+      padding: const EdgeInsets.only(left: 10, top: 4, bottom: 4, right: 4),
       child: Row(
         children: [
           Icon(
