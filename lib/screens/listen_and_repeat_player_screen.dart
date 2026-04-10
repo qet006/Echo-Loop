@@ -492,7 +492,7 @@ class _ListenAndRepeatPlayerScreenState
                                   highlightedSegments:
                                       currentAttempt?.referenceSegments,
                                   onStopMainPlayer: () {
-                                    ctrl.onUserInteraction();
+                                    ctrl.enterWaitingForUser();
                                   },
                                   onToolbarButtonTapped: () {
                                     AppLogger.log('L&R Screen', '工具栏点击: 打断流程');
