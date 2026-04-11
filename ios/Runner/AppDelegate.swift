@@ -28,6 +28,10 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
   private var isEngineRunning = false
   private var isRecording = false
 
+  /// 是否启用平台语音识别（默认 false，纯录音 + VAD）。
+  /// Dart 层通过 `setRecognitionEnabled` 在 warmup 前设置。
+  private var recognitionEnabled = false
+
   // 句子级资源（每次录音创建/释放）
   private var audioFile: AVAudioFile?
   private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
@@ -84,6 +88,10 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
       shutdown(result: result)
     case "deleteRecording":
       deleteRecording(call.arguments as? [String: Any], result: result)
+    case "setRecognitionEnabled":
+      let args = call.arguments as? [String: Any]
+      recognitionEnabled = (args?["enabled"] as? Bool) ?? false
+      result([:])
     default:
       result(FlutterMethodNotImplemented)
     }
@@ -140,9 +148,11 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
   /// 如果权限尚未请求（notDetermined），会自动触发系统权限弹窗。
   private func warmup(_ arguments: [String: Any]?, result: @escaping FlutterResult) {
     let micStatus = microphonePermissionStatus()
-    let speechStatus = speechPermissionStatus()
 
-    // notDetermined 时自动请求权限，请求完成后重新进入 warmup。
+    // 纯录音模式只需要麦克风权限；识别模式还需要语音识别权限。
+    let needsSpeech = recognitionEnabled
+    let speechStatus = needsSpeech ? speechPermissionStatus() : "granted"
+
     if micStatus == "notDetermined" || speechStatus == "notDetermined" {
       requestPermissions { [weak self] _ in
         self?.warmup(arguments, result: result)
@@ -166,7 +176,9 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
     }
 
     let localeIdentifier = (arguments?["locale"] as? String) ?? "en-US"
-    cachedRecognizer = SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier))
+    if recognitionEnabled {
+      cachedRecognizer = SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier))
+    }
 
     do {
       try configureRecordingSession()
@@ -239,19 +251,12 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
     startSessionFull(promptId: promptId, locale: localeIdentifier, result: result)
   }
 
-  /// 轻量启动：engine 已 running，只建句子级资源（recognitionTask + audioFile）。
+  /// 轻量启动：engine 已 running，只建句子级资源。
+  ///
+  /// `recognitionEnabled=true` 时创建 recognitionTask + audioFile。
+  /// `recognitionEnabled=false` 时只创建 audioFile（纯录音 + VAD）。
   private func startSessionLightweight(engine: AVAudioEngine, promptId: String, locale: String, result: @escaping FlutterResult) throws {
     cleanupSentenceState(cancelRecognition: true)
-
-    let recognizer = cachedRecognizer ?? SFSpeechRecognizer(locale: Locale(identifier: locale))
-    guard let recognizer, recognizer.isAvailable else {
-      result(FlutterError(
-        code: SpeechPracticeError.notAvailable.rawValue,
-        message: "Speech recognizer unavailable",
-        details: nil
-      ))
-      return
-    }
 
     let fileName = sanitizedFileName(promptId)
     let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
@@ -260,16 +265,31 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
     let inputFormat = engine.inputNode.outputFormat(forBus: 0)
     let file = try AVAudioFile(forWriting: fileURL, settings: inputFormat.settings)
 
-    let request = SFSpeechAudioBufferRecognitionRequest()
-    request.shouldReportPartialResults = true
+    var request: SFSpeechAudioBufferRecognitionRequest?
+
+    if recognitionEnabled {
+      let recognizer = cachedRecognizer ?? SFSpeechRecognizer(locale: Locale(identifier: locale))
+      guard let recognizer, recognizer.isAvailable else {
+        result(FlutterError(
+          code: SpeechPracticeError.notAvailable.rawValue,
+          message: "Speech recognizer unavailable",
+          details: nil
+        ))
+        return
+      }
+
+      let req = SFSpeechAudioBufferRecognitionRequest()
+      req.shouldReportPartialResults = true
+      request = req
+
+      let generation = sessionGeneration
+      recognitionTask = recognizer.recognitionTask(with: req) { [weak self] recognitionResult, error in
+        guard let self, self.sessionGeneration == generation else { return }
+        self.handleRecognitionCallback(recognitionResult: recognitionResult, error: error)
+      }
+    }
 
     resetSentenceState(promptId: promptId, fileURL: fileURL, audioFile: file, request: request)
-
-    let generation = sessionGeneration
-    recognitionTask = recognizer.recognitionTask(with: request) { [weak self] recognitionResult, error in
-      guard let self, self.sessionGeneration == generation else { return }
-      self.handleRecognitionCallback(recognitionResult: recognitionResult, error: error)
-    }
 
     isRecording = true
     result(["filePath": fileURL.path])
@@ -298,15 +318,18 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
       return
     }
 
-    guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: locale)),
-          recognizer.isAvailable
-    else {
-      result(FlutterError(
-        code: SpeechPracticeError.notAvailable.rawValue,
-        message: "Speech recognizer unavailable",
-        details: nil
-      ))
-      return
+    if recognitionEnabled {
+      guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: locale)),
+            recognizer.isAvailable
+      else {
+        result(FlutterError(
+          code: SpeechPracticeError.notAvailable.rawValue,
+          message: "Speech recognizer unavailable",
+          details: nil
+        ))
+        return
+      }
+      cachedRecognizer = recognizer
     }
 
     cleanupSentenceState(cancelRecognition: true)
@@ -323,20 +346,24 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
       let inputNode = engine.inputNode
       let inputFormat = inputNode.outputFormat(forBus: 0)
 
-      let request = SFSpeechAudioBufferRecognitionRequest()
-      request.shouldReportPartialResults = true
+      var request: SFSpeechAudioBufferRecognitionRequest?
 
       let file = try AVAudioFile(forWriting: fileURL, settings: inputFormat.settings)
 
-      resetSentenceState(promptId: promptId, fileURL: fileURL, audioFile: file, request: request)
-      cachedRecognizer = recognizer
-      audioEngine = engine
+      if recognitionEnabled, let recognizer = cachedRecognizer {
+        let req = SFSpeechAudioBufferRecognitionRequest()
+        req.shouldReportPartialResults = true
+        request = req
 
-      let generation = sessionGeneration
-      recognitionTask = recognizer.recognitionTask(with: request) { [weak self] recognitionResult, error in
-        guard let self, self.sessionGeneration == generation else { return }
-        self.handleRecognitionCallback(recognitionResult: recognitionResult, error: error)
+        let generation = sessionGeneration
+        recognitionTask = recognizer.recognitionTask(with: req) { [weak self] recognitionResult, error in
+          guard let self, self.sessionGeneration == generation else { return }
+          self.handleRecognitionCallback(recognitionResult: recognitionResult, error: error)
+        }
       }
+
+      resetSentenceState(promptId: promptId, fileURL: fileURL, audioFile: file, request: request)
+      audioEngine = engine
 
       inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
         guard let self, self.isRecording else { return }
@@ -377,6 +404,15 @@ private final class IOSSpeechPracticeHandler: NSObject, FlutterStreamHandler {
       trimRecordingIfNeeded(fileURL: fileURL)
     }
     result(["filePath": currentFileURL?.path as Any])
+
+    // 纯录音模式（无 ASR）：手动发空 finalTranscriptReady，与 Android 行为对齐。
+    if !recognitionEnabled, let promptId = currentPromptId {
+      emitEvent([
+        "type": "finalTranscriptReady",
+        "promptId": promptId,
+        "transcript": "",
+      ])
+    }
   }
 
   private func cancelSession(result: @escaping FlutterResult) {

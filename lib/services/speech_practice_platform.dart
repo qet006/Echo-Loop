@@ -9,11 +9,38 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/speech_practice_models.dart';
+import '../providers/asr_engine_provider.dart';
+import '../providers/offline_asr_settings_provider.dart';
 import 'app_logger.dart';
+import 'asr/offline_asr_backend.dart';
 
 /// 统一后端 provider。
+///
+/// 根据 ASR 设置选择后端组合：
+/// - ASR 关闭 → 平台后端（recognition=false，纯录音）
+/// - Apple Speech → 平台后端（recognition=true，平台 ASR）
+/// - Echo Loop AI + 引擎就绪 → OfflineAsrBackend（recognition=false + 离线转录）
+/// - Echo Loop AI + 引擎未就绪 → 平台后端（recognition=false，降级为纯录音）
 final speechPracticeBackendProvider = Provider<SpeechPracticeBackend>((ref) {
-  return SpeechPracticePlatform.instance;
+  final s = ref.watch(offlineAsrSettingsProvider);
+  final platform = SpeechPracticePlatform.instance;
+
+  if (s.enabled && s.backend == AsrBackend.platform) {
+    // Apple Speech：启用平台 ASR
+    platform.setRecognitionEnabled(true);
+    return platform;
+  }
+
+  // 其他情况（ASR 关闭、Echo Loop AI）：纯录音模式
+  platform.setRecognitionEnabled(false);
+
+  if (s.isOfflineReady) {
+    // Echo Loop AI：离线引擎就绪，包装平台后端
+    final engine = ref.read(offlineAsrEngineProvider);
+    return OfflineAsrBackend(platform: platform, engine: engine);
+  }
+
+  return platform;
 });
 
 /// 平台桥接异常。
@@ -43,6 +70,13 @@ abstract class SpeechPracticeBackend {
 
   /// 录音识别事件流。
   Stream<SpeechPracticeEvent> get events;
+
+  /// 设置是否启用平台语音识别。
+  ///
+  /// `false`（默认）：纯录音 + VAD，stopSession 返回空 transcript。
+  /// `true`：录音 + 平台 ASR（iOS/macOS SFSpeechRecognizer）。
+  /// 必须在 [warmup] 之前调用。
+  Future<void> setRecognitionEnabled(bool enabled);
 
   /// 预热引擎：页面进入时调用，提前初始化 AVAudioEngine + tap。
   Future<void> warmup({String locale = 'en-US'});
@@ -131,6 +165,13 @@ class SpeechPracticePlatform implements SpeechPracticeBackend {
           throw _parseException(error);
         })
         .asBroadcastStream();
+  }
+
+  @override
+  Future<void> setRecognitionEnabled(bool enabled) async {
+    _ensureSupported();
+    AppLogger.log('SpeechPlatform', '● setRecognitionEnabled=$enabled');
+    await _invokeMap('setRecognitionEnabled', {'enabled': enabled});
   }
 
   @override

@@ -51,6 +51,10 @@ class OfflineAsrBackend implements SpeechPracticeBackend {
       _platform.requestPermissions();
 
   @override
+  Future<void> setRecognitionEnabled(bool enabled) =>
+      _platform.setRecognitionEnabled(enabled);
+
+  @override
   Stream<SpeechPracticeEvent> get events {
     if (_mergedController != null) return _mergedController!.stream;
 

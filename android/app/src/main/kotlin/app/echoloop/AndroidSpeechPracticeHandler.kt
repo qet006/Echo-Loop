@@ -95,6 +95,7 @@ class AndroidSpeechPracticeHandler(
             "cancelSession" -> cancelSession(result)
             "shutdown" -> shutdown(result)
             "deleteRecording" -> deleteRecording(call, result)
+            "setRecognitionEnabled" -> result.success(emptyMap<String, Any>()) // Android 纯录音，ASR 由 Dart 层处理
             else -> result.notImplemented()
         }
     }
