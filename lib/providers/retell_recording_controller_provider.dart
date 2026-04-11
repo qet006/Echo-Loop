@@ -174,7 +174,7 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
 
   @override
   RetellRecordingState build() {
-    final backend = ref.read(speechPracticeBackendProvider);
+    final backend = ref.watch(speechPracticeBackendProvider);
     _recordingService = RecordingService(backend);
 
     final lifecycleListener = AppLifecycleListener(
