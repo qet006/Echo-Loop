@@ -1364,10 +1364,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get disableSpeechRecognitionTitle => '关闭语音识别？';
 
   @override
-  String get disableSpeechRecognitionMessage => '关闭后语音练习将无法评分。是否删除已下载的模型？';
+  String get disableSpeechRecognitionMessage => '关闭后语音练习将无法评分。';
 
   @override
-  String get keepModel => '保留模型';
+  String get alsoDeleteModel => '同时删除已下载的模型';
+
+  @override
+  String get disableAction => '关闭';
 
   @override
   String get speechRecognitionRequiredTitle => '语音练习需要语音识别';

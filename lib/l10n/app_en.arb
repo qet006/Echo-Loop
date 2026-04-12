@@ -777,8 +777,9 @@
     }
   },
   "disableSpeechRecognitionTitle": "Disable Speech Recognition?",
-  "disableSpeechRecognitionMessage": "Speech practice scoring will be unavailable. Delete the downloaded model?",
-  "keepModel": "Keep Model",
+  "disableSpeechRecognitionMessage": "Speech practice scoring will be unavailable.",
+  "alsoDeleteModel": "Also delete downloaded model",
+  "disableAction": "Disable",
   "speechRecognitionRequiredTitle": "Speech Recognition Required",
   "speechRecognitionRequiredMessage": "A speech recognition model is required for voice practice. Download now?",
   "downloadAndEnable": "Download & Enable",

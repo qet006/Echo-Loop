@@ -2543,14 +2543,20 @@ abstract class AppLocalizations {
   /// No description provided for @disableSpeechRecognitionMessage.
   ///
   /// In en, this message translates to:
-  /// **'Speech practice scoring will be unavailable. Delete the downloaded model?'**
+  /// **'Speech practice scoring will be unavailable.'**
   String get disableSpeechRecognitionMessage;
 
-  /// No description provided for @keepModel.
+  /// No description provided for @alsoDeleteModel.
   ///
   /// In en, this message translates to:
-  /// **'Keep Model'**
-  String get keepModel;
+  /// **'Also delete downloaded model'**
+  String get alsoDeleteModel;
+
+  /// No description provided for @disableAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable'**
+  String get disableAction;
 
   /// No description provided for @speechRecognitionRequiredTitle.
   ///

@@ -298,32 +298,70 @@ class _AsrSettingsScreenState extends ConsumerState<AsrSettingsScreen> {
     WidgetRef ref,
     AppLocalizations l10n,
   ) {
+    var deleteModel = false;
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.disableSpeechRecognitionTitle),
-        content: Text(l10n.disableSpeechRecognitionMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text(l10n.disableSpeechRecognitionTitle),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.disableSpeechRecognitionMessage),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () => setState(() => deleteModel = !deleteModel),
+                behavior: HitTestBehavior.opaque,
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: Checkbox(
+                        value: deleteModel,
+                        onChanged: (v) =>
+                            setState(() => deleteModel = v ?? false),
+                        materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l10n.alsoDeleteModel,
+                        style: Theme.of(ctx).textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              ref.read(offlineAsrSettingsProvider.notifier).disable();
-            },
-            child: Text(l10n.keepModel),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              ref.read(offlineAsrSettingsProvider.notifier).disableAndDelete();
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: Text(l10n.deleteModelAction),
-          ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                final notifier =
+                    ref.read(offlineAsrSettingsProvider.notifier);
+                if (deleteModel) {
+                  notifier.disableAndDelete();
+                } else {
+                  notifier.disable();
+                }
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(ctx).colorScheme.error,
+              ),
+              child: Text(l10n.disableAction),
+            ),
+          ],
+        ),
       ),
     );
   }

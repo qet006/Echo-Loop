@@ -1410,10 +1410,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get disableSpeechRecognitionMessage =>
-      'Speech practice scoring will be unavailable. Delete the downloaded model?';
+      'Speech practice scoring will be unavailable.';
 
   @override
-  String get keepModel => 'Keep Model';
+  String get alsoDeleteModel => 'Also delete downloaded model';
+
+  @override
+  String get disableAction => 'Disable';
 
   @override
   String get speechRecognitionRequiredTitle => 'Speech Recognition Required';
