@@ -704,6 +704,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     required String promptId,
     required String referenceText,
     required Duration maxDuration,
+    Duration? referenceDuration,
   }) {
     final controller = ref.read(speechRecordingControllerProvider.notifier);
     controller.setMaxRecordingDuration(maxDuration);
@@ -711,6 +712,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       controller.startRecording(
         promptId: promptId,
         referenceText: referenceText,
+        referenceDuration: referenceDuration,
       ),
     );
   }

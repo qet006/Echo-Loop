@@ -910,6 +910,7 @@ class BookmarkReview extends _$BookmarkReview {
     required String promptId,
     required String referenceText,
     required Duration maxDuration,
+    Duration? referenceDuration,
   }) {
     final controller = ref.read(speechRecordingControllerProvider.notifier);
     controller.setMaxRecordingDuration(maxDuration);
@@ -917,6 +918,7 @@ class BookmarkReview extends _$BookmarkReview {
       controller.startRecording(
         promptId: promptId,
         referenceText: referenceText,
+        referenceDuration: referenceDuration,
       ),
     );
   }

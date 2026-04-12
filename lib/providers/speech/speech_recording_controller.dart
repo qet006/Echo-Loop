@@ -136,14 +136,18 @@ class SpeechPracticeCompletionHeuristic {
   /// B. [detectOverallMatchRate] — 全句匹配率 → 1-3s
   /// C. [detectTailHitCount] — 末尾 5 词命中数 → 1-5s
   ///
-  /// 三条规则取最小值，无规则触发时返回 [_defaultSilenceThreshold]。
+  /// 三条规则取最小值，无规则触发时返回兜底阈值。
   Duration computeSilenceThreshold({
     required String referenceText,
     required String partialTranscript,
+    Duration? voicedDuration,
+    Duration? referenceDuration,
   }) {
     return computeSilenceThresholdDetailed(
       referenceText: referenceText,
       partialTranscript: partialTranscript,
+      voicedDuration: voicedDuration,
+      referenceDuration: referenceDuration,
     ).threshold!;
   }
 
@@ -154,18 +158,34 @@ class SpeechPracticeCompletionHeuristic {
   /// A. [detectTailMatch] — 连续尾部匹配 + 唯一 → 1s
   /// B. [detectOverallMatchRate] — 全句匹配率 → 1-3s
   /// C. [detectTailHitCount] — 末尾 5 词命中数 → 1-5s
+  ///
+  /// 无规则触发时，兜底阈值根据有声时长比例动态计算（需传入
+  /// [voicedDuration] 和 [referenceDuration]），否则固定 5s。
   DetectionResult computeSilenceThresholdDetailed({
     required String referenceText,
     required String partialTranscript,
+    Duration? voicedDuration,
+    Duration? referenceDuration,
   }) {
     final ctx = buildMatchContext(
       referenceText: referenceText,
       partialTranscript: partialTranscript,
     );
+
+    // 计算动态兜底阈值
+    final fallback =
+        (voicedDuration != null && referenceDuration != null)
+            ? computeDynamicFallback(
+                voicedDuration: voicedDuration,
+                referenceDuration: referenceDuration,
+                matchRate: ctx.matchRate,
+              )
+            : _defaultSilenceThreshold;
+
     if (!ctx.hasMatch) {
       return DetectionResult(
-        threshold: _defaultSilenceThreshold,
-        description: '无匹配, 默认${_defaultSilenceThreshold.inSeconds}s',
+        threshold: fallback,
+        description: '无匹配, 兜底${fallback.inSeconds}s',
       );
     }
 
@@ -177,7 +197,7 @@ class SpeechPracticeCompletionHeuristic {
         detectTailHitCount(ctx), // C
       ],
       ctx,
-      fallback: _defaultSilenceThreshold,
+      fallback: fallback,
     );
   }
 }
@@ -225,6 +245,15 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
   DateTime? _speechStartTime;
   String? _cachedReferenceText;
   String? _lastSilenceLogDesc;
+
+  /// 原句音频时长（用于有声时长比例兜底）
+  Duration? _referenceDuration;
+
+  /// 累计有声时长（silenceMs == 0 区间的加总）
+  Duration _voicedDuration = Duration.zero;
+
+  /// 上一次有声事件的时间戳（用于累加有声时长）
+  DateTime? _lastVoicedTimestamp;
 
   // ── 配置 ──
   bool _isManualMode = false;
@@ -278,6 +307,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
   Future<void> startRecording({
     required String promptId,
     required String referenceText,
+    Duration? referenceDuration,
   }) async {
     final backend = ref.read(speechPracticeBackendProvider);
     if (state.promptId == promptId && state.isActive) {
@@ -298,6 +328,9 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
     _lastSilenceLogDesc = null;
     _speechStartTime = null;
     _cachedReferenceText = referenceText;
+    _referenceDuration = referenceDuration;
+    _voicedDuration = Duration.zero;
+    _lastVoicedTimestamp = null;
 
     AppLogger.log('SpeechRec', '┌ startRecording (manual=$_isManualMode)');
     AppLogger.log('SpeechRec', '│ promptId=$promptId');
@@ -666,6 +699,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
 
   void _handleSpeechStarted(SpeechPracticeEvent event) {
     _speechStartTime ??= DateTime.now();
+    _lastVoicedTimestamp ??= DateTime.now();
     state = state.copyWith(
       hasDetectedSpeech: true,
       silenceDuration: Duration.zero,
@@ -680,7 +714,42 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
     final silence = event.silenceDuration ?? Duration.zero;
     state = state.copyWith(silenceDuration: silence);
 
+    // 累加有声时长
+    _updateVoicedDuration(silence);
+
     _checkAutoStopOnSilence(silence);
+  }
+
+  /// 根据 silenceProgress 事件累加有声时长。
+  ///
+  /// 短静音（< [_voicedGapThreshold]）被视为语音的一部分，不结算有声段。
+  /// 这是因为 VAD 基于 RMS 阈值，说话中的低音段可能被误判为静音。
+  ///
+  /// - silenceMs == 0：有声，累加时间差。
+  /// - silenceMs > 0 但 < 阈值：不操作，等待恢复。
+  /// - silenceMs >= 阈值：真正的静音，结算有声段（结束点 = now - silence）。
+  static const _voicedGapThreshold = Duration(milliseconds: 500);
+
+  void _updateVoicedDuration(Duration silence) {
+    final now = DateTime.now();
+    final lastVoiced = _lastVoicedTimestamp;
+
+    if (silence == Duration.zero) {
+      // 有声：累加自上次有声时间戳的差值
+      if (lastVoiced != null) {
+        _voicedDuration += now.difference(lastVoiced);
+      }
+      _lastVoicedTimestamp = now;
+    } else if (silence >= _voicedGapThreshold && lastVoiced != null) {
+      // 静音超过阈值：有声段结束于静音开始时刻
+      final voicedEnd = now.subtract(silence);
+      final diff = voicedEnd.difference(lastVoiced);
+      if (diff > Duration.zero) {
+        _voicedDuration += diff;
+      }
+      _lastVoicedTimestamp = null;
+    }
+    // silence > 0 但 < 阈值：VAD 抖动，不结算，等恢复
   }
 
   /// 检查语音检测 + 自动停止
@@ -723,6 +792,8 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
       final detailed = heuristic.computeSilenceThresholdDetailed(
         referenceText: referenceText,
         partialTranscript: liveTranscript,
+        voicedDuration: _voicedDuration,
+        referenceDuration: _referenceDuration,
       );
       final required = detailed.threshold!;
       if (detailed.description != _lastSilenceLogDesc) {
@@ -742,11 +813,23 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
       }
     }
 
-    // 静音 5s 兜底（无转录时）
-    if (currentSilence >= _defaultSilenceThreshold) {
+    // 静音兜底（无转录时，含无 ASR 场景）
+    final refDur = _referenceDuration;
+    final fallback = (refDur != null)
+        ? computeDynamicFallback(
+            voicedDuration: _voicedDuration,
+            referenceDuration: refDur,
+          )
+        : _defaultSilenceThreshold;
+    if (currentSilence >= fallback) {
+      final ratioDesc = (refDur != null && refDur > Duration.zero)
+          ? ', ratio=${(_voicedDuration.inMilliseconds / (refDur.inMilliseconds * 1.1) * 100).toStringAsFixed(0)}%'
+          : '';
       _stopForEvaluation(
         promptId: promptId,
-        reason: '静音兜底 ${currentSilence.inSeconds}s',
+        reason: '静音兜底 ${fallback.inSeconds}s '
+            '(有声${_voicedDuration.inMilliseconds}ms, '
+            'ref=${refDur?.inMilliseconds ?? 0}ms$ratioDesc)',
       );
     }
   }
@@ -807,6 +890,8 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
     final detailed = heuristic.computeSilenceThresholdDetailed(
       referenceText: referenceText,
       partialTranscript: transcript,
+      voicedDuration: _voicedDuration,
+      referenceDuration: _referenceDuration,
     );
     final threshold = detailed.threshold!;
     AppLogger.log(

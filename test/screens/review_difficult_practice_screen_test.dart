@@ -54,6 +54,7 @@ class _WaitingSpyRepeatEngine extends RepeatFlowEngine {
                 required String promptId,
                 required String referenceText,
                 required Duration maxDuration,
+                Duration? referenceDuration,
               }) {},
           cancelRecording: () async {},
           stopAndEvaluate: ({required String referenceText}) async {},

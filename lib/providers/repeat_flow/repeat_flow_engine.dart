@@ -87,6 +87,7 @@ class RepeatFlowCallbacks {
     required String promptId,
     required String referenceText,
     required Duration maxDuration,
+    Duration? referenceDuration,
   })
   startRecording;
 
@@ -614,6 +615,7 @@ class RepeatFlowEngine {
       promptId: promptId,
       referenceText: sentence.text,
       maxDuration: maxDuration,
+      referenceDuration: sentence.duration,
     );
   }
 

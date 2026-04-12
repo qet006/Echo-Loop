@@ -233,4 +233,136 @@ void main() {
       expect(combined.threshold, const Duration(seconds: 2));
     });
   });
+
+  // ================================================================
+  // 动态兜底：computeDynamicFallback
+  // ================================================================
+  group('computeDynamicFallback', () {
+    // 基准：referenceDuration = 10s, speedFactor = 1.1 → adjustedDuration = 11s
+
+    const ref10s = Duration(seconds: 10); // 原句 10s
+
+    test('referenceDuration <= 0 → 返回 defaultFallback', () {
+      expect(
+        computeDynamicFallback(
+          voicedDuration: const Duration(seconds: 15),
+          referenceDuration: Duration.zero,
+        ),
+        const Duration(seconds: 5),
+      );
+    });
+
+    test('matchRate < 0.8 → 返回 defaultFallback', () {
+      expect(
+        computeDynamicFallback(
+          voicedDuration: const Duration(seconds: 15),
+          referenceDuration: ref10s,
+          matchRate: 0.5,
+        ),
+        const Duration(seconds: 5),
+      );
+    });
+
+    test('matchRate = null（无转录）+ ratio >= 0.95 → 1s', () {
+      // voiced = 10.5s, adjusted = 11s → ratio ≈ 0.955
+      expect(
+        computeDynamicFallback(
+          voicedDuration: const Duration(milliseconds: 10500),
+          referenceDuration: ref10s,
+        ),
+        const Duration(seconds: 1),
+      );
+    });
+
+    test('matchRate = null + ratio >= 0.90 → 2s', () {
+      // voiced = 9.9s, adjusted = 11s → ratio = 0.90
+      expect(
+        computeDynamicFallback(
+          voicedDuration: const Duration(milliseconds: 9900),
+          referenceDuration: ref10s,
+        ),
+        const Duration(seconds: 2),
+      );
+    });
+
+    test('matchRate = null + ratio >= 0.85 → 3s', () {
+      // voiced = 9.35s, adjusted = 11s → ratio = 0.85
+      expect(
+        computeDynamicFallback(
+          voicedDuration: const Duration(milliseconds: 9350),
+          referenceDuration: ref10s,
+        ),
+        const Duration(seconds: 3),
+      );
+    });
+
+    test('matchRate = null + ratio >= 0.80 → 4s', () {
+      // voiced = 8.8s, adjusted = 11s → ratio = 0.80
+      expect(
+        computeDynamicFallback(
+          voicedDuration: const Duration(milliseconds: 8800),
+          referenceDuration: ref10s,
+        ),
+        const Duration(seconds: 4),
+      );
+    });
+
+    test('matchRate = null + ratio >= 0.75 → 5s', () {
+      // voiced = 8.25s, adjusted = 11s → ratio = 0.75
+      expect(
+        computeDynamicFallback(
+          voicedDuration: const Duration(milliseconds: 8250),
+          referenceDuration: ref10s,
+        ),
+        const Duration(seconds: 5),
+      );
+    });
+
+    test('matchRate = null + ratio < 0.75 → defaultFallback (5s)', () {
+      // voiced = 8s, adjusted = 11s → ratio ≈ 0.727
+      expect(
+        computeDynamicFallback(
+          voicedDuration: const Duration(seconds: 8),
+          referenceDuration: ref10s,
+        ),
+        const Duration(seconds: 5),
+      );
+    });
+
+    test('matchRate >= 0.8 时动态兜底生效', () {
+      // voiced = 10.5s, adjusted = 11s → ratio ≈ 0.955, matchRate = 0.8 → 1s
+      expect(
+        computeDynamicFallback(
+          voicedDuration: const Duration(milliseconds: 10500),
+          referenceDuration: ref10s,
+          matchRate: 0.8,
+        ),
+        const Duration(seconds: 1),
+      );
+    });
+
+    test('matchRate = 0.79 时即使 ratio 很高也返回 defaultFallback', () {
+      expect(
+        computeDynamicFallback(
+          voicedDuration: const Duration(seconds: 20),
+          referenceDuration: ref10s,
+          matchRate: 0.79,
+        ),
+        const Duration(seconds: 5),
+      );
+    });
+
+    test('speedFactor 自定义', () {
+      // ref = 10s, speedFactor = 1.0 → adjusted = 10s
+      // voiced = 10s → ratio = 1.0 → 1s
+      expect(
+        computeDynamicFallback(
+          voicedDuration: const Duration(seconds: 10),
+          referenceDuration: ref10s,
+          speedFactor: 1.0,
+        ),
+        const Duration(seconds: 1),
+      );
+    });
+  });
 }

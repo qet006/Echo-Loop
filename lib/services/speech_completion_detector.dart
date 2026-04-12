@@ -298,6 +298,38 @@ DetectionResult combineDetections(
   );
 }
 
+// ========== 动态兜底 ==========
+
+/// 根据有声时长与原句时长的比例计算动态兜底阈值。
+///
+/// 当文本匹配规则（A/B/C/D）均未触发时，用此函数替代固定 5 秒兜底，
+/// 让说得越多的用户越快停止录音。
+///
+/// - [matchRate]：文本匹配率（0-1），低于 0.8 时不缩短兜底。
+///   传 null 表示无转录（ASR 关闭），此时仅凭有声比例计算。
+/// - [speedFactor]：语速补偿系数（默认 1.3），学习者通常比原音慢，
+///   实际比较基准 = referenceDuration × speedFactor。
+Duration computeDynamicFallback({
+  required Duration voicedDuration,
+  required Duration referenceDuration,
+  double? matchRate,
+  double speedFactor = 1.1,
+  Duration defaultFallback = const Duration(seconds: 5),
+}) {
+  if (referenceDuration <= Duration.zero) return defaultFallback;
+  if (matchRate != null && matchRate < 0.8) return defaultFallback;
+
+  final adjustedMs = referenceDuration.inMilliseconds * speedFactor;
+  final ratio = voicedDuration.inMilliseconds / adjustedMs;
+
+  if (ratio >= 0.95) return const Duration(seconds: 1);
+  if (ratio >= 0.90) return const Duration(seconds: 2);
+  if (ratio >= 0.85) return const Duration(seconds: 3);
+  if (ratio >= 0.80) return const Duration(seconds: 4);
+  if (ratio >= 0.75) return const Duration(seconds: 5);
+  return defaultFallback;
+}
+
 // ========== 内部工具函数 ==========
 
 final RegExp _englishWordPattern = RegExp(r"[A-Za-z]+(?:'[A-Za-z]+)?");

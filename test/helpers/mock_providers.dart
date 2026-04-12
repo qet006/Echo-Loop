@@ -1033,6 +1033,7 @@ class TestReviewDifficultPractice extends ReviewDifficultPractice {
               required String promptId,
               required String referenceText,
               required Duration maxDuration,
+              Duration? referenceDuration,
             }) {},
         cancelRecording: () async {},
         stopAndEvaluate: ({required String referenceText}) async {},
@@ -1534,6 +1535,7 @@ class TestSpeechRecordingController extends SpeechRecordingController {
   Future<void> startRecording({
     required String promptId,
     required String referenceText,
+    Duration? referenceDuration,
   }) async {}
 
   @override
