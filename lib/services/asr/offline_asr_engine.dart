@@ -4,6 +4,8 @@
 /// 和 whisper.cpp（Whisper GGML）都实现此接口，上层不感知具体引擎差异。
 library;
 
+import 'dart:io' show Platform;
+
 /// ASR 模型类型。
 enum AsrModelType {
   /// Moonshine 系列（Useful Sensors），ONNX 格式，sherpa-onnx 加载。
@@ -53,6 +55,17 @@ class AsrModelConfig {
     this.numThreads = 4,
     this.provider,
   });
+
+  /// 根据设备 CPU 核心数推荐线程数。
+  ///
+  /// cores ≥ 8 → 6 线程，cores ≥ 6 → 4 线程，其他 → 2 线程。
+  /// 不占满 CPU，留余量给 UI 和其他任务。
+  static int recommendedThreads() {
+    final cores = Platform.numberOfProcessors;
+    if (cores >= 8) return 6;
+    if (cores >= 6) return 4;
+    return 2;
+  }
 }
 
 /// ASR 转录结果。

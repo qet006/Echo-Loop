@@ -356,7 +356,11 @@ class OfflineAsrSettingsNotifier extends Notifier<OfflineAsrSettingsState> {
 
     try {
       await engine.initialize(
-        AsrModelConfig(model: state.recommendedModel, modelDir: modelDir),
+        AsrModelConfig(
+          model: state.recommendedModel,
+          modelDir: modelDir,
+          numThreads: AsrModelConfig.recommendedThreads(),
+        ),
       );
       state = state.copyWith(engineReady: true);
     } catch (e) {

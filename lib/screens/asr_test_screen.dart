@@ -302,7 +302,11 @@ class _AsrTestScreenState extends ConsumerState<AsrTestScreen> {
           (m) => m.id == _selectedModelId,
         );
         await engine.initialize(
-          AsrModelConfig(model: modelInfo, modelDir: modelDir),
+          AsrModelConfig(
+            model: modelInfo,
+            modelDir: modelDir,
+            numThreads: AsrModelConfig.recommendedThreads(),
+          ),
         );
         _addLog('engine ready');
       }
