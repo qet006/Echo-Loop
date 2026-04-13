@@ -437,9 +437,9 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
     _enterProcessing(promptId);
 
     // ── 阶段 3：等待转录结果 ──
-    // whisper 推理时间与录音时长成正比，按 10s 基础 + 0.3x 录音时长计算超时。
+    // whisper-small 推理接近 1:1 实时，加 10s 基础余量。
     final transcriptTimeout = effectiveDurationMs != null
-        ? Duration(seconds: 10 + (effectiveDurationMs * 0.3 / 1000).ceil())
+        ? Duration(seconds: 10 + (effectiveDurationMs / 1000).ceil())
         : null;
     final result = await _recordingService.waitForTranscript(
       filePath: filePath,

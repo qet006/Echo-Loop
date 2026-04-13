@@ -408,17 +408,13 @@ class AsrModelManager {
   /// 根据设备硬件推荐模型。
   ///
   /// [ramBytes] 由原生层提供（全平台统一）。
-  /// - 核心数 ≥ 8 且 RAM ≥ 8GB → Small (Accurate)
-  /// - 核心数 ≥ 6 且 RAM ≥ 4GB → Base (Balanced)
+  /// - 核心数 ≥ 8 且 RAM ≥ 8GB → Base (Balanced)
   /// - 其他 → Tiny (Fast)
   AsrModelInfo recommendModel({int ramBytes = 0}) {
     final cores = Platform.numberOfProcessors;
     final ramGb = ramBytes ~/ (1024 * 1024 * 1024);
     AppLogger.log('ASR', 'recommendModel: cores=$cores, ramGb=$ramGb');
     if (cores >= 8 && ramGb >= 8) {
-      return availableModels.firstWhere((m) => m.id == 'whisper-small-en-int8');
-    }
-    if (cores >= 6 && ramGb >= 4) {
       return availableModels.firstWhere((m) => m.id == 'whisper-base-en-int8');
     }
     return availableModels.firstWhere((m) => m.id == 'whisper-tiny-en-int8');

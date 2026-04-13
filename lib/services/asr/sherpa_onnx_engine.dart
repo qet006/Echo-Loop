@@ -243,7 +243,7 @@ sherpa.VoiceActivityDetector? _createVad(String? vadModelPath) {
       model: vadModelPath,
       minSilenceDuration: 0.25,
       minSpeechDuration: 0.5,
-      maxSpeechDuration: 60.0,
+      maxSpeechDuration: 30.0,
     ),
     sampleRate: 16000,
     numThreads: 1,
@@ -253,11 +253,12 @@ sherpa.VoiceActivityDetector? _createVad(String? vadModelPath) {
   return sherpa.VoiceActivityDetector(config: config, bufferSizeInSeconds: 600);
 }
 
-/// 用 VAD 提取语音段，拼接后返回纯语音 16kHz 采样。
+/// 用 VAD 提取语音段列表。
 ///
 /// 按 windowSize（默认 512）分块喂入 VAD，与官方示例一致。
+/// 每个 segment ≤ maxSpeechDuration（30s），可直接送入 whisper。
 /// 返回 null 表示无语音段（全静音）。
-Float32List? _extractSpeechWithVad(
+List<Float32List>? _extractSpeechWithVad(
   sherpa.VoiceActivityDetector vad,
   Float32List samples16k,
 ) {
@@ -265,7 +266,6 @@ Float32List? _extractSpeechWithVad(
   final numIter = samples16k.length ~/ windowSize;
 
   final segments = <Float32List>[];
-  var totalLen = 0;
 
   // 按 windowSize 分块喂入，每次检查是否检测到语音段。
   for (var i = 0; i < numIter; i++) {
@@ -274,9 +274,7 @@ Float32List? _extractSpeechWithVad(
       Float32List.sublistView(samples16k, start, start + windowSize),
     );
     while (!vad.isEmpty()) {
-      final seg = vad.front();
-      segments.add(seg.samples);
-      totalLen += seg.samples.length;
+      segments.add(vad.front().samples);
       vad.pop();
     }
   }
@@ -284,29 +282,51 @@ Float32List? _extractSpeechWithVad(
   // 处理尾部不足一个 window 的残余。
   vad.flush();
   while (!vad.isEmpty()) {
-    final seg = vad.front();
-    segments.add(seg.samples);
-    totalLen += seg.samples.length;
+    segments.add(vad.front().samples);
     vad.pop();
   }
   vad.reset();
 
-  if (segments.isEmpty) return null;
-
-  // 单段直接返回，避免拷贝。
-  if (segments.length == 1) return segments.first;
-
-  final merged = Float32List(totalLen);
-  var offset = 0;
-  for (final seg in segments) {
-    merged.setAll(offset, seg);
-    offset += seg.length;
-  }
-  return merged;
+  return segments.isEmpty ? null : segments;
 }
 
 /// VAD 目标采样率。
 const _vadSampleRate = 16000;
+
+/// 将 VAD 语音段合并为 ≤ maxSamples 的 chunk。
+///
+/// 相邻小段累积合并，当加入下一段会超过上限时切出新 chunk。
+List<Float32List> _mergeSegments(List<Float32List> segments, int maxSamples) {
+  final chunks = <Float32List>[];
+  var pending = <Float32List>[];
+  var pendingLen = 0;
+
+  for (final seg in segments) {
+    if (pendingLen + seg.length > maxSamples && pending.isNotEmpty) {
+      chunks.add(_concat(pending, pendingLen));
+      pending = [];
+      pendingLen = 0;
+    }
+    pending.add(seg);
+    pendingLen += seg.length;
+  }
+  if (pending.isNotEmpty) {
+    chunks.add(_concat(pending, pendingLen));
+  }
+  return chunks;
+}
+
+/// 拼接多个 Float32List 为一个。
+Float32List _concat(List<Float32List> parts, int totalLen) {
+  if (parts.length == 1) return parts.first;
+  final merged = Float32List(totalLen);
+  var offset = 0;
+  for (final p in parts) {
+    merged.setAll(offset, p);
+    offset += p.length;
+  }
+  return merged;
+}
 
 /// 在 Worker 内执行转录：读取音频文件 → VAD 裁静音 → FFI 推理 → 返回结果。
 void _handleTranscribe(
@@ -324,8 +344,6 @@ void _handleTranscribe(
     }
 
     // VAD 裁剪静音段（需要 16kHz 输入）。
-    Float32List samples;
-    int sampleRate;
     if (vad != null && audioData.sampleRate >= _vadSampleRate) {
       final samples16k = audioData.sampleRate == _vadSampleRate
           ? audioData.samples
@@ -344,39 +362,66 @@ void _handleTranscribe(
             'rms²=${rms.toStringAsExponential(2)}, '
             'max=${samples16k.reduce((a, b) => a.abs() > b.abs() ? a : b).toStringAsFixed(4)}',
       );
-      final speech = _extractSpeechWithVad(vad, samples16k);
-      if (speech == null) {
+      final segments = _extractSpeechWithVad(vad, samples16k);
+      if (segments == null) {
         AppLogger.log('ASREngine', 'VAD: ${beforeSec.toStringAsFixed(1)}s → 0.0s (全静音)');
         request.replyPort.send(
           const _TranscribeResponse(text: '', inferenceTimeMs: 0),
         );
         return;
       }
-      final afterSec = speech.length / _vadSampleRate;
-      AppLogger.log('ASREngine', 'VAD: ${beforeSec.toStringAsFixed(1)}s → ${afterSec.toStringAsFixed(1)}s');
-      samples = speech;
-      sampleRate = _vadSampleRate;
+      final totalSpeechSamples = segments.fold<int>(0, (s, seg) => s + seg.length);
+      final afterSec = totalSpeechSamples / _vadSampleRate;
+      AppLogger.log(
+        'ASREngine',
+        'VAD: ${beforeSec.toStringAsFixed(1)}s → ${afterSec.toStringAsFixed(1)}s (${segments.length} segments)',
+      );
+
+      // 合并小段为 ≤30s 的 chunk，减少 whisper 调用次数。
+      final chunks = _mergeSegments(segments, 30 * _vadSampleRate);
+      AppLogger.log(
+        'ASREngine',
+        '│ ${segments.length} segments → ${chunks.length} chunks',
+      );
+
+      final stopwatch = Stopwatch()..start();
+      final texts = <String>[];
+      for (final chunk in chunks) {
+        final stream = recognizer.createStream();
+        stream.acceptWaveform(samples: chunk, sampleRate: _vadSampleRate);
+        recognizer.decode(stream);
+        final t = recognizer.getResult(stream).text.trim();
+        if (t.isNotEmpty) texts.add(t);
+        stream.free();
+      }
+      stopwatch.stop();
+
+      request.replyPort.send(
+        _TranscribeResponse(
+          text: texts.join(' '),
+          inferenceTimeMs: stopwatch.elapsedMilliseconds,
+        ),
+      );
     } else {
-      samples = audioData.samples;
-      sampleRate = audioData.sampleRate;
+      // 无 VAD，直接转录（可能被 whisper 截断到 30s）。
+      final stopwatch = Stopwatch()..start();
+      final stream = recognizer.createStream();
+      stream.acceptWaveform(
+        samples: audioData.samples,
+        sampleRate: audioData.sampleRate,
+      );
+      recognizer.decode(stream);
+      final text = recognizer.getResult(stream).text.trim();
+      stopwatch.stop();
+      stream.free();
+
+      request.replyPort.send(
+        _TranscribeResponse(
+          text: text,
+          inferenceTimeMs: stopwatch.elapsedMilliseconds,
+        ),
+      );
     }
-
-    final stopwatch = Stopwatch()..start();
-    final stream = recognizer.createStream();
-    stream.acceptWaveform(samples: samples, sampleRate: sampleRate);
-    recognizer.decode(stream);
-    final result = recognizer.getResult(stream);
-    stopwatch.stop();
-
-    final text = result.text.trim();
-    stream.free();
-
-    request.replyPort.send(
-      _TranscribeResponse(
-        text: text,
-        inferenceTimeMs: stopwatch.elapsedMilliseconds,
-      ),
-    );
   } catch (e) {
     request.replyPort.send('Transcribe failed: $e');
   }
