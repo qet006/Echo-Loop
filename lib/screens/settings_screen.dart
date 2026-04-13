@@ -1157,6 +1157,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: Text(l10n.nativeLanguage),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.s),
@@ -1310,6 +1311,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: Text(l10n.language),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.s),
