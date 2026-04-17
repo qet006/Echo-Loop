@@ -68,6 +68,10 @@ abstract final class GuideFlowIds {
   static const learningPlanNoTranscript = 'learning_plan_no_transcript';
   static const learningPlanWithTranscript = 'learning_plan_with_transcript';
   static const subtitleSheetTranscription = 'subtitle_sheet_transcription';
+  static const studyTasksOverview = 'study_tasks_overview';
+  static const studyStatsStreak = 'study_stats_streak';
+  static const favoritesSentencesReview = 'favorites_sentences_review';
+  static const favoritesVocabularyReview = 'favorites_vocabulary_review';
 
   static const active = [
     libraryCreateCollection,
@@ -77,6 +81,10 @@ abstract final class GuideFlowIds {
     learningPlanNoTranscript,
     learningPlanWithTranscript,
     subtitleSheetTranscription,
+    studyTasksOverview,
+    studyStatsStreak,
+    favoritesSentencesReview,
+    favoritesVocabularyReview,
   ];
 
   static const legacy = [

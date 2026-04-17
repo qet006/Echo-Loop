@@ -4610,6 +4610,90 @@ abstract class AppLocalizations {
   /// **'Tap here to follow the learning plan step by step. Echo Loop will guide you and remind you to review at the right time.'**
   String get guidePlanStartLearningDescription;
 
+  /// No description provided for @guideStudyTasksOverviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your study tasks'**
+  String get guideStudyTasksOverviewTitle;
+
+  /// No description provided for @guideStudyTasksOverviewDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'This area shows reviews that are due and new audio to learn. Finish them in order and Echo Loop will schedule the next reviews for you.'**
+  String get guideStudyTasksOverviewDescription;
+
+  /// No description provided for @guideStudyStatsHeaderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s study time'**
+  String get guideStudyStatsHeaderTitle;
+
+  /// No description provided for @guideStudyStatsHeaderDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s listening, speaking time, and new vocabulary all live here. Tap the card for a detailed breakdown.'**
+  String get guideStudyStatsHeaderDescription;
+
+  /// No description provided for @guideStudyStreakTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Learning streak'**
+  String get guideStudyStreakTitle;
+
+  /// No description provided for @guideStudyStreakDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap here to open the activity calendar and keep your streak going every day.'**
+  String get guideStudyStreakDescription;
+
+  /// No description provided for @guideFavoritesSentencesListTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved sentences'**
+  String get guideFavoritesSentencesListTitle;
+
+  /// No description provided for @guideFavoritesSentencesListDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Your saved sentences are grouped by audio. Expand a card to play the original or practice just that audio\'s sentences.'**
+  String get guideFavoritesSentencesListDescription;
+
+  /// No description provided for @guideFavoritesSentencesReviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start sentence review'**
+  String get guideFavoritesSentencesReviewTitle;
+
+  /// No description provided for @guideFavoritesSentencesReviewDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap here to enter shadowing practice and polish your pronunciation on saved sentences.'**
+  String get guideFavoritesSentencesReviewDescription;
+
+  /// No description provided for @guideFavoritesVocabularyListTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved vocabulary'**
+  String get guideFavoritesVocabularyListTitle;
+
+  /// No description provided for @guideFavoritesVocabularyListDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved words and phrases are sorted by date. Expand a card to see definitions or listen to the source sentence.'**
+  String get guideFavoritesVocabularyListDescription;
+
+  /// No description provided for @guideFavoritesFlashcardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start flashcard review'**
+  String get guideFavoritesFlashcardTitle;
+
+  /// No description provided for @guideFavoritesFlashcardDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap here to enter flashcard mode and reinforce memory through a see-listen-recall rhythm.'**
+  String get guideFavoritesFlashcardDescription;
+
   /// No description provided for @resetNewUserGuide.
   ///
   /// In en, this message translates to:

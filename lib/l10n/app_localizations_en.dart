@@ -2585,6 +2585,55 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tap here to follow the learning plan step by step. Echo Loop will guide you and remind you to review at the right time.';
 
   @override
+  String get guideStudyTasksOverviewTitle => 'Your study tasks';
+
+  @override
+  String get guideStudyTasksOverviewDescription =>
+      'This area shows reviews that are due and new audio to learn. Finish them in order and Echo Loop will schedule the next reviews for you.';
+
+  @override
+  String get guideStudyStatsHeaderTitle => 'Today\'s study time';
+
+  @override
+  String get guideStudyStatsHeaderDescription =>
+      'Today\'s listening, speaking time, and new vocabulary all live here. Tap the card for a detailed breakdown.';
+
+  @override
+  String get guideStudyStreakTitle => 'Learning streak';
+
+  @override
+  String get guideStudyStreakDescription =>
+      'Tap here to open the activity calendar and keep your streak going every day.';
+
+  @override
+  String get guideFavoritesSentencesListTitle => 'Saved sentences';
+
+  @override
+  String get guideFavoritesSentencesListDescription =>
+      'Your saved sentences are grouped by audio. Expand a card to play the original or practice just that audio\'s sentences.';
+
+  @override
+  String get guideFavoritesSentencesReviewTitle => 'Start sentence review';
+
+  @override
+  String get guideFavoritesSentencesReviewDescription =>
+      'Tap here to enter shadowing practice and polish your pronunciation on saved sentences.';
+
+  @override
+  String get guideFavoritesVocabularyListTitle => 'Saved vocabulary';
+
+  @override
+  String get guideFavoritesVocabularyListDescription =>
+      'Saved words and phrases are sorted by date. Expand a card to see definitions or listen to the source sentence.';
+
+  @override
+  String get guideFavoritesFlashcardTitle => 'Start flashcard review';
+
+  @override
+  String get guideFavoritesFlashcardDescription =>
+      'Tap here to enter flashcard mode and reinforce memory through a see-listen-recall rhythm.';
+
+  @override
   String get resetNewUserGuide => 'Reset New User Guide';
 
   @override

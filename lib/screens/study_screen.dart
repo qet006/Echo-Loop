@@ -6,12 +6,14 @@ import '../database/daos/stage_completion_dao.dart';
 import '../database/enums.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/learning_progress_provider.dart';
+import '../providers/new_user_guide_provider.dart';
 import '../providers/study_stats_provider.dart';
 import '../providers/study_task_provider.dart';
 import '../providers/time_provider.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
 import '../widgets/asr_download_prompt_dialog.dart';
+import '../widgets/guide_flow.dart';
 import '../widgets/learning_progress_icon.dart';
 import '../widgets/study/study_stats_header.dart';
 
@@ -24,11 +26,21 @@ import '../widgets/study/study_stats_header.dart';
 /// 4. Upcoming Reviews（默认折叠）
 /// 5. First Study（首次学习任务）
 /// 6. Completed（默认折叠）
-class StudyScreen extends ConsumerWidget {
+class StudyScreen extends ConsumerStatefulWidget {
   const StudyScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StudyScreen> createState() => _StudyScreenState();
+}
+
+class _StudyScreenState extends ConsumerState<StudyScreen> {
+  /// 引导 step 的 key 需在整个页面生命周期内保持稳定，故放在 State 中持有。
+  final GlobalKey _keyTaskArea = GlobalKey();
+  final GlobalKey _keyStatsHeader = GlobalKey();
+  final GlobalKey _keyStreakChip = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final tasks = ref.watch(studyTaskProvider);
     final completedAudios = ref.watch(completedAudioProvider);
@@ -91,83 +103,145 @@ class StudyScreen extends ConsumerWidget {
       ),
     );
 
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.studyTasks), actions: [streakChip]),
-      body: !hasAnyTask
-          ? const _EmptyState(type: _EmptyStateType.noTasks)
-          : tasks.isEmpty && completedAudios.isNotEmpty
-          ? _buildAllDoneContent(context, l10n, completedAudios)
-          : ListView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.m,
-                vertical: AppSpacing.s,
-              ),
-              children: [
-                // 统计 Chips + 柱状图
-                const StudyStatsHeader(),
-                const SizedBox(height: AppSpacing.l),
+    // ----- 新手引导 flow 声明 -----
+    final stepTaskArea = GuideStep(
+      key: _keyTaskArea,
+      title: l10n.guideStudyTasksOverviewTitle,
+      description: l10n.guideStudyTasksOverviewDescription,
+    );
+    final stepStatsHeader = GuideStep(
+      key: _keyStatsHeader,
+      title: l10n.guideStudyStatsHeaderTitle,
+      description: l10n.guideStudyStatsHeaderDescription,
+    );
+    final stepStreakChip = GuideStep(
+      key: _keyStreakChip,
+      title: l10n.guideStudyStreakTitle,
+      description: l10n.guideStudyStreakDescription,
+    );
+    // 门槛：用户本周已经累计过学习时长才触发引导。
+    final hasStudyTime = (statsAsync.valueOrNull?.weekTotalSeconds ?? 0) > 0;
+    final flows = <GuideFlow>[
+      GuideFlow(
+        flowId: GuideFlowIds.studyTasksOverview,
+        shouldRun: hasStudyTime && tasks.isNotEmpty,
+        steps: [stepTaskArea],
+      ),
+      GuideFlow(
+        flowId: GuideFlowIds.studyStatsStreak,
+        shouldRun: hasStudyTime,
+        steps: [stepStatsHeader, stepStreakChip],
+      ),
+    ];
 
-                // Ready to Review
-                if (readyReviews.isNotEmpty) ...[
-                  _TaskSection(
-                    title: l10n.readyToReview(readyReviews.length),
-                    emoji: '🔁',
-                    tasks: readyReviews,
-                    l10n: l10n,
-                    now: now,
+    return GuideFlowSequenceHost(
+      flows: flows,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.studyTasks),
+          actions: [GuideTarget(step: stepStreakChip, child: streakChip)],
+        ),
+        body: !hasAnyTask
+            ? const _EmptyState(type: _EmptyStateType.noTasks)
+            : tasks.isEmpty && completedAudios.isNotEmpty
+            ? _buildAllDoneContent(
+                context,
+                l10n,
+                completedAudios,
+                stepStatsHeader,
+              )
+            : ListView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.m,
+                  vertical: AppSpacing.s,
+                ),
+                children: [
+                  // 统计 Chips + 柱状图
+                  GuideTarget(
+                    step: stepStatsHeader,
+                    child: const StudyStatsHeader(),
                   ),
-                  const SizedBox(height: AppSpacing.m),
-                ],
+                  const SizedBox(height: AppSpacing.l),
 
-                // Upcoming Reviews (默认折叠)
-                if (upcomingReviews.isNotEmpty) ...[
-                  _CollapsibleSection(
-                    title: l10n.upcomingReviews(upcomingReviews.length),
-                    summary: l10n.upcomingReviewsSummary(
-                      upcomingReviews.length,
-                    ),
-                    initiallyExpanded: false,
-                    children: upcomingReviews
-                        .map((t) => _TaskCard(task: t, l10n: l10n, now: now))
-                        .toList(),
-                  ),
-                  const SizedBox(height: AppSpacing.m),
-                ],
-
-                // First Study
-                if (firstStudies.isNotEmpty) ...[
-                  _TaskSection(
-                    title: l10n.firstStudySection(firstStudies.length),
-                    emoji: '🌱',
-                    tasks: firstStudies,
-                    l10n: l10n,
-                    now: now,
-                  ),
-                  const SizedBox(height: AppSpacing.m),
-                ],
-
-                // Completed (默认折叠)
-                if (completedAudios.isNotEmpty) ...[
-                  _CompletedSection(completedAudios: completedAudios),
-                  const SizedBox(height: AppSpacing.m),
-                ],
-
-                // 最近完成（过去24小时，默认折叠）
-                ...recentCompletionsAsync.whenOrNull(
-                      data: (completions) => completions.isNotEmpty
-                          ? [
-                              _RecentCompletionsSection(
-                                completions: completions,
-                                l10n: l10n,
-                                now: now,
+                  // 学习任务区（引导 flow 1 的高亮目标）
+                  if (readyReviews.isNotEmpty ||
+                      upcomingReviews.isNotEmpty ||
+                      firstStudies.isNotEmpty)
+                    GuideTarget(
+                      step: stepTaskArea,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (readyReviews.isNotEmpty) ...[
+                            _TaskSection(
+                              title: l10n.readyToReview(readyReviews.length),
+                              emoji: '🔁',
+                              tasks: readyReviews,
+                              l10n: l10n,
+                              now: now,
+                            ),
+                            const SizedBox(height: AppSpacing.m),
+                          ],
+                          if (upcomingReviews.isNotEmpty) ...[
+                            _CollapsibleSection(
+                              title: l10n.upcomingReviews(
+                                upcomingReviews.length,
                               ),
-                              const SizedBox(height: AppSpacing.m),
-                            ]
-                          : null,
-                    ) ??
-                    [],
-              ],
-            ),
+                              summary: l10n.upcomingReviewsSummary(
+                                upcomingReviews.length,
+                              ),
+                              initiallyExpanded: false,
+                              children: upcomingReviews
+                                  .map(
+                                    (t) => _TaskCard(
+                                      task: t,
+                                      l10n: l10n,
+                                      now: now,
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                            const SizedBox(height: AppSpacing.m),
+                          ],
+                          if (firstStudies.isNotEmpty) ...[
+                            _TaskSection(
+                              title: l10n.firstStudySection(
+                                firstStudies.length,
+                              ),
+                              emoji: '🌱',
+                              tasks: firstStudies,
+                              l10n: l10n,
+                              now: now,
+                            ),
+                            const SizedBox(height: AppSpacing.m),
+                          ],
+                        ],
+                      ),
+                    ),
+
+                  // Completed (默认折叠)
+                  if (completedAudios.isNotEmpty) ...[
+                    _CompletedSection(completedAudios: completedAudios),
+                    const SizedBox(height: AppSpacing.m),
+                  ],
+
+                  // 最近完成（过去24小时，默认折叠）
+                  ...recentCompletionsAsync.whenOrNull(
+                        data: (completions) => completions.isNotEmpty
+                            ? [
+                                _RecentCompletionsSection(
+                                  completions: completions,
+                                  l10n: l10n,
+                                  now: now,
+                                ),
+                                const SizedBox(height: AppSpacing.m),
+                              ]
+                            : null,
+                      ) ??
+                      [],
+                ],
+              ),
+      ),
     );
   }
 
@@ -176,6 +250,7 @@ class StudyScreen extends ConsumerWidget {
     BuildContext context,
     AppLocalizations l10n,
     List<({String audioId, String audioName})> completedAudios,
+    GuideStep stepStatsHeader,
   ) {
     return ListView(
       padding: const EdgeInsets.symmetric(
@@ -183,7 +258,7 @@ class StudyScreen extends ConsumerWidget {
         vertical: AppSpacing.s,
       ),
       children: [
-        const StudyStatsHeader(),
+        GuideTarget(step: stepStatsHeader, child: const StudyStatsHeader()),
         const SizedBox(height: AppSpacing.xl),
         const _EmptyState(type: _EmptyStateType.allDone),
         if (completedAudios.isNotEmpty) ...[

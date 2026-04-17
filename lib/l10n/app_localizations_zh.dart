@@ -2506,6 +2506,54 @@ class AppLocalizationsZh extends AppLocalizations {
       '点击这里即可按照学习计划逐步学习。Echo Loop 会自动引导你学习，并及时提醒你复习。';
 
   @override
+  String get guideStudyTasksOverviewTitle => '这里是你的学习任务';
+
+  @override
+  String get guideStudyTasksOverviewDescription =>
+      '包括到期的复习和新学的音频。按顺序完成，Echo Loop 会自动安排后续的复习节奏。';
+
+  @override
+  String get guideStudyStatsHeaderTitle => '今日学习时长';
+
+  @override
+  String get guideStudyStatsHeaderDescription =>
+      '今天听、说的时长和新学词汇量都在这里。点击卡片可以查看更详细的分布。';
+
+  @override
+  String get guideStudyStreakTitle => '连续学习';
+
+  @override
+  String get guideStudyStreakDescription => '点击这里查看学习日历，坚持每天打卡，养成稳定的学习习惯。';
+
+  @override
+  String get guideFavoritesSentencesListTitle => '收藏的句子';
+
+  @override
+  String get guideFavoritesSentencesListDescription =>
+      '按音频分组展示你收藏的句子。展开卡片可以播放原声，也能单独练习该音频下的收藏句。';
+
+  @override
+  String get guideFavoritesSentencesReviewTitle => '开始句子复习';
+
+  @override
+  String get guideFavoritesSentencesReviewDescription =>
+      '点击这里进入跟读练习，对收藏的句子反复打磨发音。';
+
+  @override
+  String get guideFavoritesVocabularyListTitle => '收藏的词汇';
+
+  @override
+  String get guideFavoritesVocabularyListDescription =>
+      '收藏的单词和意群按时间排序。展开可查看释义，也能听来源句子的原声。';
+
+  @override
+  String get guideFavoritesFlashcardTitle => '开始闪卡复习';
+
+  @override
+  String get guideFavoritesFlashcardDescription =>
+      '点击这里进入闪卡模式，通过看词、听句、回忆的节奏高效巩固记忆。';
+
+  @override
   String get resetNewUserGuide => '重置新手引导';
 
   @override
