@@ -336,39 +336,6 @@ class AppDatabase extends _$AppDatabase {
             'ALTER TABLE collections RENAME COLUMN is_starred TO is_pinned',
           );
         }
-        // v30→v31：audio_items 加 original_date（音频原始发布/播出日期，官方合集用）
-        if (from < 31) {
-          await _addColumnIfNotExists(
-            'audio_items',
-            'original_date',
-            'INTEGER',
-          );
-        }
-        // v29→v30：audio_path 改 nullable，删除 is_audio_downloaded 字段
-        // - 单一真实来源：audioPath != null ↔ 文件已下载
-        // - 先按 is_audio_downloaded=0 把预置但文件不存在的 path 清成 NULL
-        // - 然后走 Drift alterTable 重建表（nullable audio_path + 去掉 is_audio_downloaded 列）
-        if (from < 30) {
-          await m.alterTable(
-            TableMigration(
-              audioItems,
-              columnTransformer: {
-                audioItems.audioPath: const CustomExpression<String>(
-                  'CASE WHEN is_audio_downloaded = 0 THEN NULL ELSE audio_path END',
-                ),
-                audioItems.transcriptPath: const CustomExpression<String>(
-                  'CASE WHEN is_audio_downloaded = 0 THEN NULL ELSE transcript_path END',
-                ),
-              },
-            ),
-          );
-          // alterTable 重建表后索引需要重建
-          await customStatement('''
-            CREATE INDEX IF NOT EXISTS idx_audio_items_remote_audio_id
-            ON audio_items(remote_audio_id)
-            WHERE remote_audio_id IS NOT NULL
-          ''');
-        }
         // v28→v29：官方合集支持字段
         // - collections 加：source / remoteId / coverUrl / description / deprecatedAt
         // - audio_items 加：remoteAudioId / isAudioDownloaded（默认 true 兼容老数据）
@@ -382,7 +349,11 @@ class AppDatabase extends _$AppDatabase {
           await _addColumnIfNotExists('collections', 'remote_id', 'TEXT');
           await _addColumnIfNotExists('collections', 'cover_url', 'TEXT');
           await _addColumnIfNotExists('collections', 'description', 'TEXT');
-          await _addColumnIfNotExists('collections', 'deprecated_at', 'INTEGER');
+          await _addColumnIfNotExists(
+            'collections',
+            'deprecated_at',
+            'INTEGER',
+          );
           await _addColumnIfNotExists('audio_items', 'remote_audio_id', 'TEXT');
           await _addColumnIfNotExists(
             'audio_items',
@@ -396,6 +367,49 @@ class AppDatabase extends _$AppDatabase {
             WHERE source = 'official' AND remote_id IS NOT NULL
           ''');
           // 同步时按 remoteAudioId 反查
+          await customStatement('''
+            CREATE INDEX IF NOT EXISTS idx_audio_items_remote_audio_id
+            ON audio_items(remote_audio_id)
+            WHERE remote_audio_id IS NOT NULL
+          ''');
+        }
+        // v30→v31：audio_items 加 original_date（音频原始发布/播出日期，官方合集用）
+        //
+        // 注意：这里必须在 v29→v30 的 alterTable 之前执行。Drift 的
+        // TableMigration 会按当前表定义重建 audio_items，当前表已包含
+        // original_date；若旧表还没有该列，重建时会在 SELECT 阶段缺列失败。
+        if (from < 31) {
+          await _addColumnIfNotExists(
+            'audio_items',
+            'original_date',
+            'INTEGER',
+          );
+        }
+        // v29→v30：audio_path 改 nullable，删除 is_audio_downloaded 字段
+        // - 单一真实来源：audioPath != null ↔ 文件已下载
+        // - 先按 is_audio_downloaded=0 把预置但文件不存在的 path 清成 NULL
+        // - 然后走 Drift alterTable 重建表（nullable audio_path + 去掉 is_audio_downloaded 列）
+        //
+        // 该块依赖 v28→v29 先补出 is_audio_downloaded。老用户从 v28 或更早
+        // 直接升到当前版本时，如果顺序反了，会在表重建时报 no such column。
+        if (from < 30) {
+          // 上一次失败的 TableMigration 可能留下临时拷贝表；重试前清理残留。
+          await customStatement('DROP TABLE IF EXISTS tmp_for_copy_audio_items');
+          await m.alterTable(
+            // ignore: experimental_member_use
+            TableMigration(
+              audioItems,
+              columnTransformer: {
+                audioItems.audioPath: const CustomExpression<String>(
+                  'CASE WHEN is_audio_downloaded = 0 THEN NULL ELSE audio_path END',
+                ),
+                audioItems.transcriptPath: const CustomExpression<String>(
+                  'CASE WHEN is_audio_downloaded = 0 THEN NULL ELSE transcript_path END',
+                ),
+              },
+            ),
+          );
+          // alterTable 重建表后索引需要重建
           await customStatement('''
             CREATE INDEX IF NOT EXISTS idx_audio_items_remote_audio_id
             ON audio_items(remote_audio_id)

@@ -42,77 +42,97 @@ class AudioLibrary extends _$AudioLibrary {
   Future<void> loadLibrary() async {
     state = state.copyWith(isLoading: true);
 
-    final dao = ref.read(audioItemDaoProvider);
-    final dbItems = await dao.getAllActive();
+    try {
+      final dao = ref.read(audioItemDaoProvider);
+      final dbItems = await dao.getAllActive();
+      AppLogger.log('StartupLoad', 'audio query ok: dbRows=${dbItems.length}');
 
-    // 将 Drift 数据转换为模型
-    final allItems = dbItems
-        .map(
-          (row) => AudioItem(
-            id: row.id,
-            name: row.name,
-            audioPath: row.audioPath,
-            transcriptPath: row.transcriptPath,
-            addedDate: row.addedDate,
-            totalDuration: row.totalDuration,
-            sentenceCount: row.sentenceCount,
-            wordCount: row.wordCount,
-            isPinned: row.isPinned,
-            transcriptSource: TranscriptSource.fromIndex(row.transcriptSource),
-            audioSha256: row.audioSha256,
-            transcriptLanguage: row.transcriptLanguage,
-            remoteAudioId: row.remoteAudioId,
-            originalDate: row.originalDate,
-          ),
-        )
-        .toList();
+      // 将 Drift 数据转换为模型
+      final allItems = dbItems
+          .map(
+            (row) => AudioItem(
+              id: row.id,
+              name: row.name,
+              audioPath: row.audioPath,
+              transcriptPath: row.transcriptPath,
+              addedDate: row.addedDate,
+              totalDuration: row.totalDuration,
+              sentenceCount: row.sentenceCount,
+              wordCount: row.wordCount,
+              isPinned: row.isPinned,
+              transcriptSource: TranscriptSource.fromIndex(
+                row.transcriptSource,
+              ),
+              audioSha256: row.audioSha256,
+              transcriptLanguage: row.transcriptLanguage,
+              remoteAudioId: row.remoteAudioId,
+              originalDate: row.originalDate,
+            ),
+          )
+          .toList();
 
-    final validItems = <AudioItem>[];
-    bool hasMigratedItems = false;
+      final validItems = <AudioItem>[];
+      bool hasMigratedItems = false;
 
-    for (final item in allItems) {
-      AudioItem processedItem = item;
+      for (final item in allItems) {
+        AudioItem processedItem = item;
 
-      // audioPath=null → 未就绪（官方合集未下载）；直接保留为合法条目
-      final currentAudioPath = item.audioPath;
-      if (currentAudioPath == null) {
-        validItems.add(processedItem);
-        continue;
-      }
-
-      // 老数据绝对路径 → 相对路径迁移（仅对已就绪音频做）
-      if (currentAudioPath.startsWith('/')) {
-        final migratedItem = await _migrateToRelativePath(item);
-        if (migratedItem != null) {
-          processedItem = migratedItem;
-          hasMigratedItems = true;
-          AppLogger.log(
-            'AudioLib',
-            'Migrated ${item.name} from absolute to relative path',
-          );
-        } else {
-          AppLogger.log(
-            'AudioLib',
-            'Failed to migrate ${item.name}, skipping',
-          );
+        // audioPath=null → 未就绪（官方合集未下载）；直接保留为合法条目
+        final currentAudioPath = item.audioPath;
+        if (currentAudioPath == null) {
+          validItems.add(processedItem);
           continue;
         }
+
+        // 老数据绝对路径 → 相对路径迁移（仅对已就绪音频做）
+        if (currentAudioPath.startsWith('/')) {
+          final migratedItem = await _migrateToRelativePath(item);
+          if (migratedItem != null) {
+            processedItem = migratedItem;
+            hasMigratedItems = true;
+            AppLogger.log(
+              'AudioLib',
+              'Migrated ${item.name} from absolute to relative path',
+            );
+          } else {
+            AppLogger.log(
+              'AudioLib',
+              'Failed to migrate ${item.name}, skipping',
+            );
+            continue;
+          }
+        }
+
+        validItems.add(processedItem);
       }
 
-      validItems.add(processedItem);
-    }
-
-    state = state.copyWith(audioItems: validItems, isLoading: false);
-
-    if (hasMigratedItems) {
-      // 更新迁移后的音频项到数据库
-      for (final item in validItems) {
-        await _upsertItem(item);
-      }
+      final readyCount = validItems.where((item) => item.isAudioReady).length;
+      final remoteCount = validItems
+          .where((item) => item.remoteAudioId != null)
+          .length;
       AppLogger.log(
-        'AudioLib',
-        'Migrated paths from absolute to relative format',
+        'StartupLoad',
+        'audio mapped: visible=${validItems.length}, ready=$readyCount, '
+            'remote=$remoteCount, migrated=$hasMigratedItems',
       );
+
+      state = state.copyWith(audioItems: validItems, isLoading: false);
+
+      if (hasMigratedItems) {
+        // 更新迁移后的音频项到数据库
+        for (final item in validItems) {
+          await _upsertItem(item);
+        }
+        AppLogger.log(
+          'AudioLib',
+          'Migrated paths from absolute to relative format',
+        );
+      }
+    } catch (e, st) {
+      AppLogger.log('StartupLoad', 'audio load failed: $e');
+      AppLogger.log('StartupLoad', st.toString());
+      state = state.copyWith(isLoading: false);
+      rethrow;
     }
   }
 

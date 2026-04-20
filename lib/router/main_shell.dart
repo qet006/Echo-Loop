@@ -82,12 +82,30 @@ class _MainShellState extends ConsumerState<MainShell> {
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await ref.read(audioLibraryProvider.notifier).loadLibrary().then((_) {
-        ref.read(collectionListProvider.notifier).loadCollections();
+      AppLogger.log('StartupLoad', 'library bootstrap start');
+      try {
+        await ref.read(audioLibraryProvider.notifier).loadLibrary();
+        final audioState = ref.read(audioLibraryProvider);
+        AppLogger.log(
+          'StartupLoad',
+          'library bootstrap audio done: stateItems=${audioState.audioItems.length}',
+        );
+
+        await ref.read(collectionListProvider.notifier).loadCollections();
+        final collectionState = ref.read(collectionListProvider);
+        AppLogger.log(
+          'StartupLoad',
+          'library bootstrap collections done: '
+          'stateCollections=${collectionState.rawCollections.length}',
+        );
+
         ref.read(tagListProvider.notifier).loadTags();
         ref.read(audioLibraryProvider.notifier).backfillDurations();
         ref.read(audioLibraryProvider.notifier).backfillTranscriptStats();
-      });
+      } catch (e, st) {
+        AppLogger.log('StartupLoad', 'library bootstrap failed: $e');
+        AppLogger.log('StartupLoad', st.toString());
+      }
       // 学习进度加载失败时给用户 snackbar 反馈，而不是默默吞掉；
       // isLoading 已在 notifier 内部重置，状态不会卡死。
       try {

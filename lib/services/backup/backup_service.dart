@@ -275,8 +275,10 @@ class BackupService {
 
     final paths = <String>{};
     for (final row in rows) {
-      final audioPath = row.read<String>('audio_path');
-      paths.add(audioPath);
+      final audioPath = row.readNullable<String>('audio_path');
+      if (audioPath != null) {
+        paths.add(audioPath);
+      }
       final transcriptPath = row.readNullable<String>('transcript_path');
       if (transcriptPath != null) {
         paths.add(transcriptPath);

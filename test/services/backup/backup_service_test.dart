@@ -2,12 +2,37 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
+import 'package:drift/native.dart';
+import 'package:fluency/database/app_database.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+// ignore: depend_on_referenced_packages
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fluency/services/backup/backup_manifest.dart';
 import 'package:fluency/services/backup/backup_service.dart';
+import 'package:fluency/utils/app_data_dir.dart';
+
+class _FakePathProvider extends PathProviderPlatform
+    with MockPlatformInterfaceMixin {
+  final String rootPath;
+
+  _FakePathProvider(this.rootPath);
+
+  @override
+  Future<String?> getApplicationSupportPath() async => rootPath;
+
+  @override
+  Future<String?> getTemporaryPath() async => rootPath;
+}
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('BackupManifest', () {
     test('toJson / fromJson 往返正确', () {
       final manifest = BackupManifest(
@@ -149,9 +174,7 @@ void main() {
 
     test('manifest.json 缺失时应失败', () {
       final archive = Archive();
-      archive.addFile(
-        ArchiveFile('echo_loop.db', 4, utf8.encode('test')),
-      );
+      archive.addFile(ArchiveFile('echo_loop.db', 4, utf8.encode('test')));
       final zipData = ZipEncoder().encode(archive);
 
       final decoded = ZipDecoder().decodeBytes(zipData);
@@ -166,7 +189,8 @@ void main() {
         '/absolute/path.txt',
       ];
       for (final path in testPaths) {
-        final hasSlip = path.contains('..') ||
+        final hasSlip =
+            path.contains('..') ||
             path.startsWith('/') ||
             path.startsWith('\\');
         expect(hasSlip, isTrue, reason: 'Should detect: $path');
@@ -181,11 +205,77 @@ void main() {
         'media/transcripts/test.srt',
       ];
       for (final path in safePaths) {
-        final hasSlip = path.contains('..') ||
+        final hasSlip =
+            path.contains('..') ||
             path.startsWith('/') ||
             path.startsWith('\\');
         expect(hasSlip, isFalse, reason: 'Should be safe: $path');
       }
+    });
+
+    test('导出时跳过未下载官方音频的 null audio_path', () async {
+      final docsDir = Directory(p.join(tempDir.path, 'docs'))
+        ..createSync(recursive: true);
+      final outputDir = Directory(p.join(tempDir.path, 'out'))
+        ..createSync(recursive: true);
+      PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
+      SharedPreferences.setMockInitialValues({});
+      appDataDirectoryOverride = docsDir;
+      addTearDown(() => appDataDirectoryOverride = null);
+
+      final db = AppDatabase(
+        NativeDatabase(File(p.join(docsDir.path, 'echo_loop.db'))),
+      );
+      addTearDown(db.close);
+
+      final now = DateTime(2026, 4, 20);
+      await db
+          .into(db.audioItems)
+          .insert(
+            AudioItemsCompanion.insert(
+              id: 'official-placeholder',
+              name: 'Official Placeholder',
+              addedDate: now,
+              updatedAt: now,
+              audioPath: const Value(null),
+              transcriptPath: const Value(null),
+              remoteAudioId: const Value('remote-audio-1'),
+            ),
+          );
+
+      final localAudio = File(p.join(docsDir.path, 'audios/local.mp3'));
+      await localAudio.parent.create(recursive: true);
+      await localAudio.writeAsBytes([1, 2, 3]);
+      await db
+          .into(db.audioItems)
+          .insert(
+            AudioItemsCompanion.insert(
+              id: 'local-audio',
+              name: 'Local Audio',
+              addedDate: now,
+              updatedAt: now,
+              audioPath: const Value('audios/local.mp3'),
+            ),
+          );
+
+      final zipPath = await BackupService(db).exportData(
+        outputDir: outputDir.path,
+        appVersion: '1.0.0',
+        platform: 'macos',
+      );
+
+      final archive = ZipDecoder().decodeBytes(
+        await File(zipPath).readAsBytes(),
+      );
+      expect(archive.findFile('media/audios/local.mp3'), isNotNull);
+      expect(archive.findFile('media/audios/official-placeholder.mp3'), isNull);
+
+      final manifestEntry = archive.findFile('manifest.json');
+      final manifest = BackupManifest.fromJson(
+        jsonDecode(utf8.decode(manifestEntry!.content as List<int>))
+            as Map<String, dynamic>,
+      );
+      expect(manifest.mediaFileCount, 1);
     });
   });
 

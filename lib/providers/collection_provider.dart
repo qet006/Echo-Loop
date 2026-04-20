@@ -5,6 +5,7 @@ import '../analytics/models/event_names.dart';
 import '../database/app_database.dart' as db;
 import '../database/providers.dart';
 import '../models/collection.dart';
+import '../services/app_logger.dart';
 
 part 'collection_provider.g.dart';
 
@@ -94,36 +95,61 @@ class CollectionList extends _$CollectionList {
   Future<void> loadCollections() async {
     state = state.copyWith(isLoading: true);
 
-    final dao = ref.read(collectionDaoProvider);
-    final dbCollections = await dao.getAllActive();
+    try {
+      final dao = ref.read(collectionDaoProvider);
+      final dbCollections = await dao.getAllActive();
+      AppLogger.log(
+        'StartupLoad',
+        'collections query ok: dbRows=${dbCollections.length}',
+      );
 
-    final collections = dbCollections
-        .map(
-          (row) => Collection(
-            id: row.id,
-            name: row.name,
-            createdDate: row.createdDate,
-            isPinned: row.isPinned,
-            source: CollectionSource.fromString(row.source),
-            remoteId: row.remoteId,
-            coverUrl: row.coverUrl,
-            description: row.description,
-            deprecatedAt: row.deprecatedAt,
-          ),
-        )
-        .toList();
+      final collections = dbCollections
+          .map(
+            (row) => Collection(
+              id: row.id,
+              name: row.name,
+              createdDate: row.createdDate,
+              isPinned: row.isPinned,
+              source: CollectionSource.fromString(row.source),
+              remoteId: row.remoteId,
+              coverUrl: row.coverUrl,
+              description: row.description,
+              deprecatedAt: row.deprecatedAt,
+            ),
+          )
+          .toList();
 
-    // 加载每个合集的音频 ID 列表
-    final audioIdsMap = <String, List<String>>{};
-    for (final c in collections) {
-      audioIdsMap[c.id] = await dao.getAudioIds(c.id);
+      // 加载每个合集的音频 ID 列表
+      final audioIdsMap = <String, List<String>>{};
+      for (final c in collections) {
+        audioIdsMap[c.id] = await dao.getAudioIds(c.id);
+      }
+
+      final localCount = collections.where((c) => !c.isOfficial).length;
+      final officialCount = collections.where((c) => c.isOfficial).length;
+      final deprecatedCount = collections.where((c) => c.isDeprecated).length;
+      final linkedAudioCount = audioIdsMap.values.fold<int>(
+        0,
+        (total, ids) => total + ids.length,
+      );
+      AppLogger.log(
+        'StartupLoad',
+        'collections mapped: visible=${collections.length}, local=$localCount, '
+            'official=$officialCount, deprecated=$deprecatedCount, '
+            'linkedAudios=$linkedAudioCount',
+      );
+
+      state = state.copyWith(
+        rawCollections: collections,
+        isLoading: false,
+        audioIdsMap: audioIdsMap,
+      );
+    } catch (e, st) {
+      AppLogger.log('StartupLoad', 'collections load failed: $e');
+      AppLogger.log('StartupLoad', st.toString());
+      state = state.copyWith(isLoading: false);
+      rethrow;
     }
-
-    state = state.copyWith(
-      rawCollections: collections,
-      isLoading: false,
-      audioIdsMap: audioIdsMap,
-    );
   }
 
   Future<void> createCollection(String name) async {

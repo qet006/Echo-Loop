@@ -235,7 +235,11 @@ class _FluencyAppState extends ConsumerState<FluencyApp>
     // 启动时先尝试从磁盘加载已缓存的 catalog（让 Discover 页一进来就有数据）。
     // 失败静默，下面的 syncAll 会按需重新拉网络。
     unawaited(
-      ref.read(officialCatalogServiceProvider).loadCachedCatalog(),
+      ref.read(officialCatalogServiceProvider).loadCachedCatalog().then((_) {
+        if (mounted) {
+          ref.invalidate(cachedCatalogProvider);
+        }
+      }),
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -248,8 +252,12 @@ class _FluencyAppState extends ConsumerState<FluencyApp>
       }
     });
 
-    // 冷启动后异步触发 catalog 同步：inflight 防重入 + 10min 节流自动管理
-    Future.delayed(const Duration(seconds: 3), _triggerCatalogSync);
+    // 冷启动后异步触发 catalog 同步。force=true 绕过本地 10min 节流，
+    // 避免运营刚调整精选合集后启动仍停留在旧磁盘缓存。
+    Future.delayed(
+      const Duration(seconds: 3),
+      () => _triggerCatalogSync(force: true),
+    );
   }
 
   @override
@@ -270,10 +278,10 @@ class _FluencyAppState extends ConsumerState<FluencyApp>
 
   /// 全局唯一同步入口；inflight + 10min 节流防止重复请求。
   /// updated 时由 helper 自动 loadLibrary + loadCollections + invalidate catalog。
-  void _triggerCatalogSync() {
+  void _triggerCatalogSync({bool force = false}) {
     if (!mounted) return;
     unawaited(
-      triggerOfficialSync(ref).then((outcome) {
+      triggerOfficialSync(ref, force: force).then((outcome) {
         AppLogger.log('main', 'OfficialSync outcome=$outcome');
       }),
     );
