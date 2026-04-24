@@ -550,6 +550,10 @@
 
 ## bug 修复
 
+- [x] 修复精选合集加入后音频列表出现重复项（新发布音频被插入多次）：`OfficialSyncService.syncAll` 加 inflight 锁，消除并发 trigger 下两份 `_applyCatalog` 共享旧 `localByRemoteId` 快照各 insert 一次的竞态；`audio_items(remote_audio_id)` 索引升级为 UNIQUE 作为 DB 层兜底
+
+  **完成时间**: 2026-04-24
+
 - [x] 精选合集官方音频更新字幕前增加确认弹窗，并在更新成功后清空该音频收藏句子和学习进度，避免旧句子索引错位
 
   **完成时间**: 2026-04-20 22:57

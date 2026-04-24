@@ -57,6 +57,16 @@ class OfficialSyncService {
   final db.AppDatabase _db;
   final OfficialCatalogService _catalog;
 
+  /// 防重入：并发 syncAll 复用同一个 future。
+  ///
+  /// 底层 `OfficialCatalogService.refresh` 已有自己的 inflight，但若两个
+  /// `syncAll` 并发 `await refresh` 拿到同一个 `CatalogUpdated`，两人会各自
+  /// 进入 `_applyCatalog` 并发执行 diff。`_applyDetail` 的本地快照在事务外
+  /// 构建，两条 Future 的 `localByRemoteId` 都是旧快照，就会把"新发布的
+  /// 音频"各 insert 一次，产生重复。这里在 syncAll 层再加一层 inflight
+  /// 去重，保证 `_applyCatalog` 同一时间只会有一份实际在跑。
+  Future<OfficialSyncStats>? _inflight;
+
   OfficialSyncService({
     required db.AppDatabase database,
     required OfficialCatalogService catalog,
@@ -64,7 +74,21 @@ class OfficialSyncService {
        _catalog = catalog;
 
   /// 全局唯一同步入口。详情见 class doc。
-  Future<OfficialSyncStats> syncAll({bool force = false}) async {
+  Future<OfficialSyncStats> syncAll({bool force = false}) {
+    final existing = _inflight;
+    if (existing != null) {
+      AppLogger.log(
+        'OfficialSync',
+        'syncAll reusing inflight (force=$force)',
+      );
+      return existing;
+    }
+    final future = _runSyncAll(force: force);
+    _inflight = future;
+    return future.whenComplete(() => _inflight = null);
+  }
+
+  Future<OfficialSyncStats> _runSyncAll({required bool force}) async {
     final outcome = await _catalog.refresh(force: force);
     if (outcome is! CatalogUpdated) {
       // 关键：catalog 无变化 / 节流 / 失败 → 整链路全跳过

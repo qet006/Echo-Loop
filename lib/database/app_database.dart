@@ -577,11 +577,15 @@ class AppDatabase extends _$AppDatabase {
         AND deleted_at IS NULL
     ''');
 
-    // 同步时按 remoteAudioId 反查 audio_items
+    // 同步时按 remoteAudioId 反查 audio_items。
+    // UNIQUE：防并发 syncAll 把同一个 remoteAudioId 插成两行。
+    // 老版本可能已经创建了非 UNIQUE 的同名索引，这里先 DROP 再 CREATE 保证升级到 UNIQUE。
+    await customStatement('DROP INDEX IF EXISTS idx_audio_items_remote_audio_id');
     await customStatement('''
-      CREATE INDEX IF NOT EXISTS idx_audio_items_remote_audio_id
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_audio_items_remote_audio_id
       ON audio_items(remote_audio_id)
       WHERE remote_audio_id IS NOT NULL
+        AND deleted_at IS NULL
     ''');
   }
 }

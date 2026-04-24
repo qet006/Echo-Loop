@@ -284,4 +284,75 @@ void main() {
     await sync.syncAll(force: true);
     expect(fakeCatalog.refreshCallCount, 2);
   });
+
+  group('并发 syncAll 去重（inflight）', () {
+    test('两个并发 syncAll 共享同一次执行，新发布音频不重复插入', () async {
+      // 本地已加入合集，已有 r-a1 / r-a2
+      await seedEnrolledCollection(
+        db,
+        remoteId: 'r-collA',
+        audios: [
+          (
+            remoteAudioId: 'r-a1',
+            sha256: 'sha-a1',
+            sortOrder: 0,
+            downloaded: false
+          ),
+          (
+            remoteAudioId: 'r-a2',
+            sha256: 'sha-a2',
+            sortOrder: 1,
+            downloaded: false
+          ),
+        ],
+      );
+      expect(await _audioRowCount(), 2);
+      expect(await _junctionCount(), 2);
+
+      // catalog 新增 r-a3 / r-a4
+      final snapshot = makeSnapshot(collections: [
+        makeCatalogCollection(id: 'r-collA', audios: [
+          makeCatalogAudio(id: 'r-a1', sortOrder: 0),
+          makeCatalogAudio(id: 'r-a2', sortOrder: 1),
+          makeCatalogAudio(id: 'r-a3', sortOrder: 2),
+          makeCatalogAudio(id: 'r-a4', sortOrder: 3),
+        ]),
+      ]);
+      fakeCatalog.nextOutcome = CatalogUpdated(snapshot);
+
+      // 并发触发两次 syncAll（模拟冷启动 3s trigger + initState 兜底重叠）
+      await Future.wait([sync.syncAll(), sync.syncAll()]);
+
+      // inflight 让底层 refresh 只被调用一次
+      expect(fakeCatalog.refreshCallCount, 1);
+
+      // 总行数 = 2 既有 + 2 新发布（各一次），junction 同
+      expect(await _audioRowCount(), 4);
+      expect(await _junctionCount(), 4);
+
+      // 新发布音频每个只存一行
+      final a3Rows = await (db.select(db.audioItems)
+            ..where((t) => t.remoteAudioId.equals('r-a3')))
+          .get();
+      expect(a3Rows.length, 1);
+      final a4Rows = await (db.select(db.audioItems)
+            ..where((t) => t.remoteAudioId.equals('r-a4')))
+          .get();
+      expect(a4Rows.length, 1);
+    });
+
+    test('inflight 完成后可以重新触发新一轮 syncAll', () async {
+      await seedEnrolledCollection(db, remoteId: 'r-collA');
+
+      fakeCatalog.nextOutcome = CatalogUpdated(
+        makeSnapshot(collections: [makeCatalogCollection(id: 'r-collA')]),
+      );
+      await sync.syncAll();
+      expect(fakeCatalog.refreshCallCount, 1);
+
+      // 上一轮结束后，再次触发应发起新的 refresh（不是复用旧 inflight）
+      await sync.syncAll();
+      expect(fakeCatalog.refreshCallCount, 2);
+    });
+  });
 }
