@@ -73,7 +73,7 @@ class _AppUpdateDialogContent extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (message.isNotEmpty) Text(message),
+          if (message.isNotEmpty) _ReleaseNotesText(text: message),
           if (isForceUpdate && downloadUrl != null) ...[
             const SizedBox(height: 12),
             Align(
@@ -121,6 +121,68 @@ class _AppUpdateDialogContent extends StatelessWidget {
     Clipboard.setData(ClipboardData(text: downloadUrl!));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(l10n.linkCopied)),
+    );
+  }
+}
+
+/// 简易 release notes 渲染：按行拆分，`- ` / `* ` 开头的行渲染为带圆点的列表项
+class _ReleaseNotesText extends StatelessWidget {
+  final String text;
+
+  const _ReleaseNotesText({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = text.split('\n');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < lines.length; i++) _buildLine(lines[i], i, context),
+      ],
+    );
+  }
+
+  Widget _buildLine(String raw, int index, BuildContext context) {
+    final line = raw.trimRight();
+    final padTop = index == 0 ? 0.0 : 4.0;
+    final trimmed = line.trimLeft();
+    final isBullet = trimmed.startsWith('- ') || trimmed.startsWith('* ');
+
+    if (isBullet) {
+      final dotColor = DefaultTextStyle.of(context).style.color ??
+          Theme.of(context).colorScheme.onSurface;
+      return Padding(
+        padding: EdgeInsets.only(top: padTop),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 4, right: 8, top: 7),
+              child: SizedBox(
+                width: 4,
+                height: 4,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: dotColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(child: Text(trimmed.substring(2))),
+          ],
+        ),
+      );
+    }
+
+    if (line.isEmpty) {
+      return const SizedBox(height: 4);
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(top: padTop),
+      child: Text(line),
     );
   }
 }
