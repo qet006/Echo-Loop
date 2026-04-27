@@ -28,6 +28,7 @@ Future<void> showBlindListenParagraphSheet({
     title: l10n.blindListenBriefingTitle,
     subtitle: l10n.blindListenBriefingTip,
     sentences: sentences,
+    defaultSeconds: -1,
     showPauseMultiplier: true,
     pauseMultiplierOptions: const [0.5, 1.0, 1.5, 2.0, 3.0],
     stageLabel: stageLabel,
