@@ -824,18 +824,6 @@ abstract class AppLocalizations {
   /// **'TOEFL · IELTS · TEM · VOA…'**
   String get discoverEntrySubtitleA;
 
-  /// No description provided for @discoverEntryTitleB.
-  ///
-  /// In en, this message translates to:
-  /// **'See what\'s new'**
-  String get discoverEntryTitleB;
-
-  /// No description provided for @discoverEntrySubtitleB.
-  ///
-  /// In en, this message translates to:
-  /// **'Fresh picks from our catalog'**
-  String get discoverEntrySubtitleB;
-
   /// No description provided for @officialCollectionEmpty.
   ///
   /// In en, this message translates to:

@@ -384,12 +384,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get discoverEntrySubtitleA => 'TOEFL · IELTS · TEM · VOA…';
 
   @override
-  String get discoverEntryTitleB => 'See what\'s new';
-
-  @override
-  String get discoverEntrySubtitleB => 'Fresh picks from our catalog';
-
-  @override
   String get officialCollectionEmpty => 'This collection has no audios yet';
 
   @override

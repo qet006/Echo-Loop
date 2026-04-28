@@ -382,12 +382,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get discoverEntrySubtitleA => '托福 · 雅思 · 专四专八 · VOA…';
 
   @override
-  String get discoverEntryTitleB => '看看新上架';
-
-  @override
-  String get discoverEntrySubtitleB => '精选合集持续更新';
-
-  @override
   String get officialCollectionEmpty => '该合集暂无音频';
 
   @override
