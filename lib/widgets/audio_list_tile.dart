@@ -578,10 +578,19 @@ class AudioListTile extends ConsumerWidget {
     final notifier = ref.read(officialDownloadProvider.notifier);
     final progress = ref.read(officialDownloadProvider);
 
-    // 已在下载该音频 → 直接打开对话框
+    // 已在下载该音频 → 直接打开对话框；只有弹窗在前台期间自然完成才跳转
     if (progress is DownloadInProgress &&
         progress.audioItemId == audioItem.id) {
-      _showDownloadDialog(context, audioItem.id);
+      final completedInForeground = await _showDownloadDialog(
+        context,
+        audioItem.id,
+      );
+      if (!context.mounted || completedInForeground != true) return;
+      if (_isCollectionContext) {
+        context.push(AppRoutes.learningPlan(collectionId!, audioItem.id));
+      } else {
+        context.push(AppRoutes.audioLearningPlan(audioItem.id));
+      }
       return;
     }
 
@@ -592,7 +601,16 @@ class AudioListTile extends ConsumerWidget {
     if (!context.mounted) return;
     switch (result) {
       case StartResult.started:
-        _showDownloadDialog(context, audioItem.id);
+        final completedInForeground = await _showDownloadDialog(
+          context,
+          audioItem.id,
+        );
+        if (!context.mounted || completedInForeground != true) return;
+        if (_isCollectionContext) {
+          context.push(AppRoutes.learningPlan(collectionId!, audioItem.id));
+        } else {
+          context.push(AppRoutes.audioLearningPlan(audioItem.id));
+        }
       case StartResult.busy:
         final activeName =
             (ref.read(officialDownloadProvider) as DownloadInProgress?)
@@ -611,8 +629,12 @@ class AudioListTile extends ConsumerWidget {
     }
   }
 
-  void _showDownloadDialog(BuildContext context, String audioItemId) {
-    showDialog(
+  /// 返回值：见 [PrepareLearningDialog] 的 pop 结果约定。
+  /// - `true`  → 弹窗前台期间下载自然完成（应跳转学习计划页）
+  /// - `false` → 用户点取消按钮
+  /// - `null`  → 用户关 × / 点弹窗外（后台仍在下载）
+  Future<bool?> _showDownloadDialog(BuildContext context, String audioItemId) {
+    return showDialog<bool>(
       context: context,
       barrierDismissible: true,
       builder: (_) => PrepareLearningDialog(audioItemId: audioItemId),

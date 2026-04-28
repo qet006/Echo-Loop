@@ -14,13 +14,28 @@ import '../download/official_download_notifier.dart';
 /// - [DownloadInProgress] 同一 audioItem → 底部仅一个「取消下载」；关闭不影响后台下载
 /// - [DownloadFailed]                   → 底部仅一个「重试」
 /// - [DownloadIdle]                     → 无按钮；listen 回调会自动 pop
-class PrepareLearningDialog extends ConsumerWidget {
+///
+/// pop 结果约定（调用方据此决定是否自动跳转学习计划页）：
+/// - `true`  → 下载在弹窗前台期间自然完成
+/// - `false` → 用户点底部「取消下载」
+/// - `null`  → 用户关 × / 点弹窗外（后台下载仍在继续）
+class PrepareLearningDialog extends ConsumerStatefulWidget {
   final String audioItemId;
 
   const PrepareLearningDialog({super.key, required this.audioItemId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PrepareLearningDialog> createState() =>
+      _PrepareLearningDialogState();
+}
+
+class _PrepareLearningDialogState extends ConsumerState<PrepareLearningDialog> {
+  /// 用户点了「取消下载」按钮 → cancel() 会把 state 切到 Idle，
+  /// 此 flag 用于和「下载成功自然进入 Idle」区分开。
+  bool _userCancelled = false;
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final progress = ref.watch(officialDownloadProvider);
@@ -29,14 +44,15 @@ class PrepareLearningDialog extends ConsumerWidget {
     ref.listen<DownloadProgress>(officialDownloadProvider, (prev, next) {
       if (next is DownloadIdle) {
         if (Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
+          Navigator.of(context).pop(_userCancelled ? false : true);
         }
       }
     });
 
     final isFailed = progress is DownloadFailed;
     final isCurrent =
-        progress is DownloadInProgress && progress.audioItemId == audioItemId;
+        progress is DownloadInProgress &&
+            progress.audioItemId == widget.audioItemId;
 
     return AlertDialog(
       title: Row(
@@ -83,8 +99,11 @@ class PrepareLearningDialog extends ConsumerWidget {
           TextButton(
             // cancel() 会把 state 切回 Idle，触发 ref.listen 自动 pop dialog；
             // 这里不要再手动 pop，否则会把下层页面也一起 pop 掉。
-            onPressed: () =>
-                ref.read(officialDownloadProvider.notifier).cancel(),
+            // 先标记 _userCancelled，避免 listen 把这次 Idle 误认为成功。
+            onPressed: () {
+              _userCancelled = true;
+              ref.read(officialDownloadProvider.notifier).cancel();
+            },
             child: Text(
               l10n.downloadCancel,
               style: TextStyle(color: theme.colorScheme.error),
@@ -96,7 +115,7 @@ class PrepareLearningDialog extends ConsumerWidget {
               // Failed 不是 InProgress，start() 会直接重新启动；state 从 Failed
               // 跳到 InProgress，不会经过 Idle，所以 listen 不会误 pop dialog。
               await ref.read(officialDownloadProvider.notifier).start(
-                audioItemId: audioItemId,
+                audioItemId: widget.audioItemId,
                 displayName: progress.displayName,
               );
             },
