@@ -36,5 +36,16 @@
 	<false/>
 	<key>FLTEnableMergedPlatformUIThread</key>
 	<false/>
+	<!-- PostHog 原生自动初始化：在 applicationDidFinishLaunching 阶段
+	     完成 SDK setup，从而能捕获 Application Opened / Application Backgrounded
+	     等生命周期事件。macOS 使用 NSApplication.didResignActiveNotification
+	     作为"进入后台"信号（窗口失焦即触发），与 iOS didEnterBackground 行为略有差异，
+	     但事件捕获机制一致。 -->
+	<key>com.posthog.posthog.API_KEY</key>
+	<string>phc_s2ZWTJV3n57Tcz16OYZailIJroIUJhWEXmHMothJ5MZ</string>
+	<key>com.posthog.posthog.POSTHOG_HOST</key>
+	<string>https://us.i.posthog.com</string>
+	<key>com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS</key>
+	<true/>
 </dict>
 </plist>

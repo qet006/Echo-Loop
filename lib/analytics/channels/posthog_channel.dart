@@ -1,9 +1,15 @@
 /// PostHog 上报通道
 ///
 /// 直接通过 HTTP 上报，不依赖 GMS，中国大陆和境外均可使用。
-/// API Key 和 Host 通过 dart-define 注入：
-///   --dart-define="POSTHOG_API_KEY=phc_xxx"
-///   --dart-define="POSTHOG_HOST=https://your-posthog-host"
+///
+/// **初始化路径**（iOS / macOS）：
+/// - 原生侧：通过 `Info.plist` 配 `com.posthog.posthog.API_KEY` 等 meta-data，
+///   插件在 `register(with:)` 阶段（即 `applicationDidFinishLaunching` 内）自动初始化，
+///   确保能捕获 `Application Opened` / `Application Backgrounded` 等生命周期事件。
+/// - Dart 侧：此处 `Posthog().setup(config)` 注入 Session Replay 等运行时配置。
+///   SDK 二次 setup 是幂等的（仅更新配置，不重置事件队列）。
+///
+/// Android 无需原生 meta-data（生命周期事件已稳定上报）。
 library;
 
 import 'package:posthog_flutter/posthog_flutter.dart';

@@ -293,8 +293,19 @@ class _FluencyAppState extends ConsumerState<FluencyApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.resumed) {
-      _triggerCatalogSync();
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _triggerCatalogSync();
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        // 立即刷新 PostHog 埋点队列，避免 Application Backgrounded 等事件
+        // 卡在内存队列里，App 被 OS 挂起 / 杀进程时丢失。
+        // PostHog 默认 flushAt=20 / flushInterval=30s，单纯依赖默认策略
+        // 在快速切后台场景容易丢。
+        unawaited(Posthog().flush());
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+        // no-op
     }
   }
 
