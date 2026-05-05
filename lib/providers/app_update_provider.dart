@@ -114,7 +114,12 @@ class AppUpdate extends _$AppUpdate {
       return const AppUpdateResult(type: AppUpdateType.none);
     }
 
-    final localVersion = ref.read(packageInfoProvider).version;
+    final packageInfo = ref.read(packageInfoProvider);
+    final buildNumber = packageInfo.buildNumber;
+    // 构建号 > 0 时组合为完整版本号（如 1.0.9+1）
+    final localVersion = buildNumber.isNotEmpty && buildNumber != '0'
+        ? '${packageInfo.version}+$buildNumber'
+        : packageInfo.version;
     final updateType = determineUpdateType(localVersion, info);
 
     // 非手动检查时，检查是否已忽略此版本
