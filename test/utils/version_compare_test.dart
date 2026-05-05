@@ -54,6 +54,22 @@ void main() {
     test('构建号带 pre-release 后缀', () {
       expect(parseVersion('1.0.8+2-beta'), [1, 0, 8, 2]);
     });
+
+    test('构建号超大', () {
+      expect(parseVersion('1.0.8+999999'), [1, 0, 8, 999999]);
+    });
+
+    test('只有构建号没有版本号', () {
+      expect(parseVersion('+1'), [0, 0, 0, 1]);
+    });
+
+    test('多个 + 号取第一个', () {
+      expect(parseVersion('1.0.9+1+2'), [1, 0, 9, 1]);
+    });
+
+    test('构建号为负数解析为 0', () {
+      expect(parseVersion('1.0.8+-1'), [1, 0, 8, 0]);
+    });
   });
 
   group('compareVersions', () {
