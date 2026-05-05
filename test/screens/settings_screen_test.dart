@@ -3,6 +3,7 @@
 /// 测试设置页面的渲染和交互。
 library;
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -34,6 +35,7 @@ void main() {
     bool showDeveloperOptions = true,
     bool showOfflineAsrSection = false,
     OfflineAsrSettingsState? offlineAsrState,
+    PackageInfo? packageInfo,
   }) {
     const recommendedModel = AsrModelInfo(
       id: 'whisper-base-en-int8',
@@ -55,7 +57,7 @@ void main() {
       collectionListProvider.overrideWith(() => TestCollectionList()),
       listeningPracticeProvider.overrideWith(() => TestListeningPractice()),
       audioEngineProvider.overrideWith(() => TestAudioEngine()),
-      packageInfoProvider.overrideWithValue(testPackageInfo),
+      packageInfoProvider.overrideWithValue(packageInfo ?? testPackageInfo),
       appUpdateProvider.overrideWith(() => TestAppUpdate()),
       analyticsOverride(),
     ];
@@ -95,7 +97,7 @@ void main() {
         expect(find.text('Terms of Service'), findsOneWidget);
         expect(find.text('Privacy Policy'), findsOneWidget);
         expect(find.text('Write Feedback'), findsOneWidget);
-        expect(find.text('Version 1.0.0 (Debug)'), findsOneWidget);
+        expect(find.text('Version 1.0.0+1 (Debug)'), findsOneWidget);
       });
 
       testWidgets('显示外观标题', (tester) async {

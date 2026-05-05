@@ -116,5 +116,16 @@ void main() {
         AppUpdateType.none,
       );
     });
+
+    test('本地 1.0.9+0 等于远程 1.0.9，无需更新', () {
+      const info = AppUpdateInfo(
+        latestVersion: '1.0.9',
+        minimumVersion: '1.0.0',
+      );
+      expect(
+        AppUpdate.determineUpdateType('1.0.9+0', info),
+        AppUpdateType.none,
+      );
+    });
   });
 }
