@@ -362,6 +362,13 @@ class RetellPlayer extends _$RetellPlayer {
       await BookmarkManager.addBookmarkToDb(audioItemId, sentence, dao: dao);
     }
 
+    // 埋点：收藏/取消收藏句子
+    ref.read(analyticsServiceProvider).track(Events.bookmarkToggle, {
+      EventParams.audioId: audioItemId,
+      EventParams.sentenceIndex: sentence.index,
+      EventParams.action: isCurrentlyBookmarked ? 'remove' : 'add',
+    });
+
     // DB 操作完成后更新内存
     final newSet = Set<int>.from(state.bookmarkedSentenceIndices);
     if (isCurrentlyBookmarked) {

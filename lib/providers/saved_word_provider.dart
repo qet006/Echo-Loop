@@ -1,5 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../analytics/analytics_providers.dart';
+import '../analytics/models/event_names.dart';
 import '../database/app_database.dart';
 import '../database/providers.dart';
 import '../models/dict_entry.dart';
@@ -39,6 +41,12 @@ class SavedWordList extends _$SavedWordList {
       sentenceStartMs: sentenceStartMs,
       sentenceEndMs: sentenceEndMs,
     );
+
+    // 埋点：收藏单词
+    ref.read(analyticsServiceProvider).track(Events.wordSave, {
+      EventParams.word: word,
+      if (audioItemId != null) EventParams.audioId: audioItemId,
+    });
   }
 
   /// 取消收藏单词

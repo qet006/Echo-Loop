@@ -8,6 +8,7 @@
 /// 离线缓存和批量上报由 SDK 自身处理。
 library;
 
+import '../services/app_logger.dart';
 import 'analytics_channel.dart';
 import 'consent_manager.dart';
 
@@ -40,8 +41,9 @@ class AnalyticsService {
     if (!_consent.hasConsented) return;
     try {
       await _channel.logEvent(name, properties);
-    } catch (_) {
-      // 埋点永远不应影响主业务流程，静默忽略所有异常
+    } catch (e) {
+      // 埋点失败不影响主业务，但需要日志排查
+      AppLogger.log('Analytics', 'FAIL "$name": $e');
     }
   }
 

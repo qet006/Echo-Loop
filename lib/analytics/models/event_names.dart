@@ -69,6 +69,12 @@ abstract class Events {
   /// 上传音频
   static const audioUpload = 'audio_upload';
 
+  /// 删除合集
+  static const collectionDelete = 'collection_delete';
+
+  /// 删除音频
+  static const audioDelete = 'audio_delete';
+
   // ── AI 功能 ──
   /// 请求翻译
   static const translationRequested = 'translation_requested';
@@ -96,6 +102,9 @@ abstract class Events {
   /// 收藏句子复习完成（dispose 时上报，含中途退出）
   static const bookmarkReviewComplete = 'bookmark_review_complete';
 
+  /// 收藏/取消收藏句子
+  static const bookmarkToggle = 'bookmark_toggle';
+
   /// 单词卡片复习开始
   static const flashcardStart = 'flashcard_start';
 
@@ -109,6 +118,9 @@ abstract class Events {
   // ── 查单词 ──
   /// 用户查询单词
   static const wordLookup = 'word_lookup';
+
+  /// 收藏单词
+  static const wordSave = 'word_save';
 
   // ── 设置 ──
   /// 提醒时间修改
@@ -196,6 +208,9 @@ abstract class EventParams {
   static const stage = 'stage';
   static const durationMs = 'duration_ms';
 
+  // ── 内容管理 ──
+  static const collectionId = 'collection_id';
+
   // ── 页面浏览 ──
   /// PostHog 官方保留属性名，用于填充 Activity 流的 URL/Screen 列
   static const screenName = r'$screen_name';
@@ -245,6 +260,8 @@ abstract class EventParams {
   // ── 复习会话 ──
   static const totalCards = 'total_cards';
   static const totalSentencesCount = 'total_sentences_count';
+  static const sentenceIndex = 'sentence_index';
+  static const action = 'action'; // 'add' 或 'remove'
 
   // ── 精品合集 ──
   static const remoteId = 'remote_id';

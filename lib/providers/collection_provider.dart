@@ -167,6 +167,15 @@ class CollectionList extends _$CollectionList {
   }
 
   Future<void> deleteCollection(String id) async {
+    // 埋点：删除合集
+    final collection = state.rawCollections.where((c) => c.id == id).firstOrNull;
+    if (collection != null) {
+      ref.read(analyticsServiceProvider).track(Events.collectionDelete, {
+        EventParams.collectionId: id,
+        EventParams.collectionName: collection.name,
+      });
+    }
+
     final newMap = Map<String, List<String>>.from(state.audioIdsMap)
       ..remove(id);
     state = state.copyWith(

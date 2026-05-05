@@ -8,6 +8,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../analytics/analytics_providers.dart';
+import '../analytics/models/event_names.dart';
 import '../database/providers.dart';
 import '../l10n/app_localizations.dart';
 import '../models/audio_item.dart' as model;
@@ -124,6 +126,14 @@ class _SentenceDetailScreenState extends ConsumerState<SentenceDetailScreen> {
           dao: dao,
         );
       }
+
+      // 埋点：收藏/取消收藏句子
+      ref.read(analyticsServiceProvider).track(Events.bookmarkToggle, {
+        EventParams.audioId: args.audioItemId,
+        EventParams.sentenceIndex: args.sentenceIndex,
+        EventParams.action: _isBookmarked ? 'remove' : 'add',
+      });
+
       if (mounted) {
         setState(() => _isBookmarked = !_isBookmarked);
       }

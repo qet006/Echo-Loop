@@ -12,6 +12,8 @@ import '../l10n/app_localizations.dart';
 import '../models/app_update_info.dart';
 import '../models/learning_progress.dart';
 import '../models/reminder_settings.dart';
+import '../analytics/analytics_providers.dart';
+import '../analytics/models/event_names.dart';
 import '../database/providers.dart';
 import '../providers/app_update_provider.dart';
 import '../providers/audio_library_provider.dart';
@@ -186,8 +188,18 @@ class _MainShellState extends ConsumerState<MainShell> {
     );
   }
 
+  /// Tab 切换埋点：StatefulShellRoute 的 Tab 切换不经过 Navigator，
+  /// AnalyticsObserver 无法自动捕获，需手动上报。
+  static const _tabScreenNames = ['collections', 'study', 'favorites', 'settings'];
+
   /// 切换 tab 时调用，切到学习 tab 时刷新数据
   void _onTabSelected(int index) {
+    // Tab 切换埋点
+    final screenName = _tabScreenNames[index];
+    ref.read(analyticsServiceProvider).track(Events.screenView, {
+      EventParams.screenName: screenName,
+    });
+
     widget.navigationShell.goBranch(
       index,
       initialLocation: index == widget.navigationShell.currentIndex,

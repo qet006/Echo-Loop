@@ -184,6 +184,12 @@ class AudioLibrary extends _$AudioLibrary {
       return;
     }
 
+    // 埋点：删除音频
+    ref.read(analyticsServiceProvider).track(Events.audioDelete, {
+      EventParams.audioId: id,
+      EventParams.audioName: item.name,
+    });
+
     try {
       final audioPath = await item.getFullAudioPath();
       if (audioPath != null) {

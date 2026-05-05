@@ -35,21 +35,21 @@ class PostHogChannel implements AnalyticsChannel {
 
   @override
   Future<void> initialize() async {
-    // 启用 Session Replay（移动端 beta）：
-    // - maskAllTexts=false / maskAllImages=false 表示不做全量遮罩，
-    //   SDK 仍会自动遮罩 TextField/Password 等敏感输入控件。
-    // - PostHog 后台还需在 Project Settings → Session Replay 打开 Mobile beta 开关。
     final config = PostHogConfig(_apiKey)
       ..host = _host
+      ..flushAt = 5
+      ..flushInterval = const Duration(seconds: 3)
+      ..personProfiles = PostHogPersonProfiles.always
       ..sessionReplay = true
       ..sessionReplayConfig.maskAllTexts = false
-      ..sessionReplayConfig.maskAllImages = false;
+      ..sessionReplayConfig.maskAllImages = false
+      ..debug = true;
     await Posthog().setup(config);
   }
 
   @override
-  Future<void> logEvent(String name, Map<String, Object>? parameters) {
-    return Posthog().capture(eventName: name, properties: parameters);
+  Future<void> logEvent(String name, Map<String, Object>? parameters) async {
+    await Posthog().capture(eventName: name, properties: parameters);
   }
 
   @override

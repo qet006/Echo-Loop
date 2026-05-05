@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:just_audio/just_audio.dart' as ja;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../analytics/analytics_providers.dart';
+import '../../analytics/models/event_names.dart';
 import '../../database/providers.dart';
 import '../../models/audio_item.dart';
 import '../../models/sentence.dart';
@@ -716,6 +718,15 @@ class ListeningPractice extends _$ListeningPractice {
       state.bookmarkedIndices,
       state.playlistMode == PlaylistMode.bookmarks,
     );
+
+    // 埋点：收藏/取消收藏句子
+    if (state.currentAudioItem != null) {
+      ref.read(analyticsServiceProvider).track(Events.bookmarkToggle, {
+        EventParams.audioId: state.currentAudioItem!.id,
+        EventParams.sentenceIndex: index,
+        EventParams.action: isRemoving ? 'remove' : 'add',
+      });
+    }
 
     final inBookmarksMode = state.playlistMode == PlaylistMode.bookmarks;
     final shouldResume =
