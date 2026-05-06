@@ -46,3 +46,6 @@ app.*.map.json
 /android/app/release
 /android/build/
 macos/build/
+
+# Private documents (not for open source)
+METHOD.md
