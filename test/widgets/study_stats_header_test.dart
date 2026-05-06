@@ -229,6 +229,7 @@ void main() {
     testWidgets('input+output > total 时 clamp 显示正确', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
+          locale: const Locale('zh'),
           stats: const StudyStats(
             todaySeconds: 1500, // 25 min
             todayInputSeconds: 1440, // 24 min（超过 total）
@@ -239,8 +240,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 总时长正常显示 25 min
-      expect(find.text('25 min'), findsOneWidget);
+      // 总时长正常显示 25 分钟（中文格式）
+      expect(find.text('25 分钟'), findsOneWidget);
 
       // input: min(1440, 1500) = 1440 → 24分
       // output: min(1260, 1500) = 1260 → 21分（听说独立 clamp，不互相挤占）
@@ -251,6 +252,7 @@ void main() {
     testWidgets('input+output <= total 时不 clamp', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
+          locale: const Locale('zh'),
           stats: const StudyStats(
             todaySeconds: 1800, // 30 min
             todayInputSeconds: 900, // 15 min
@@ -261,7 +263,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('30 min'), findsOneWidget);
+      expect(find.text('30 分钟'), findsOneWidget);
       expect(find.text('15分'), findsOneWidget);
       expect(find.text('10分'), findsOneWidget);
     });
