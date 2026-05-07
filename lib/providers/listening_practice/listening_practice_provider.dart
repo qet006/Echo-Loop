@@ -721,8 +721,10 @@ class ListeningPractice extends _$ListeningPractice {
 
     // 埋点：收藏/取消收藏句子
     if (state.currentAudioItem != null) {
+      final item = state.currentAudioItem!;
       ref.read(analyticsServiceProvider).track(Events.bookmarkToggle, {
-        EventParams.audioId: state.currentAudioItem!.id,
+        EventParams.audioId: item.id,
+        EventParams.audioName: item.name,
         EventParams.sentenceIndex: index,
         EventParams.action: isRemoving ? 'remove' : 'add',
       });

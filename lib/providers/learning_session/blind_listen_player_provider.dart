@@ -13,6 +13,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../analytics/analytics_providers.dart';
+import '../../analytics/audio_event_params.dart';
 import '../../services/app_logger.dart';
 import '../../analytics/models/event_names.dart';
 import '../../database/providers.dart';
@@ -238,7 +239,7 @@ class BlindListenPlayer extends _$BlindListenPlayer {
       settings: settings,
     );
     ref.read(analyticsServiceProvider).track(Events.blindListenStart, {
-      EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
+      ...ref.audioEventParams(ref.read(learningSessionProvider).audioItemId),
       EventParams.passNumber: ref
           .read(learningSessionProvider)
           .blindListenPassCount,
@@ -655,8 +656,7 @@ class BlindListenPlayer extends _$BlindListenPlayer {
         stepFinished: true,
       );
       ref.read(analyticsServiceProvider).track(Events.blindListenComplete, {
-        EventParams.audioId:
-            ref.read(learningSessionProvider).audioItemId ?? '',
+        ...ref.audioEventParams(ref.read(learningSessionProvider).audioItemId),
         EventParams.passNumber: state.currentRepeatCount,
       });
     }

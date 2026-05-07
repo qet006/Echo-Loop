@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../analytics/analytics_providers.dart';
+import '../analytics/audio_event_params.dart';
 import '../analytics/models/event_names.dart';
 import '../database/app_database.dart';
 import '../database/providers.dart';
@@ -45,7 +46,7 @@ class SavedWordList extends _$SavedWordList {
     // 埋点：收藏单词
     ref.read(analyticsServiceProvider).track(Events.wordSave, {
       EventParams.word: word,
-      if (audioItemId != null) EventParams.audioId: audioItemId,
+      ...ref.audioEventParams(audioItemId),
     });
   }
 

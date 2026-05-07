@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../analytics/analytics_providers.dart';
+import '../analytics/audio_event_params.dart';
 import '../analytics/models/event_names.dart';
 import '../database/providers.dart';
 import '../l10n/app_localizations.dart';
@@ -129,7 +130,7 @@ class _SentenceDetailScreenState extends ConsumerState<SentenceDetailScreen> {
 
       // 埋点：收藏/取消收藏句子
       ref.read(analyticsServiceProvider).track(Events.bookmarkToggle, {
-        EventParams.audioId: args.audioItemId,
+        ...ref.audioEventParams(args.audioItemId),
         EventParams.sentenceIndex: args.sentenceIndex,
         EventParams.action: _isBookmarked ? 'remove' : 'add',
       });

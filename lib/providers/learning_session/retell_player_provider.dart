@@ -13,6 +13,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../analytics/analytics_providers.dart';
+import '../../analytics/audio_event_params.dart';
 import '../../analytics/models/event_names.dart';
 import '../../database/providers.dart';
 import '../../models/retell_settings.dart';
@@ -236,8 +237,7 @@ class RetellPlayer extends _$RetellPlayer {
           next.currentAttempt != null) {
         final attempt = next.currentAttempt!;
         ref.read(analyticsServiceProvider).track(Events.recordingComplete, {
-          EventParams.audioId:
-              ref.read(learningSessionProvider).audioItemId ?? '',
+          ...ref.audioEventParams(ref.read(learningSessionProvider).audioItemId),
           EventParams.mode: 'retell',
           if (attempt.score != null) EventParams.score: attempt.score!,
         });
@@ -313,7 +313,7 @@ class RetellPlayer extends _$RetellPlayer {
       totalParagraphs: paragraphs.length,
     );
     ref.read(analyticsServiceProvider).track(Events.retellStart, {
-      EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
+      ...ref.audioEventParams(ref.read(learningSessionProvider).audioItemId),
       EventParams.totalParagraphs: paragraphs.length,
     });
 
@@ -364,7 +364,7 @@ class RetellPlayer extends _$RetellPlayer {
 
     // 埋点：收藏/取消收藏句子
     ref.read(analyticsServiceProvider).track(Events.bookmarkToggle, {
-      EventParams.audioId: audioItemId,
+      ...ref.audioEventParams(audioItemId),
       EventParams.sentenceIndex: sentence.index,
       EventParams.action: isCurrentlyBookmarked ? 'remove' : 'add',
     });
@@ -523,8 +523,7 @@ class RetellPlayer extends _$RetellPlayer {
         stepFinished: true,
       );
       ref.read(analyticsServiceProvider).track(Events.retellComplete, {
-        EventParams.audioId:
-            ref.read(learningSessionProvider).audioItemId ?? '',
+        ...ref.audioEventParams(ref.read(learningSessionProvider).audioItemId),
         EventParams.totalParagraphs: state.totalParagraphs,
       });
       return;

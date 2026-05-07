@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../analytics/analytics_providers.dart';
+import '../../analytics/audio_event_params.dart';
 import '../../analytics/models/event_names.dart';
 import '../../database/providers.dart';
 import '../../models/intensive_listen_settings.dart';
@@ -239,7 +240,7 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     );
     _prepareBlindFlow(startIndex: safeIndex);
     ref.read(analyticsServiceProvider).track(Events.intensiveListenStart, {
-      EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
+      ...ref.audioEventParams(ref.read(learningSessionProvider).audioItemId),
       EventParams.totalSentences: _sentences.length,
     });
   }
@@ -692,8 +693,7 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
 
     if (phase is BlindSessionCompleted) {
       ref.read(analyticsServiceProvider).track(Events.intensiveListenComplete, {
-        EventParams.audioId:
-            ref.read(learningSessionProvider).audioItemId ?? '',
+        ...ref.audioEventParams(ref.read(learningSessionProvider).audioItemId),
         EventParams.totalSentences: state.totalSentences,
         EventParams.difficultCount: state.difficultSentences.length,
       });
@@ -824,8 +824,7 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
         playedSenseGroupIndices: const {},
       );
       ref.read(analyticsServiceProvider).track(Events.intensiveListenComplete, {
-        EventParams.audioId:
-            ref.read(learningSessionProvider).audioItemId ?? '',
+        ...ref.audioEventParams(ref.read(learningSessionProvider).audioItemId),
         EventParams.totalSentences: state.totalSentences,
         EventParams.difficultCount: state.difficultSentences.length,
       });

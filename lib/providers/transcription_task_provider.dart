@@ -388,6 +388,7 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
     _cancelTokens.remove(audioItem.id);
     ref.read(analyticsServiceProvider).track(Events.transcriptionComplete, {
       EventParams.audioId: audioItem.id,
+      EventParams.audioName: audioItem.name,
     });
 
     // 10 秒后自动清理 completed 状态，避免内存累积

@@ -732,6 +732,7 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
 
       ref.read(analyticsServiceProvider).track(Events.subtitleUploaded, {
         EventParams.audioId: audioItem.id,
+        EventParams.audioName: audioItem.name,
       });
       if (context.mounted) Navigator.pop(context);
     } catch (e) {
@@ -812,6 +813,7 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
         .startTranscription(audioItem, _selectedLanguage);
     ref.read(analyticsServiceProvider).track(Events.transcriptionStarted, {
       EventParams.audioId: audioItem.id,
+      EventParams.audioName: audioItem.name,
     });
   }
 

@@ -12,6 +12,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../analytics/analytics_providers.dart';
+import '../../analytics/audio_event_params.dart';
 import '../../analytics/models/event_names.dart';
 import '../../database/providers.dart';
 import '../../models/intensive_listen_settings.dart';
@@ -167,7 +168,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
       isFreePlay: isFreePlay,
     );
     ref.read(analyticsServiceProvider).track(Events.listenRepeatStart, {
-      EventParams.audioId: audioItemId,
+      ...ref.audioEventParams(audioItemId),
       EventParams.totalSentences: difficultSentences.length,
     });
   }
@@ -338,7 +339,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
   /// 退出学习模式
   Future<void> exitLearningMode() async {
     ref.read(analyticsServiceProvider).track(Events.listenRepeatComplete, {
-      EventParams.audioId: _engine.config.audioItemId,
+      ...ref.audioEventParams(_engine.config.audioItemId),
       EventParams.totalSentences: _sentences.length,
     });
     disposeSession();
@@ -459,7 +460,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
       final attempt = next.currentAttempt!;
       _engine.onRecordingFinished(attempt.filePath, attempt.score);
       ref.read(analyticsServiceProvider).track(Events.recordingComplete, {
-        EventParams.audioId: _engine.config.audioItemId,
+        ...ref.audioEventParams(_engine.config.audioItemId),
         EventParams.mode: 'listen_repeat',
         if (attempt.score != null) EventParams.score: attempt.score!,
       });

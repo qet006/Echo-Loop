@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../analytics/analytics_providers.dart';
+import '../analytics/audio_event_params.dart';
 import '../analytics/models/event_names.dart';
 import '../database/enums.dart';
 import '../database/providers.dart';
@@ -245,14 +246,15 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     if (currentIdx + 1 >= subStages.length) {
       final analytics = ref.read(analyticsServiceProvider);
       final nextStage = updated.currentStage;
+      final audioParams = ref.audioEventParams(audioItemId);
       analytics.track(Events.stageAdvance, {
-        EventParams.audioId: audioItemId,
+        ...audioParams,
         EventParams.fromStage: stage.name,
         EventParams.toStage: nextStage.name,
       });
       if (stage == LearningStage.firstLearn) {
         analytics.track(Events.firstLearnComplete, {
-          EventParams.audioId: audioItemId,
+          ...audioParams,
           EventParams.totalDurationMs: newTotalDuration,
         });
       }
@@ -279,7 +281,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     await _persistProgress(updated);
 
     ref.read(analyticsServiceProvider).track(Events.blindListenDifficultySet, {
-      EventParams.audioId: audioItemId,
+      ...ref.audioEventParams(audioItemId),
       EventParams.difficulty: difficulty.name,
     });
 

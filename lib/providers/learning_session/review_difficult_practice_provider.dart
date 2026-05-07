@@ -11,6 +11,7 @@ library;
 import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../analytics/analytics_providers.dart';
+import '../../analytics/audio_event_params.dart';
 import '../../analytics/models/event_names.dart';
 import '../../database/providers.dart';
 import '../../models/difficult_practice_settings.dart';
@@ -257,7 +258,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     );
     _prepareBlindFlow(startIndex: validIndex);
     ref.read(analyticsServiceProvider).track(Events.difficultPracticeStart, {
-      EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
+      ...ref.audioEventParams(ref.read(learningSessionProvider).audioItemId),
       EventParams.totalDifficultSentences: _sentences.length,
     });
 
@@ -687,8 +688,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       final attempt = next.currentAttempt!;
       _repeatEngine!.onRecordingFinished(attempt.filePath, attempt.score);
       ref.read(analyticsServiceProvider).track(Events.recordingComplete, {
-        EventParams.audioId:
-            ref.read(learningSessionProvider).audioItemId ?? '',
+        ...ref.audioEventParams(ref.read(learningSessionProvider).audioItemId),
         EventParams.mode: 'difficult_practice',
         if (attempt.score != null) EventParams.score: attempt.score!,
       });
@@ -880,7 +880,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   /// 上报完成事件
   void _trackDifficultPracticeComplete() {
     ref.read(analyticsServiceProvider).track(Events.difficultPracticeComplete, {
-      EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
+      ...ref.audioEventParams(ref.read(learningSessionProvider).audioItemId),
       EventParams.totalDifficultSentences: state.totalSentences,
     });
   }

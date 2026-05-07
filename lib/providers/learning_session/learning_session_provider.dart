@@ -11,6 +11,7 @@ import 'package:flutter/widgets.dart';
 import 'package:just_audio/just_audio.dart' as ja;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../analytics/analytics_providers.dart';
+import '../../analytics/audio_event_params.dart';
 import '../../analytics/models/event_names.dart';
 import '../../models/blind_listen_settings.dart';
 import '../../models/playback_settings.dart';
@@ -274,7 +275,7 @@ class LearningSession extends _$LearningSession {
   void _trackSessionStart() {
     final analytics = ref.read(analyticsServiceProvider);
     analytics.track(Events.learningStart, {
-      if (state.audioItemId != null) EventParams.audioId: state.audioItemId!,
+      ...ref.audioEventParams(state.audioItemId),
       if (state.learningMode != null)
         EventParams.stage: state.learningMode!.name,
       EventParams.isFreePractice: state.isFreePlay ? 1 : 0,
@@ -286,7 +287,7 @@ class LearningSession extends _$LearningSession {
     final analytics = ref.read(analyticsServiceProvider);
     final durationMs = _studyStopwatch.elapsedMilliseconds;
     analytics.track(Events.learningEnd, {
-      if (state.audioItemId != null) EventParams.audioId: state.audioItemId!,
+      ...ref.audioEventParams(state.audioItemId),
       if (state.learningMode != null)
         EventParams.stage: state.learningMode!.name,
       EventParams.durationMs: durationMs,

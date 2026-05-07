@@ -14,6 +14,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../analytics/analytics_providers.dart';
+import '../analytics/audio_event_params.dart';
 import '../analytics/models/event_names.dart';
 import '../models/study_stage.dart';
 import '../database/providers.dart';
@@ -98,7 +99,7 @@ mixin StudyTaskControllerMixin {
 
     // 上报 analytics
     ref.read(analyticsServiceProvider).track(Events.learningStart, {
-      EventParams.audioId: audioItemId,
+      ...ref.audioEventParams(audioItemId),
       EventParams.stage: stage.name,
       EventParams.isFreePractice: isFreePlay ? 1 : 0,
     });
@@ -110,7 +111,7 @@ mixin StudyTaskControllerMixin {
   Future<void> disposeStudyTask(Ref ref) async {
     // 上报 session_end
     ref.read(analyticsServiceProvider).track(Events.learningEnd, {
-      if (_studyAudioItemId != null) EventParams.audioId: _studyAudioItemId!,
+      ...ref.audioEventParams(_studyAudioItemId),
       if (_studyStage != null) EventParams.stage: _studyStage!.name,
       EventParams.durationMs: _studyStopwatch.elapsedMilliseconds,
       EventParams.isFreePractice: _studyIsFreePlay ? 1 : 0,
