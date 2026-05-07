@@ -49,3 +49,6 @@ macos/build/
 
 # Private documents (not for open source)
 METHOD.md
+
+# Claude Code runtime files
+.claude/scheduled_tasks.lock
