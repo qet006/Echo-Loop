@@ -1,7 +1,69 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-05-14
-> 当前焦点：复述功能开关
+> 最后更新：2026-05-16
+> 当前焦点：复述跳过机制重构（自动跳过 + 手动跳过单一机制）
+
+## 已完成：复述功能重构 — 移除引导弹窗 + 自动跳过单一机制 + 简报手动跳过
+
+V2.1 之后再次重构。问题：原方案保留了「全局开关过滤 plan」+「引导弹窗 + 三态判定」两套机制，复杂度高且与未来「用户自定义学习计划」逻辑冲突。本次改为**单一机制**——所有跳过（手动 / 自动）走同一 `skipCurrentSubStage`，全部写入 `LearningProgress.skippedSubStageKeys`；plan 永远静态全量。
+
+### 设计变更
+- 移除引导弹窗 + 9 处 `ensureRetellDecisionMade` 调用 + 删除 `setupChoiceMade` 字段/SP key/方法
+- 全局开关语义反转：`retellEnabled` (默认 false) → `autoSkipRetell` (默认 false)
+- 「关闭复述」不再过滤 plan；新语义是「学习推进到复述时自动调跳过」
+- 计划列表三态：✅ completed / ⏭ skipped（灰色横线） / planned
+- 手动跳过：仅在按计划学习触发的简报弹窗里加「跳过」按钮（宽度比例 1:2）
+
+### 数据层
+- [x] `lib/database/tables/learning_progresses.dart` 新增 `skippedSubStages` TEXT 列（逗号分隔 'stage.key:subStage.key'）
+- [x] `lib/database/app_database.dart` schema 31→32 + onUpgrade addColumn；`_addColumnIfNotExists` 加 table-exists 守卫（解决 v28 fixture 升级直接跳到 v32 时 learning_progresses 缺表问题）
+- [x] `lib/models/learning_progress.dart` 新增 `skippedSubStageKeys` 字段 + `isSubStageSkipped` 辅助 + `progressPercent` 公式改为 `分母 = inPlan ∪ isDone ∪ isUserSkipped、分子 = isDone + isUserSkipped`（纯跳过场景也能到 100%）
+- [x] DAO mapper `_encodeSkippedKeys` / `_decodeSkippedKeys` 双向序列化
+
+### Model 层
+- [x] `lib/models/learning_plan.dart` 静态化：删除 `fromSettings(LearningSettings)`，改为 `LearningPlan.standard()`；与 settings 解耦
+- [x] `lib/providers/learning_plan_provider.dart` 不再 watch settings
+
+### Settings 层
+- [x] `lib/providers/learning_settings_provider.dart` 字段重命名 + 默认 false + 删除 `setupChoiceMade` / `markSetupChoiceMade` / `LearningSettingsKeys.setupChoiceMadeAtMs`
+- [x] 启动期 best-effort 清理老 SP key (`learning_retell_enabled` / `retell_setup_choice_at_ms`)
+
+### Progress Notifier
+- [x] 新增 `skipCurrentSubStage` (public) + `_doSkipCore` (内部，参数 source=manual/auto)
+- [x] 新增 `_autoSkipRetellIfEnabled` 循环 hook：complete / skip 推进后调；autoSkipRetell=true + 新位置是复述类 → 连续 skip 推进
+- [x] 新增 `_autoSkipScanAllProgress`：autoSkipRetell false→true 时遍历所有 progress
+- [x] reconcile listener 改为监听 `learningSettingsProvider`（plan 静态后不再需要监听 plan）
+- [x] 互斥不变量：`completeCurrentSubStage` / `recordCompletionIfNew` 写 completion 时清除对应 skipped key（用户从自由练习完成已跳过的复述 → 状态变 ✅，skip 集合清空）
+
+### UI 层
+- [x] `lib/widgets/common/paragraph_selection_sheet.dart` 加可选 `onSkip` + `skipLabel`：`Row(Expanded flex:1 OutlinedButton + 16px + Expanded flex:2 FilledButton)`；`onSkip==null` 时保留原 width:double.infinity 路径（盲听不受影响）
+- [x] `lib/widgets/retell/retell_briefing_sheet.dart` 透传 `onSkip` + `skipLabel: l10n.retellSkip`
+- [x] `lib/screens/learning_plan_screen.dart` 仅 line 438 计划流加 `onSkip` 回调；其他 3 处自由练习入口保持无 skip 按钮
+- [x] 计划列表三态渲染：`_StepCard` 加 `isSkipped` 参数；iterate `inPlan || isDone || isUserSkipped`；isSkipped 用 `Icons.remove` 灰色 + 文案后缀「· 已跳过」
+- [x] `lib/screens/learning_settings_screen.dart` 改用新 ARB key + 读 autoSkipRetell；图标 `Icons.chat`（与复述任务一致）
+
+### 删除
+- [x] `lib/widgets/retell_intro_dialog.dart` / `retell_decision_gate.dart` / `test/widgets/retell_intro_dialog_test.dart`
+- [x] 9 处 `ensureRetellDecisionMade` 调用全部简化为直接 push（main / study_screen ×4 / favorites_screen ×2 / audio_list_tile）
+
+### i18n / 埋点
+- [x] ARB：删 `retellEnabled*` / `retellPrompt*` 共 8 个 key；新增 `autoSkipRetell{Toggle,Subtitle,Description}` + `retellSkip` + `retellSkippedSuffix`
+- [x] event_names：删 `retellIntroDialogShown` / `retellIntroDialogChoice` / `retellAutoStageAdvance`；新增 `retellSkipped`（params source=manual/auto）
+
+### 测试
+- [x] `test/providers/learning_settings_provider_test.dart` 重写（autoSkipRetell + cleanupLegacy）
+- [x] `test/providers/learning_progress_provider_test.dart` 全部用例 retellEnabled→autoSkipRetell 语义反转；新增 skipCurrentSubStage（同/跨阶段 / 互斥早返回）、completion ⊥ skipped 互斥、autoSkip OFF→ON 全量扫描 6 个边界 + true→false 不触发
+- [x] `test/models/learning_plan_test.dart` 重写（plan 静态化）
+- [x] `test/models/learning_progress_test.dart` 加跳过场景 100%、isSubStageSkipped 用例
+- [x] mock_providers / test_notifiers / 5 个 player screen test / learning_plan_screen_test / learning_settings_screen_test / retell_toggle_tests 全部适配新字段名
+
+### 验证
+- flutter analyze 0 error（lib + test + integration_test）
+- 2054 个 unit/widget 测试全过
+
+  **完成时间**: 2026-05-16
+
+---
 
 ## 已完成：完成历史驱动的三态判定（V2.1 修复 3 个 V2 bug）
 

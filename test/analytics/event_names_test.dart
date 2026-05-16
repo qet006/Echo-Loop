@@ -130,11 +130,9 @@ void main() {
       }
     });
 
-    test('复述功能开关 4 个事件常量正确', () {
-      expect(Events.retellIntroDialogShown, 'retell_intro_dialog_shown');
-      expect(Events.retellIntroDialogChoice, 'retell_intro_dialog_choice');
+    test('复述跳过事件常量正确', () {
       expect(Events.retellToggleChanged, 'retell_toggle_changed');
-      expect(Events.retellAutoStageAdvance, 'retell_auto_stage_advance');
+      expect(Events.retellSkipped, 'retell_skipped');
     });
 
     test('复述参数常量正确', () {

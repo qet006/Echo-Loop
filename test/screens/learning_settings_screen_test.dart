@@ -20,9 +20,9 @@ import '../helpers/mock_providers.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  Future<Widget> buildApp({bool retellEnabled = false}) async {
+  Future<Widget> buildApp({bool autoSkipRetell = false}) async {
     SharedPreferences.setMockInitialValues({
-      if (retellEnabled) LearningSettingsKeys.retellEnabled: true,
+      if (autoSkipRetell) LearningSettingsKeys.autoSkipRetell: true,
     });
     final prefs = await SharedPreferences.getInstance();
     return ProviderScope(
@@ -54,8 +54,7 @@ void main() {
       find.byType(SwitchListTile),
     );
     expect(switchTile.value, isFalse);
-    // 说明文字（部分关键词）
-    expect(find.textContaining('Speaking practice'), findsWidgets);
+    expect(find.textContaining('Auto-skip'), findsWidgets);
   });
 
   testWidgets('点击开关 → 翻转 state + 写 SP', (tester) async {
@@ -71,11 +70,11 @@ void main() {
     expect(switchTile.value, isTrue);
 
     final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getBool(LearningSettingsKeys.retellEnabled), isTrue);
+    expect(prefs.getBool(LearningSettingsKeys.autoSkipRetell), isTrue);
   });
 
   testWidgets('初始 ON 时开关显示 ON', (tester) async {
-    await tester.pumpWidget(await buildApp(retellEnabled: true));
+    await tester.pumpWidget(await buildApp(autoSkipRetell: true));
     await tester.pumpAndSettle();
 
     final switchTile = tester.widget<SwitchListTile>(

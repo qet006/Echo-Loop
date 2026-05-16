@@ -1753,19 +1753,14 @@ List<Override> onboardingTestOverrides() {
 
 /// 学习设置相关的 provider 测试 override。
 ///
-/// 默认 `retellEnabled = true`（保留现有集成测试用例的 4 步首次学习预期）
-/// 且 `setupChoiceMade = true`（避免引导弹窗遮挡 plan 页交互）。
-/// 复述开关流程专项测试时显式传 `retellEnabled: false` / `setupChoiceMade: false`。
+/// 默认 `autoSkipRetell = false`（与生产默认一致：retell 在 plan 中、不自动跳）。
+/// 自动跳过流程专项测试时传 `autoSkipRetell: true`。
 List<Override> learningSettingsTestOverrides({
-  bool retellEnabled = true,
-  bool setupChoiceMade = true,
+  bool autoSkipRetell = false,
 }) {
   return [
     initialLearningSettingsProvider.overrideWithValue(
-      LearningSettings(
-        retellEnabled: retellEnabled,
-        setupChoiceMade: setupChoiceMade,
-      ),
+      LearningSettings(autoSkipRetell: autoSkipRetell),
     ),
   ];
 }

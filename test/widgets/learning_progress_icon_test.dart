@@ -56,10 +56,8 @@ void main() {
       final indicator = tester.widget<CircularProgressIndicator>(
         find.byType(CircularProgressIndicator),
       );
-      // 默认 retellEnabled=false（与生产默认一致），未做过任何子步骤
-      final defaultPlan = LearningPlan.fromSettings(
-        const LearningSettings(retellEnabled: false),
-      );
+      // plan 是静态的全量
+      final defaultPlan = LearningPlan.standard();
       expect(
         indicator.value,
         progress.progressPercent(defaultPlan, const <String>{}),

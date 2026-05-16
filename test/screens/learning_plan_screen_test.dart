@@ -153,11 +153,8 @@ void main() {
         analyticsOverride(),
         ...studyTimeOverrides(),
         sharedPreferencesProvider.overrideWithValue(prefs),
-        // 现有用例预设复述开关 ON（4 步首次学习），且已展示引导弹窗（避免遮挡）
-        ...learningSettingsOverrides(
-          retellEnabled: true,
-          setupChoiceMade: true,
-        ),
+        // plan 静态全量；默认 autoSkipRetell=false（手动跳过路径）
+        ...learningSettingsOverrides(),
         audioLibraryProvider.overrideWith(
           () => TestAudioLibrary(AudioLibraryState(audioItems: [item])),
         ),
@@ -536,10 +533,7 @@ void main() {
         ProviderScope(
           overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
-            ...learningSettingsOverrides(
-              retellEnabled: true,
-              setupChoiceMade: true,
-            ),
+            ...learningSettingsOverrides(),
             audioLibraryProvider.overrideWith(
               () => TestAudioLibrary(), // 空音频库
             ),

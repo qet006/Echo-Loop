@@ -35,7 +35,8 @@ class _TestLearningProgressNotifier extends LearningProgressNotifier {
 
 /// 测试用学习设置 Notifier：不依赖 SP，纯内存状态。
 ///
-/// 用于在 reconcile 测试中通过 `setRetellEnabled` 直接触发 settings 变化。
+/// 用于通过 `setAutoSkipRetell` 直接触发 settings 变化、验证 progress 侧
+/// 的 listener 联动（autoSkipRetell false→true 时的全量扫描）。
 class _TestLearningSettingsNotifier extends Notifier<LearningSettings>
     implements LearningSettingsNotifier {
   final LearningSettings _initial;
@@ -46,15 +47,9 @@ class _TestLearningSettingsNotifier extends Notifier<LearningSettings>
   LearningSettings build() => _initial;
 
   @override
-  Future<void> setRetellEnabled(bool enabled) async {
-    if (state.retellEnabled == enabled) return;
-    state = state.copyWith(retellEnabled: enabled);
-  }
-
-  @override
-  Future<void> markSetupChoiceMade() async {
-    if (state.setupChoiceMade) return;
-    state = state.copyWith(setupChoiceMade: true);
+  Future<void> setAutoSkipRetell(bool enabled) async {
+    if (state.autoSkipRetell == enabled) return;
+    state = state.copyWith(autoSkipRetell: enabled);
   }
 }
 
@@ -105,7 +100,7 @@ void main() {
   ProviderContainer createContainer(
     LearningProgressState initialState, {
     NowGetter? nowGetter,
-    bool retellEnabled = true,
+    bool autoSkipRetell = false,
   }) {
     final container = ProviderContainer(
       overrides: [
@@ -116,10 +111,10 @@ void main() {
         stageCompletionDaoProvider.overrideWithValue(mockStageCompletionDao),
         if (nowGetter != null) nowProvider.overrideWithValue(nowGetter),
         analyticsOverride(),
-        ...learningSettingsOverrides(retellEnabled: retellEnabled),
+        ...learningSettingsOverrides(autoSkipRetell: autoSkipRetell),
         learningSettingsProvider.overrideWith(
           () => _TestLearningSettingsNotifier(
-            LearningSettings(retellEnabled: retellEnabled),
+            LearningSettings(autoSkipRetell: autoSkipRetell),
           ),
         ),
       ],
@@ -529,10 +524,13 @@ void main() {
       expect(after.totalStudyDurationMs, initialProgress.totalStudyDurationMs);
     });
 
-    // ========== T3: 复述开关关闭时的推进行为 ==========
+    // ========== T3: autoSkipRetell=true 时的自动跳过推进行为 ==========
+    //
+    // 新机制：plan 永远包含 retell；autoSkipRetell 开启时，complete 推进
+    // 到 retell 位置后 hook 自动连续 skip，直到跳出 retell 区。
 
     test(
-      'retellEnabled=false：firstLearn 跟读完成 → review0（跳过 retell）',
+      'autoSkipRetell=true：firstLearn 跟读完成 → review0（自动跳过 retell）',
       () async {
         final now = DateTime(2026, 3, 1, 10, 0);
         final progress = LearningProgress(
@@ -546,7 +544,7 @@ void main() {
         final container = createContainer(
           LearningProgressState(progressMap: {'a1': progress}),
           nowGetter: () => now,
-          retellEnabled: false,
+          autoSkipRetell: true,
         );
 
         await notifier(container).completeCurrentSubStage('a1');
@@ -555,11 +553,17 @@ void main() {
         expect(after.currentStage, LearningStage.review0);
         expect(after.currentSubStage, SubStageType.reviewDifficultPractice);
         expect(after.firstLearnCompletedAt, isNotNull);
+        // retell 应被记录在跳过集合
+        expect(
+          after.skippedSubStageKeys
+              .contains('firstLearn:retell'),
+          isTrue,
+        );
       },
     );
 
     test(
-      'retellEnabled=false：review0 难句补练完成 → review1（跳过段落复述）',
+      'autoSkipRetell=true：review0 难句补练完成 → review1（自动跳过段落复述）',
       () async {
         final now = DateTime(2026, 3, 5, 10, 0);
         final completedAt = now.subtract(const Duration(days: 1));
@@ -575,7 +579,7 @@ void main() {
         final container = createContainer(
           LearningProgressState(progressMap: {'a1': progress}),
           nowGetter: () => now,
-          retellEnabled: false,
+          autoSkipRetell: true,
         );
 
         await notifier(container).completeCurrentSubStage('a1');
@@ -587,10 +591,9 @@ void main() {
     );
 
     test(
-      'retellEnabled=false：review28 难句补练完成 → completed（跳过全文复述）',
+      'autoSkipRetell=true：review28 难句补练完成 → completed（自动跳过全文复述）',
       () async {
         final now = DateTime(2026, 4, 1, 10, 0);
-        // review28 间隔 28 天，必须超过该时长才可推进
         final completedAt = now.subtract(const Duration(days: 30));
         final progress = LearningProgress(
           audioItemId: 'a1',
@@ -604,7 +607,7 @@ void main() {
         final container = createContainer(
           LearningProgressState(progressMap: {'a1': progress}),
           nowGetter: () => now,
-          retellEnabled: false,
+          autoSkipRetell: true,
         );
 
         await notifier(container).completeCurrentSubStage('a1');
@@ -962,6 +965,7 @@ void main() {
         freePlayRetellParagraphIndex: null,
         newLearningBreakpointSavedAt: null,
         freePlayBreakpointSavedAt: null,
+        skippedSubStages: '',
         updatedAt: DateTime(2026, 3, 11, 9, 30),
       );
       when(
@@ -1012,6 +1016,7 @@ void main() {
         freePlayRetellParagraphIndex: null,
         newLearningBreakpointSavedAt: null,
         freePlayBreakpointSavedAt: null,
+        skippedSubStages: '',
         updatedAt: DateTime(2026, 3, 11, 9, 30),
       );
       when(
@@ -1031,23 +1036,22 @@ void main() {
     });
   });
 
-  // ========== T14: reconcileForSettingsChange（plan 变更触发自动推进） ==========
+  // ========== T14: autoSkipRetell 开关切换时的全量扫描 ==========
+  //
+  // 新机制：autoSkipRetell false→true 触发 progress 端 listener，对所有
+  // progress 跑一次 _autoSkipRetellIfEnabled；停在复述子阶段的会立即推进
+  // 并写入 skippedSubStageKeys。true→false 不触发任何动作。
 
-  group('reconcileForSettingsChange', () {
-    /// 切换 settings 触发 reconcile 的便捷调用。
-    ///
-    /// 先 eager-read progress notifier 触发 `build()` 安装 listener，
-    /// 否则在调用方第一次 read 之前 settings 变更不会触发 reconcile。
-    Future<void> disableRetell(ProviderContainer container) async {
+  group('autoSkipRetell 切换 OFF→ON 全量扫描', () {
+    Future<void> enableAutoSkip(ProviderContainer container) async {
       container.read(learningProgressNotifierProvider.notifier);
       await container
           .read(learningSettingsProvider.notifier)
-          .setRetellEnabled(false);
-      // 给 listen 回调一个 microtask 窗口完成
+          .setAutoSkipRetell(true);
       await Future<void>.delayed(Duration.zero);
     }
 
-    test('(a) firstLearn 当前在 listenAndRepeat（非复述）→ 不推进', () async {
+    test('(a) firstLearn 当前在非复述 → 不推进', () async {
       final now = DateTime(2026, 3, 1, 10, 0);
       final progress = LearningProgress(
         audioItemId: 'a1',
@@ -1060,19 +1064,19 @@ void main() {
       final container = createContainer(
         LearningProgressState(progressMap: {'a1': progress}),
         nowGetter: () => now,
-        retellEnabled: true,
+        autoSkipRetell: false,
       );
 
-      await disableRetell(container);
+      await enableAutoSkip(container);
 
       final after = readProgress(container, 'a1')!;
       expect(after.currentStage, LearningStage.firstLearn);
       expect(after.currentSubStage, SubStageType.listenAndRepeat);
-      // 不写 stage_completions
       verifyNever(() => mockStageCompletionDao.insertRecord(any()));
+      expect(after.skippedSubStageKeys, isEmpty);
     });
 
-    test('(b) firstLearn 当前是 retell → 推进至 review0，不写 stage_completions', () async {
+    test('(b) firstLearn 当前是 retell → 推进至 review0，写入跳过集合', () async {
       final now = DateTime(2026, 3, 1, 10, 0);
       final progress = LearningProgress(
         audioItemId: 'a1',
@@ -1086,17 +1090,17 @@ void main() {
       final container = createContainer(
         LearningProgressState(progressMap: {'a1': progress}),
         nowGetter: () => now,
-        retellEnabled: true,
+        autoSkipRetell: false,
       );
 
-      await disableRetell(container);
+      await enableAutoSkip(container);
 
       final after = readProgress(container, 'a1')!;
       expect(after.currentStage, LearningStage.review0);
       expect(after.firstLearnCompletedAt, isNotNull);
-      // 静默推进：不写 stage_completions、不递增 retellPassCount
       verifyNever(() => mockStageCompletionDao.insertRecord(any()));
       expect(after.retellPassCount, 0);
+      expect(after.skippedSubStageKeys, contains('firstLearn:retell'));
     });
 
     test('(c) review0 当前是 reviewRetellParagraph → 推进至 review1', () async {
@@ -1114,13 +1118,17 @@ void main() {
       final container = createContainer(
         LearningProgressState(progressMap: {'a1': progress}),
         nowGetter: () => now,
-        retellEnabled: true,
+        autoSkipRetell: false,
       );
 
-      await disableRetell(container);
+      await enableAutoSkip(container);
 
       final after = readProgress(container, 'a1')!;
       expect(after.currentStage, LearningStage.review1);
+      expect(
+        after.skippedSubStageKeys,
+        contains('review0:reviewRetellParagraph'),
+      );
     });
 
     test('(d) review28 当前是 reviewRetellSummary → 推进至 completed', () async {
@@ -1138,10 +1146,10 @@ void main() {
       final container = createContainer(
         LearningProgressState(progressMap: {'a1': progress}),
         nowGetter: () => now,
-        retellEnabled: true,
+        autoSkipRetell: false,
       );
 
-      await disableRetell(container);
+      await enableAutoSkip(container);
 
       final after = readProgress(container, 'a1')!;
       expect(after.currentStage, LearningStage.completed);
@@ -1159,16 +1167,16 @@ void main() {
       final container = createContainer(
         LearningProgressState(progressMap: {'a1': progress}),
         nowGetter: () => now,
-        retellEnabled: true,
+        autoSkipRetell: false,
       );
 
-      await disableRetell(container);
+      await enableAutoSkip(container);
 
       final after = readProgress(container, 'a1')!;
       expect(after.currentStage, LearningStage.completed);
     });
 
-    test('(f) 多条进度同时推进互不影响', () async {
+    test('(f) 多条进度同时扫描互不影响', () async {
       final now = DateTime(2026, 3, 10, 10, 0);
       final firstLearnProgress = LearningProgress(
         audioItemId: 'a1',
@@ -1200,10 +1208,10 @@ void main() {
           'a3': nonRetellProgress,
         }),
         nowGetter: () => now,
-        retellEnabled: true,
+        autoSkipRetell: false,
       );
 
-      await disableRetell(container);
+      await enableAutoSkip(container);
 
       expect(
         readProgress(container, 'a1')!.currentStage,
@@ -1223,7 +1231,7 @@ void main() {
       );
     });
 
-    test('开启复述（false→true）不触发任何推进', () async {
+    test('autoSkipRetell true→false 不触发任何推进', () async {
       final now = DateTime(2026, 3, 1, 10, 0);
       final progress = LearningProgress(
         audioItemId: 'a1',
@@ -1236,18 +1244,134 @@ void main() {
       final container = createContainer(
         LearningProgressState(progressMap: {'a1': progress}),
         nowGetter: () => now,
-        retellEnabled: false,
+        autoSkipRetell: true,
       );
 
       container.read(learningProgressNotifierProvider.notifier);
       await container
           .read(learningSettingsProvider.notifier)
-          .setRetellEnabled(true);
+          .setAutoSkipRetell(false);
       await Future<void>.delayed(Duration.zero);
 
       final after = readProgress(container, 'a1')!;
       expect(after.currentStage, LearningStage.firstLearn);
       expect(after.currentSubStage, SubStageType.listenAndRepeat);
+    });
+  });
+
+  // ========== T15: skipCurrentSubStage 手动跳过 ==========
+
+  group('skipCurrentSubStage', () {
+    test('写 skippedSubStageKeys + 推进，不写 stage_completions', () async {
+      final now = DateTime(2026, 3, 1, 10, 0);
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.retell,
+        currentStageStartedAt: now,
+        updatedAt: now,
+      );
+
+      final container = createContainer(
+        LearningProgressState(progressMap: {'a1': progress}),
+        nowGetter: () => now,
+      );
+
+      await notifier(container).skipCurrentSubStage('a1');
+
+      final after = readProgress(container, 'a1')!;
+      expect(after.currentStage, LearningStage.review0);
+      expect(after.skippedSubStageKeys, contains('firstLearn:retell'));
+      verifyNever(() => mockStageCompletionDao.insertRecord(any()));
+    });
+
+    test('已 completed 的子步骤不能再被跳过（互斥）', () async {
+      final now = DateTime(2026, 3, 1, 10, 0);
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.retell,
+        currentStageStartedAt: now,
+        updatedAt: now,
+      );
+
+      final container = createContainer(
+        LearningProgressState(
+          progressMap: {'a1': progress},
+          completionsByAudio: {
+            'a1': {'firstLearn:retell'},
+          },
+        ),
+        nowGetter: () => now,
+      );
+
+      await notifier(container).skipCurrentSubStage('a1');
+
+      final after = readProgress(container, 'a1')!;
+      expect(after.currentSubStage, SubStageType.retell);
+      expect(after.skippedSubStageKeys, isEmpty);
+    });
+
+    test('autoSkipRetell=true 时手动跳过非 retell 会触发自动续跳到非 retell 位置',
+        () async {
+      final now = DateTime(2026, 3, 1, 10, 0);
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.listenAndRepeat,
+        currentStageStartedAt: now,
+        updatedAt: now,
+      );
+
+      final container = createContainer(
+        LearningProgressState(progressMap: {'a1': progress}),
+        nowGetter: () => now,
+        autoSkipRetell: true,
+      );
+
+      await notifier(container).skipCurrentSubStage('a1');
+
+      final after = readProgress(container, 'a1')!;
+      // listenAndRepeat 被手动跳过；下一个是 retell → 自动续跳 → review0
+      expect(after.currentStage, LearningStage.review0);
+      expect(
+        after.skippedSubStageKeys,
+        containsAll(<String>['firstLearn:listenAndRepeat', 'firstLearn:retell']),
+      );
+    });
+  });
+
+  // ========== T16: 互斥 — recordCompletionIfNew 清除 skip key ==========
+
+  group('completion ⊥ skipped 互斥', () {
+    test('skip 后 recordCompletionIfNew 同 key → skip 集合清除', () async {
+      final now = DateTime(2026, 3, 1, 10, 0);
+      const key = 'firstLearn:retell';
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.review0,
+        currentSubStage: SubStageType.reviewDifficultPractice,
+        skippedSubStageKeys: const {key},
+        updatedAt: now,
+      );
+
+      final container = createContainer(
+        LearningProgressState(progressMap: {'a1': progress}),
+        nowGetter: () => now,
+      );
+
+      await notifier(container).recordCompletionIfNew(
+        'a1',
+        LearningStage.firstLearn,
+        SubStageType.retell,
+      );
+
+      final after = readProgress(container, 'a1')!;
+      expect(after.skippedSubStageKeys, isNot(contains(key)));
+      final completions = container
+          .read(learningProgressNotifierProvider)
+          .completionsFor('a1');
+      expect(completions, contains(key));
     });
   });
 
@@ -1286,7 +1410,7 @@ void main() {
           progressMap: {},
           completionsByAudio: {},
         ),
-        retellEnabled: true,
+        autoSkipRetell: false,
       );
 
       await notifier(container).recordCompletionIfNew(
@@ -1310,7 +1434,7 @@ void main() {
             'a1': {'firstLearn:retell'},
           },
         ),
-        retellEnabled: true,
+        autoSkipRetell: false,
       );
 
       await notifier(container).recordCompletionIfNew(
@@ -1330,7 +1454,7 @@ void main() {
             'a1': {'firstLearn:blindListen'},
           },
         ),
-        retellEnabled: true,
+        autoSkipRetell: false,
       );
 
       await notifier(container).recordCompletionIfNew(

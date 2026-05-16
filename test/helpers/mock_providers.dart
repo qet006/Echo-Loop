@@ -182,23 +182,18 @@ Override analyticsOverride() {
 
 /// 返回学习设置 Provider 系列的 override 列表（用于测试默认/自定义初值）。
 ///
-/// 测试默认 retellEnabled=false（与生产默认值一致）；
-/// 显式打开复述用 `retellEnabled: true`。
+/// 测试默认 autoSkipRetell=false（与生产默认一致：默认不自动跳过）；
+/// 显式开启用 `autoSkipRetell: true`。
 ///
 /// [prefs] 可选 SharedPreferences 实例：如果传入，会同时 override
-/// `sharedPreferencesProvider`，让 `ensureRetellDecisionMade` 直接读到测试
-/// 期望的 SP key 状态。不传则 gate 行为依赖各测试自行 override。
+/// `sharedPreferencesProvider`。
 List<Override> learningSettingsOverrides({
-  bool retellEnabled = false,
-  bool setupChoiceMade = false,
+  bool autoSkipRetell = false,
   SharedPreferences? prefs,
 }) {
   return [
     initialLearningSettingsProvider.overrideWithValue(
-      LearningSettings(
-        retellEnabled: retellEnabled,
-        setupChoiceMade: setupChoiceMade,
-      ),
+      LearningSettings(autoSkipRetell: autoSkipRetell),
     ),
     if (prefs != null) sharedPreferencesProvider.overrideWithValue(prefs),
   ];

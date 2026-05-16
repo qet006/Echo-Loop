@@ -3,17 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:echo_loop/database/enums.dart';
 import 'package:echo_loop/models/learning_plan.dart';
 import 'package:echo_loop/models/learning_progress.dart';
-import 'package:echo_loop/providers/learning_settings_provider.dart';
 
 void main() {
   final now = DateTime(2026, 2, 21);
-  // 测试默认 plan：retell 启用（保留旧测试的 4 步首次学习预期）
-  final planOn = LearningPlan.fromSettings(
-    const LearningSettings(retellEnabled: true),
-  );
-  final planOff = LearningPlan.fromSettings(
-    const LearningSettings(retellEnabled: false),
-  );
+  // plan 现在是静态的，永远全量（包含复述）。
+  // 「跳过」由 LearningProgress.skippedSubStageKeys 承载，不再过滤 plan。
+  final planOn = LearningPlan.standard();
+  final planOff = LearningPlan.standard();
 
   /// 便捷构造 completedKeys 集合
   Set<String> keys(List<(LearningStage, SubStageType)> items) =>
@@ -293,14 +289,13 @@ void main() {
   });
 
   group('progressPercent(plan) / completedFirstStudySteps(plan)', () {
-    test('plan OFF：firstLearn 在 listenAndRepeat → 已完成 2/3', () {
+    test('firstLearn 在 listenAndRepeat → 已完成 2 步', () {
       final progress = LearningProgress(
         audioItemId: 'a1',
         currentStage: LearningStage.firstLearn,
         currentSubStage: SubStageType.listenAndRepeat,
         updatedAt: now,
       );
-      // 用户做过 blind + intensive
       final completed = keys([
         (LearningStage.firstLearn, SubStageType.blindListen),
         (LearningStage.firstLearn, SubStageType.intensiveListen),
@@ -308,7 +303,7 @@ void main() {
       expect(progress.completedFirstStudySteps(planOff, completed), 2);
     });
 
-    test('plan OFF：completed 阶段 progressPercent 返回 1.0', () {
+    test('completed 阶段 progressPercent 返回 1.0', () {
       final progress = LearningProgress(
         audioItemId: 'a1',
         currentStage: LearningStage.completed,
@@ -317,8 +312,7 @@ void main() {
       expect(progress.progressPercent(planOff, const {}), 1.0);
     });
 
-    test('已完成的 retell 计入分子（bug 3 进度回归）', () {
-      // firstLearn 全做过（含 retell），现在 review0
+    test('已完成的 retell 计入分子', () {
       final progress = LearningProgress(
         audioItemId: 'a1',
         currentStage: LearningStage.review0,
@@ -331,14 +325,52 @@ void main() {
             .toList(),
       );
 
-      // plan OFF：分母可见集 = firstLearn 计划 3 个 ∪ 完成 4 个 = 4
-      //          + review0 计划 1 个 = 5 + review1~14*2 + review28*2 = 5 + 10 + 2 = 17
-      // 分子 = 4（完成 firstLearn 全部）
-      // 期望比例正确反映 retell 已完成
       final off = progress.progressPercent(planOff, completed);
       expect(off, greaterThan(0));
-      // 完成的 retell 计入分子：completedFirstStudySteps = 4（含 retell）
       expect(progress.completedFirstStudySteps(planOff, completed), 4);
+    });
+
+    test('跳过的子步骤计入分子+分母（纯跳过场景能到 100%）', () {
+      // 模拟所有子步骤都被跳过的极端场景
+      final allKeys = <String>{};
+      for (final s in LearningStage.values) {
+        for (final sub in s.allSubStages) {
+          allKeys.add('${s.key}:${sub.key}');
+        }
+      }
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.review28,
+        currentSubStage: SubStageType.reviewRetellSummary,
+        skippedSubStageKeys: allKeys,
+        updatedAt: now,
+      );
+      // 没有 completion 但所有都跳过 → 分母 = 分子 = allKeys.length，比例 = 1.0
+      expect(progress.progressPercent(planOff, const {}), 1.0);
+    });
+
+    test('isSubStageSkipped 正确查询 skippedSubStageKeys', () {
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.retell,
+        skippedSubStageKeys: const {'firstLearn:retell'},
+        updatedAt: now,
+      );
+      expect(
+        progress.isSubStageSkipped(
+          LearningStage.firstLearn,
+          SubStageType.retell,
+        ),
+        isTrue,
+      );
+      expect(
+        progress.isSubStageSkipped(
+          LearningStage.firstLearn,
+          SubStageType.blindListen,
+        ),
+        isFalse,
+      );
     });
   });
 
