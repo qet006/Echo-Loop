@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/blind_listen_settings.dart';
+import '../../models/retell_settings.dart';
 import '../../models/sentence.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/paragraph_grouping.dart';
@@ -29,7 +30,8 @@ const paragraphDurationOptions = [0, 10, 15, 20, 25, 30, 45, 60, 90, -1];
 /// [estimatedDurationText] 说明下方显示的预估时长文本，可选（静态文案，不随选项变化）
 /// [estimateDurationBuilder] 动态预估时长 builder，根据当前选中的段落时长 + 停顿倍数实时计算；
 ///   优先级高于 [estimatedDurationText]，二者同时传入时取 builder
-/// [onStartPractice] 回调，传递 (目标时长, 停顿倍数)
+/// [defaultKeywordRatio] 传入则显示可见词比例下拉行（复述专用），盲听不传
+/// [onStartPractice] 回调，传递 (目标时长, 停顿倍数, 可见词比例)
 Future<void> showParagraphSelectionSheet({
   required BuildContext context,
   required IconData icon,
@@ -43,8 +45,12 @@ Future<void> showParagraphSelectionSheet({
   String? estimatedDurationText,
   Duration Function(int targetSeconds, double pauseMultiplier)?
       estimateDurationBuilder,
-  required void Function(Duration targetDuration, double pauseMultiplier)
-      onStartPractice,
+  KeywordRatio? defaultKeywordRatio,
+  required void Function(
+    Duration targetDuration,
+    double pauseMultiplier,
+    KeywordRatio? keywordRatio,
+  ) onStartPractice,
   String? skipLabel,
   VoidCallback? onSkip,
   String? skipGuideFlowId,
@@ -68,6 +74,7 @@ Future<void> showParagraphSelectionSheet({
       stageLabel: stageLabel,
       estimatedDurationText: estimatedDurationText,
       estimateDurationBuilder: estimateDurationBuilder,
+      defaultKeywordRatio: defaultKeywordRatio,
       onStartPractice: onStartPractice,
       skipLabel: skipLabel,
       onSkip: onSkip,
@@ -90,8 +97,12 @@ class _ParagraphSelectionSheet extends StatefulWidget {
   final String? estimatedDurationText;
   final Duration Function(int targetSeconds, double pauseMultiplier)?
       estimateDurationBuilder;
-  final void Function(Duration targetDuration, double pauseMultiplier)
-      onStartPractice;
+  final KeywordRatio? defaultKeywordRatio;
+  final void Function(
+    Duration targetDuration,
+    double pauseMultiplier,
+    KeywordRatio? keywordRatio,
+  ) onStartPractice;
   final String? skipLabel;
   final VoidCallback? onSkip;
   final String? skipGuideFlowId;
@@ -109,6 +120,7 @@ class _ParagraphSelectionSheet extends StatefulWidget {
     this.stageLabel,
     this.estimatedDurationText,
     this.estimateDurationBuilder,
+    this.defaultKeywordRatio,
     required this.onStartPractice,
     this.skipLabel,
     this.onSkip,
@@ -126,6 +138,7 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
   late int _targetSeconds = widget.defaultSeconds;
   /// -1.0 = 自动（智能模式）
   double _pauseMultiplier = -1.0;
+  late KeywordRatio? _keywordRatio = widget.defaultKeywordRatio;
 
   /// 用于「跳过」按钮新手引导的 showcase key；仅在调用方传入 flow id 时使用。
   final GlobalKey _skipGuideKey = GlobalKey();
@@ -168,7 +181,7 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
 
             // 图标
             Icon(widget.icon, size: 56, color: theme.colorScheme.primary),
-            const SizedBox(height: AppSpacing.m),
+            const SizedBox(height: AppSpacing.s),
 
             // 标题
             Text(
@@ -203,43 +216,7 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
               ),
             ),
 
-            // 预估时长（可选，如"预计 3 分钟"）
-            // 优先用 builder 动态计算（随段长/停顿倍数实时刷新），否则回退到静态文案
-            Builder(builder: (_) {
-              final dynamicText = widget.estimateDurationBuilder != null
-                  ? formatEstimatedDuration(
-                      l10n,
-                      widget.estimateDurationBuilder!(
-                        _targetSeconds,
-                        _pauseMultiplier,
-                      ),
-                    )
-                  : null;
-              final text = dynamicText ?? widget.estimatedDurationText;
-              if (text == null) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.s),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.timer_outlined,
-                      size: 16,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      text,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-
-            const SizedBox(height: AppSpacing.l),
+            const SizedBox(height: AppSpacing.m),
 
             // 段落时长行
             Row(
@@ -256,6 +233,7 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
                   child: DropdownButton<int>(
                     value: _targetSeconds,
                     isExpanded: true,
+                    isDense: true,
                     underline: const SizedBox.shrink(),
                     items: paragraphDurationOptions.map((s) {
                       final label = switch (s) {
@@ -293,6 +271,7 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
                     child: DropdownButton<double>(
                     value: _pauseMultiplier,
                     isExpanded: true,
+                    isDense: true,
                     underline: const SizedBox.shrink(),
                     items: [
                       DropdownMenuItem(
@@ -320,19 +299,112 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
               ),
             ],
 
-            // 段落数预览（不分段时无意义，隐藏）
-            if (_targetSeconds != -1) ...[
-              const SizedBox(height: AppSpacing.m),
-              Text(
-                l10n.blindListenParagraphCount(_paragraphCount),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w500,
-                ),
+            // 可见词比例行（仅复述时传入 defaultKeywordRatio 才显示）
+            if (_keywordRatio != null) ...[
+              const SizedBox(height: AppSpacing.s),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    l10n.retellKeywordRatio,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 80,
+                    child: DropdownButton<KeywordRatio>(
+                      value: _keywordRatio,
+                      isExpanded: true,
+                      isDense: true,
+                      underline: const SizedBox.shrink(),
+                      items: KeywordRatio.values
+                          .map(
+                            (r) => DropdownMenuItem(
+                              value: r,
+                              child: Text('${r.percent}%'),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) setState(() => _keywordRatio = v);
+                      },
+                    ),
+                  ),
+                ],
               ),
             ],
 
-            const SizedBox(height: AppSpacing.l),
+            // 段落数 + 预计时长（同一行节省空间）
+            // 不分段时段落数无意义，仅显示预计时长（若有）
+            Builder(builder: (_) {
+              final showParagraphCount = _targetSeconds != -1;
+              final dynamicText = widget.estimateDurationBuilder != null
+                  ? formatEstimatedDuration(
+                      l10n,
+                      widget.estimateDurationBuilder!(
+                        _targetSeconds,
+                        _pauseMultiplier,
+                      ),
+                    )
+                  : null;
+              final estimatedText = dynamicText ?? widget.estimatedDurationText;
+              if (!showParagraphCount && estimatedText == null) {
+                return const SizedBox.shrink();
+              }
+              final pieces = <Widget>[];
+              if (showParagraphCount) {
+                pieces.add(
+                  Text(
+                    l10n.blindListenParagraphCount(_paragraphCount),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                );
+              }
+              if (estimatedText != null) {
+                if (pieces.isNotEmpty) {
+                  pieces.add(
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s,
+                      ),
+                      child: Text(
+                        '·',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                pieces.addAll([
+                  Icon(
+                    Icons.timer_outlined,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    estimatedText,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ]);
+              }
+              return Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.s),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: pieces,
+                ),
+              );
+            }),
+
+            const SizedBox(height: AppSpacing.m),
 
             // 跳过 + 开始练习按钮（宽度 1:2，仅当 onSkip 提供时显示跳过）
             _buildActionButtons(context, l10n),
@@ -382,7 +454,7 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
         final duration = _targetSeconds < 0
             ? const Duration(hours: 24)
             : Duration(seconds: _targetSeconds);
-        widget.onStartPractice(duration, _pauseMultiplier);
+        widget.onStartPractice(duration, _pauseMultiplier, _keywordRatio);
       },
       child: Text(l10n.startPractice),
     );

@@ -28,6 +28,7 @@ import '../services/subtitle_parser.dart';
 import '../theme/app_theme.dart';
 import '../models/blind_listen_settings.dart';
 import '../models/intensive_listen_settings.dart' show PauseMode;
+import '../models/retell_settings.dart' show KeywordRatio;
 import '../utils/blind_listen_duration_estimator.dart';
 import '../utils/paragraph_grouping.dart';
 import '../utils/retell_duration_estimator.dart';
@@ -433,10 +434,10 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
     }
 
     // reviewRetellParagraph：弹出简报面板让用户选择段落时长
-    final currentStage = ref
+    final progress = ref
         .read(learningProgressNotifierProvider)
-        .progressMap[widget.audioItemId]
-        ?.currentStage;
+        .progressMap[widget.audioItemId];
+    final currentStage = progress?.currentStage;
 
     // 复习阶段显示阶段名；预估时长由 briefing sheet 内部按真实公式动态计算
     final l10n = AppLocalizations.of(context)!;
@@ -448,14 +449,24 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       sentences: lpState.sentences,
       defaultSeconds: retellDefaultSeconds(currentStage),
       stageLabel: isReview ? reviewStageLabel(l10n, currentStage) : null,
-      onStartPractice: (targetDuration, pauseMultiplier) async {
+      defaultKeywordRatio: progress != null
+          ? KeywordRatio.forDifficultyAndStage(
+              progress.difficulty,
+              currentStage ?? LearningStage.firstLearn,
+            )
+          : null,
+      onStartPractice: (targetDuration, pauseMultiplier, keywordRatio) async {
         final paragraphs = groupSentencesIntoParagraphs(
           lpState.sentences,
           targetDuration,
         );
         await ref
             .read(learningSessionProvider.notifier)
-            .enterRetellMode(widget.audioItemId, paragraphs);
+            .enterRetellMode(
+              widget.audioItemId,
+              paragraphs,
+              overrideKeywordRatio: keywordRatio,
+            );
         _applyRetellPauseMultiplier(pauseMultiplier);
         if (!context.mounted) return;
         context.push(
@@ -700,16 +711,22 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       return;
     }
 
-    final stageForDefault = ref
-            .read(learningProgressNotifierProvider)
-            .progressMap[widget.audioItemId]
-            ?.currentStage ??
-        LearningStage.firstLearn;
+    final progressForDefault = ref
+        .read(learningProgressNotifierProvider)
+        .progressMap[widget.audioItemId];
+    final stageForDefault =
+        progressForDefault?.currentStage ?? LearningStage.firstLearn;
     showRetellBriefingSheet(
       context: context,
       sentences: lpState.sentences,
       defaultSeconds: retellDefaultSeconds(stageForDefault),
-      onStartPractice: (targetDuration, pauseMultiplier) async {
+      defaultKeywordRatio: progressForDefault != null
+          ? KeywordRatio.forDifficultyAndStage(
+              progressForDefault.difficulty,
+              stageForDefault,
+            )
+          : null,
+      onStartPractice: (targetDuration, pauseMultiplier, keywordRatio) async {
         final paragraphs = groupSentencesIntoParagraphs(
           lpState.sentences,
           targetDuration,
@@ -717,7 +734,11 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
 
         await ref
             .read(learningSessionProvider.notifier)
-            .enterRetellMode(widget.audioItemId, paragraphs);
+            .enterRetellMode(
+              widget.audioItemId,
+              paragraphs,
+              overrideKeywordRatio: keywordRatio,
+            );
         _applyRetellPauseMultiplier(pauseMultiplier);
         if (!context.mounted) return;
         context.push(
@@ -1672,16 +1693,23 @@ class _FirstStudySection extends ConsumerWidget {
 
     // 段落时长 default 按用户**当前**学习阶段算（review28 用户能驾驭长段），
     // 与 catchUpStage（始终 firstLearn，因为这是 firstLearn 子步骤的补练）解耦。
-    final stageForDefault = ref
-            .read(learningProgressNotifierProvider)
-            .progressMap[audioItemId]
-            ?.currentStage ??
-        LearningStage.firstLearn;
+    // 可见词比例按 catchUpStage=firstLearn 算（补练 firstLearn 复述）。
+    final progressForDefault = ref
+        .read(learningProgressNotifierProvider)
+        .progressMap[audioItemId];
+    final stageForDefault =
+        progressForDefault?.currentStage ?? LearningStage.firstLearn;
     showRetellBriefingSheet(
       context: context,
       sentences: lpState.sentences,
       defaultSeconds: retellDefaultSeconds(stageForDefault),
-      onStartPractice: (targetDuration, pauseMultiplier) async {
+      defaultKeywordRatio: progressForDefault != null
+          ? KeywordRatio.forDifficultyAndStage(
+              progressForDefault.difficulty,
+              LearningStage.firstLearn,
+            )
+          : null,
+      onStartPractice: (targetDuration, pauseMultiplier, keywordRatio) async {
         final paragraphs = groupSentencesIntoParagraphs(
           lpState.sentences,
           targetDuration,
@@ -1695,6 +1723,7 @@ class _FirstStudySection extends ConsumerWidget {
               isFreePlay: true,
               catchUpStage: LearningStage.firstLearn,
               catchUpSubStage: SubStageType.retell,
+              overrideKeywordRatio: keywordRatio,
             );
         if (pauseMultiplier >= 0) {
           final player = ref.read(retellPlayerProvider.notifier);
@@ -2208,11 +2237,20 @@ class _ReviewRoundSection extends ConsumerWidget {
     }
 
     // 段落复述：弹出简报面板让用户选择段落时长（预估时长由 sheet 内部按真实公式动态计算）
+    final progressForRetell = ref
+        .read(learningProgressNotifierProvider)
+        .progressMap[audioItemId];
     showRetellBriefingSheet(
       context: context,
       sentences: lpState.sentences,
       defaultSeconds: retellDefaultSeconds(review.stage),
-      onStartPractice: (targetDuration, pauseMultiplier) async {
+      defaultKeywordRatio: progressForRetell != null
+          ? KeywordRatio.forDifficultyAndStage(
+              progressForRetell.difficulty,
+              review.stage,
+            )
+          : null,
+      onStartPractice: (targetDuration, pauseMultiplier, keywordRatio) async {
         final paragraphs = groupSentencesIntoParagraphs(
           lpState.sentences,
           targetDuration,
@@ -2225,6 +2263,7 @@ class _ReviewRoundSection extends ConsumerWidget {
               isFreePlay: true,
               catchUpStage: review.stage,
               catchUpSubStage: catchUpSub,
+              overrideKeywordRatio: keywordRatio,
             );
         if (pauseMultiplier >= 0) {
           final player = ref.read(retellPlayerProvider.notifier);

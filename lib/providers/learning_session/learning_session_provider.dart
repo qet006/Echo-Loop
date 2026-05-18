@@ -569,13 +569,16 @@ class LearningSession extends _$LearningSession {
   /// 2. 暂停 LP 的 stream 监听
   /// 3. 初始化 RetellPlayer（段落分组 + 按音频难度自动算可见词比例 + 断点索引）
   ///
-  /// 可见词比例由 `progress.difficulty` 映射，无需调用方传入。
+  /// 可见词比例：
+  /// - [overrideKeywordRatio] 非空时使用（用户在 briefing 弹窗中手动选了某档）
+  /// - 否则按 `progress.difficulty` + 阶段映射自动算
   Future<void> enterRetellMode(
     String audioItemId,
     List<List<Sentence>> paragraphs, {
     bool isFreePlay = false,
     LearningStage? catchUpStage,
     SubStageType? catchUpSubStage,
+    KeywordRatio? overrideKeywordRatio,
   }) async {
     _startStudyTimer();
     final practice = ref.read(listeningPracticeProvider.notifier);
@@ -617,13 +620,15 @@ class LearningSession extends _$LearningSession {
           retellSentences.isNotEmpty ? retellSentences.first.text : null,
     );
 
-    // 初始化复述播放器：按音频难度 + 学习阶段联合算可见词比例。
+    // 初始化复述播放器：优先用调用方覆盖值（briefing 弹窗里用户手动选的档位），
+    // 否则按音频难度 + 学习阶段联合算可见词比例。
     // 补练场景按 catchUpStage 算（补练 firstLearn 就走 firstLearn 的曲线）。
     final effectiveStage = catchUpStage ?? progress.currentStage;
-    final autoRatio = KeywordRatio.forDifficultyAndStage(
-      progress.difficulty,
-      effectiveStage,
-    );
+    final autoRatio = overrideKeywordRatio ??
+        KeywordRatio.forDifficultyAndStage(
+          progress.difficulty,
+          effectiveStage,
+        );
     final player = ref.read(retellPlayerProvider.notifier);
     player.initialize(
       paragraphs,

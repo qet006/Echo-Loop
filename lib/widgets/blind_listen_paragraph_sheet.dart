@@ -33,6 +33,8 @@ Future<void> showBlindListenParagraphSheet({
     pauseMultiplierOptions: const [0.5, 1.0, 1.5, 2.0, 3.0],
     stageLabel: stageLabel,
     estimatedDurationText: estimatedDurationText,
-    onStartPractice: onStartPractice,
+    // 盲听不显示可见词比例（仅复述用），第三个回调参数忽略
+    onStartPractice: (duration, multiplier, _) =>
+        onStartPractice(duration, multiplier),
   );
 }

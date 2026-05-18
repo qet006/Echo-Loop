@@ -1080,6 +1080,7 @@ class TestLearningSession extends LearningSession {
     bool isFreePlay = false,
     LearningStage? catchUpStage,
     SubStageType? catchUpSubStage,
+    KeywordRatio? overrideKeywordRatio,
   }) async {
     state = state.copyWith(
       learningMode: LearningMode.retell,

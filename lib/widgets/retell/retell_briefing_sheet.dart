@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import '../../database/enums.dart';
 import '../../l10n/app_localizations.dart';
+import '../../models/retell_settings.dart';
 import '../../models/sentence.dart';
 import '../../providers/new_user_guide_provider.dart';
 import '../../utils/retell_duration_estimator.dart';
@@ -41,8 +42,11 @@ int retellDefaultSeconds(LearningStage? stage) {
 ///
 /// [sentences] 完整句子列表（用于 DP 预览段落数 + 预估时长真实公式）
 /// [stageLabel] 可选的阶段名（如"第三轮复习"），显示在标题下方
-/// [onStartPractice] 点击"开始练习"时回调，传递选中的目标时长和停顿倍数
-/// pauseMultiplier: -1.0 = 自动（智能模式），>0 = 段长倍数
+/// [defaultKeywordRatio] 可见词比例的初始值（按音频难度 + 学习阶段算）。
+///   传入则弹窗显示"可见词比例"下拉行，用户可调整；
+///   `onStartPractice` 回调会带回最终选定的档位。
+/// [onStartPractice] 点击"开始练习"时回调，传递选中的目标时长、停顿倍数、可见词比例
+///   pauseMultiplier: -1.0 = 自动（智能模式），>0 = 段长倍数
 /// [onSkip] 可选，提供时在"开始练习"左侧显示「跳过」按钮（宽度比例 1:2）。
 ///   仅按计划学习触发的入口传入；自由练习入口不传（用户既然主动点开练习，
 ///   再让他点跳过没意义）。
@@ -52,10 +56,14 @@ int retellDefaultSeconds(LearningStage? stage) {
 Future<void> showRetellBriefingSheet({
   required BuildContext context,
   required List<Sentence> sentences,
-  required void Function(Duration targetDuration, double pauseMultiplier)
-      onStartPractice,
+  required void Function(
+    Duration targetDuration,
+    double pauseMultiplier,
+    KeywordRatio? keywordRatio,
+  ) onStartPractice,
   int defaultSeconds = 30,
   String? stageLabel,
+  KeywordRatio? defaultKeywordRatio,
   VoidCallback? onSkip,
 }) {
   final l10n = AppLocalizations.of(context)!;
@@ -75,6 +83,7 @@ Future<void> showRetellBriefingSheet({
       targetSeconds: targetSeconds,
       pauseMultiplier: pauseMultiplier,
     ),
+    defaultKeywordRatio: defaultKeywordRatio,
     onStartPractice: onStartPractice,
     skipLabel: onSkip != null ? l10n.retellSkip : null,
     onSkip: onSkip,
