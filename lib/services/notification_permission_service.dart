@@ -232,8 +232,10 @@ class NotificationPermissionService {
     try {
       granted = await _reminderService.checkNotificationGranted();
     } catch (e) {
-      AppLogger.log(_logTag, 'getCurrentState ERROR: $e (fallback blocked)');
-      return NotificationPermissionState.blocked;
+      // 失败时保守 fallback canRequest（而非 blocked），避免因临时错误
+      // 在设置页误显红色 banner 引导用户跳系统设置。
+      AppLogger.log(_logTag, 'getCurrentState ERROR: $e (fallback canRequest)');
+      return NotificationPermissionState.canRequest;
     }
     if (granted) {
       AppLogger.log(_logTag, 'getCurrentState: granted=true -> granted');
@@ -259,10 +261,11 @@ class NotificationPermissionService {
   }
 
   bool _isInCooldown() {
-    final lastAction = _prefs.getString(_spKeyLastAction);
-    if (lastAction != _actionDismiss) return false;
-    final lastShown = _prefs.getInt(_spKeyLastShownAt) ?? 0;
+    final lastShown = _prefs.getInt(_spKeyLastShownAt);
+    if (lastShown == null) return false;
     final elapsedMs = now().millisecondsSinceEpoch - lastShown;
+    // 对 dismiss 和 grant（系统框被手势 dismiss 后 SP 不变）统一冷却，
+    // 避免短期内反复弹出 pre-prompt。
     final cooldownMs = _redismissCooldownDays * 24 * 3600 * 1000;
     return elapsedMs < cooldownMs;
   }

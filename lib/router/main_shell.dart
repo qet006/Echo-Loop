@@ -56,6 +56,7 @@ class _MainShellState extends ConsumerState<MainShell> {
   ProviderSubscription<AppUpdateState>? _appUpdateSubscription;
   ProviderSubscription<ReminderSettings>? _reminderSettingsSubscription;
   ProviderSubscription<int>? _notificationPromptSubscription;
+  ProviderSubscription<GuideControllerState>? _guideWaitSubscription;
   late final AppLifecycleListener _lifecycleListener;
 
   /// 资源库 tab 图标的引导 target key；在整个 shell 生命周期内保持稳定。
@@ -246,13 +247,18 @@ class _MainShellState extends ConsumerState<MainShell> {
     _appUpdateSubscription?.close();
     _reminderSettingsSubscription?.close();
     _notificationPromptSubscription?.close();
+    _guideWaitSubscription?.close();
     super.dispose();
   }
 
   /// 等待 guide flow 结束（事件驱动）。如果当前没有 active guide 立刻 return；
   /// 否则监听 [guideControllerProvider]，active 转 inactive 时 complete。
+  ///
+  /// 竞态防护：listenManual 注册后二次检查 isActive，防止 guide 在检查和注册
+  /// 之间转为 inactive 导致 completer 永远不完成。
   Future<void> _waitForGuideToFinish() {
-    if (!ref.read(guideControllerProvider).isActive) {
+    final controller = ref.read(guideControllerProvider);
+    if (!controller.isActive) {
       return Future.value();
     }
     final completer = Completer<void>();
@@ -262,6 +268,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       (previous, next) {
         if (!next.isActive && !completer.isCompleted) {
           sub.close();
+          _guideWaitSubscription = null;
           AppLogger.log(
             'NotifPerm',
             'MainShell listener: guide finished, resuming pre-prompt',
@@ -270,10 +277,27 @@ class _MainShellState extends ConsumerState<MainShell> {
         }
       },
     );
+    _guideWaitSubscription = sub;
+
+    // 二次检查：防止 guide 在 listenManual 注册前瞬间转为 inactive
+    if (!ref.read(guideControllerProvider).isActive) {
+      if (!completer.isCompleted) {
+        sub.close();
+        _guideWaitSubscription = null;
+        AppLogger.log(
+          'NotifPerm',
+          'MainShell listener: guide already finished after listen, '
+          'resuming pre-prompt',
+        );
+        completer.complete();
+      }
+      return completer.future;
+    }
+
     AppLogger.log(
       'NotifPerm',
       'MainShell listener: guide active '
-      '(${ref.read(guideControllerProvider).activeFlowId}), '
+      '(${controller.activeFlowId}), '
       'waiting via listener…',
     );
     return completer.future;

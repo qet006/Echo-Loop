@@ -168,7 +168,32 @@ void main() {
       },
     );
 
-    test('checkNotificationGranted 抛错 → 按 blocked 处理（保守不弹）', () async {
+    test(
+      'granted=false + SP=false + grant < 14 天 → skip(cooldown) '
+      '（系统框手势 dismiss 后 SP 不变，grant 也应冷却）',
+      () async {
+        final now = DateTime(2026, 5, 22, 12, 0);
+        final lastShown = now.subtract(const Duration(days: 3));
+        await prefs.setString('notification_prompt_last_action', 'grant');
+        await prefs.setInt(
+          'notification_prompt_last_shown_at',
+          lastShown.millisecondsSinceEpoch,
+        );
+        final service = await buildService(granted: false, now: now);
+
+        await service.maybeTriggerPrompt();
+
+        expect(trigger.triggerCount, 0);
+        verify(
+          () => analytics.track(
+            Events.notificationPromptSkipped,
+            {EventParams.reason: 'cooldown'},
+          ),
+        ).called(1);
+      },
+    );
+
+    test('checkNotificationGranted 抛错 → 按 canRequest 处理（允许重试）', () async {
       when(
         () => reminderService.checkNotificationGranted(),
       ).thenAnswer((_) async => throw Exception('platform error'));
@@ -182,13 +207,10 @@ void main() {
 
       await service.maybeTriggerPrompt();
 
-      expect(trigger.triggerCount, 0);
-      verify(
-        () => analytics.track(
-          Events.notificationPromptSkipped,
-          {EventParams.reason: 'already_denied'},
-        ),
-      ).called(1);
+      expect(trigger.triggerCount, 1);
+      verifyNever(
+        () => analytics.track(Events.notificationPromptSkipped, any()),
+      );
     });
   });
 

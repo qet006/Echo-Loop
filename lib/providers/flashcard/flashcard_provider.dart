@@ -31,6 +31,7 @@ import '../../services/study_time_service.dart';
 import '../../services/tts_service.dart';
 import '../../widgets/flashcard/flashcard_card.dart';
 import '../daily_study_time_provider.dart';
+import '../notification_permission_provider.dart';
 import '../saved_word_provider.dart';
 import 'flashcard_flow_engine.dart';
 import 'flashcard_flow_phase.dart';
@@ -521,6 +522,12 @@ class FlashcardNotifier extends _$FlashcardNotifier {
                 groupStartMs: savedPhrase.groupStartMs,
                 groupEndMs: savedPhrase.groupEndMs,
               );
+          // 价值锚点：意群重新收藏时也触发通知权限 pre-prompt
+          unawaited(
+            ref
+                .read(notificationPermissionServiceProvider)
+                .maybeTriggerPrompt(),
+          );
       }
       _unsavedWords.remove(key);
       state = state.copyWith(removedCount: state.removedCount - 1);
