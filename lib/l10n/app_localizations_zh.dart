@@ -2225,10 +2225,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get notificationPromptBody => '记得牢的关键是适时回顾。我们只在关键节点轻轻提醒。';
 
   @override
+  String get notificationPromptTitleLearning => '记得及时复习';
+
+  @override
+  String get notificationPromptBodyLearning => '开启提醒，我们会在合适的时间提醒你巩固刚学过的内容。';
+
+  @override
+  String get notificationPromptTitleBookmark => '收藏后别忘复习';
+
+  @override
+  String get notificationPromptBodyBookmark => '开启提醒，帮你定时回顾收藏内容。';
+
+  @override
   String get notificationPromptCtaGrant => '开启提醒';
 
   @override
-  String get notificationPromptCtaDismiss => '暂不';
+  String get notificationPromptCtaDismiss => '稍后再说';
 
   @override
   String get notificationDisabledBanner => '通知已关闭，将无法接收复习提醒。';

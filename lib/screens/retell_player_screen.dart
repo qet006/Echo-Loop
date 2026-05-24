@@ -21,6 +21,8 @@ import '../providers/learning_progress_provider.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/learning_session/retell_player_provider.dart';
+import '../widgets/notification_permission_dialog.dart'
+    show maybeShowLearningNotificationPrompt;
 import '../widgets/common/recording_button.dart' show RecordingButtonMode;
 import '../providers/retell_recording_controller_provider.dart';
 import '../services/app_logger.dart';
@@ -643,6 +645,7 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
       await ref
           .read(learningProgressNotifierProvider.notifier)
           .completeCurrentSubStage(widget.audioItemId);
+      await maybeShowLearningNotificationPrompt(context, ref);
       await _exit();
     } else {
       // 关闭弹窗 → 留在页面，不做操作

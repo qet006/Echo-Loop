@@ -3,20 +3,42 @@
 /// - [notificationPromptTriggerProvider]: 用 Notifier<int> 作为一次性事件流，
 ///   每次 `trigger()` 通过 +1 通知监听者（同值不通知，所以并发触发也只算一次）。
 ///   MainShell 监听后用 [rootNavigatorKey] 弹 dialog。
+/// - [notificationPermissionReporterProvider]: 平台通知权限报告器，
+///   根据运行平台返回对应实现（macOS/iOS/Android/Unsupported）。
 /// - [notificationPermissionServiceProvider]: 业务入口，价值锚点调用
 ///   `maybeTriggerPrompt()` 即可，内部判定 + 触发。
 library;
 
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../analytics/analytics_providers.dart';
 import '../features/onboarding_survey/providers/onboarding_survey_provider.dart'
     show sharedPreferencesProvider;
 import '../services/app_logger.dart';
+import '../services/notification_permission_reporter.dart';
 import '../services/notification_permission_service.dart';
-import 'review_reminder_provider.dart';
 
 const String _logTag = 'NotifPerm';
+
+/// 平台通知权限报告器 —— 根据运行平台返回对应实现。
+final notificationPermissionReporterProvider =
+    Provider<NotificationPermissionReporter>((ref) {
+  if (kIsWeb) return const UnsupportedNotificationPermissionReporter();
+  if (Platform.isMacOS) return MacOSNotificationPermissionReporter();
+  if (Platform.isIOS) {
+    return IOSNotificationPermissionReporter();
+  }
+  if (Platform.isAndroid) {
+    return AndroidNotificationPermissionReporter(
+      FlutterLocalNotificationsPlugin(),
+    );
+  }
+  return const UnsupportedNotificationPermissionReporter();
+});
 
 /// pre-prompt 触发器：内部用计数器作为一次性事件流。
 class NotificationPromptTriggerNotifier extends Notifier<int>
@@ -56,10 +78,10 @@ final notificationPromptTriggerProvider =
 /// 业务入口：价值锚点调用 `maybeTriggerPrompt()` 即可。
 final notificationPermissionServiceProvider =
     Provider<NotificationPermissionService>((ref) {
-      return NotificationPermissionService(
-        prefs: ref.read(sharedPreferencesProvider),
-        analytics: ref.read(analyticsServiceProvider),
-        trigger: ref.read(notificationPromptTriggerProvider.notifier),
-        reminderService: ref.read(reviewReminderServiceProvider),
-      );
-    });
+  return NotificationPermissionService(
+    prefs: ref.read(sharedPreferencesProvider),
+    analytics: ref.read(analyticsServiceProvider),
+    trigger: ref.read(notificationPromptTriggerProvider.notifier),
+    reporter: ref.read(notificationPermissionReporterProvider),
+  );
+});

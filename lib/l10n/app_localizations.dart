@@ -4100,6 +4100,30 @@ abstract class AppLocalizations {
   /// **'Memory sticks when you review at the right moments. We\'ll nudge you only when it matters.'**
   String get notificationPromptBody;
 
+  /// No description provided for @notificationPromptTitleLearning.
+  ///
+  /// In en, this message translates to:
+  /// **'Review while it\'s fresh'**
+  String get notificationPromptTitleLearning;
+
+  /// No description provided for @notificationPromptBodyLearning.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on reminders — we\'ll nudge you at the right time to reinforce what you just learned.'**
+  String get notificationPromptBodyLearning;
+
+  /// No description provided for @notificationPromptTitleBookmark.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t forget your saved items'**
+  String get notificationPromptTitleBookmark;
+
+  /// No description provided for @notificationPromptBodyBookmark.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on reminders to review your saved content on a regular schedule.'**
+  String get notificationPromptBodyBookmark;
+
   /// No description provided for @notificationPromptCtaGrant.
   ///
   /// In en, this message translates to:
@@ -4109,7 +4133,7 @@ abstract class AppLocalizations {
   /// No description provided for @notificationPromptCtaDismiss.
   ///
   /// In en, this message translates to:
-  /// **'Not now'**
+  /// **'Maybe later'**
   String get notificationPromptCtaDismiss;
 
   /// No description provided for @notificationDisabledBanner.

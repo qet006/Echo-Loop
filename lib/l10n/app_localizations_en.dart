@@ -2294,10 +2294,25 @@ class AppLocalizationsEn extends AppLocalizations {
       'Memory sticks when you review at the right moments. We\'ll nudge you only when it matters.';
 
   @override
+  String get notificationPromptTitleLearning => 'Review while it\'s fresh';
+
+  @override
+  String get notificationPromptBodyLearning =>
+      'Turn on reminders — we\'ll nudge you at the right time to reinforce what you just learned.';
+
+  @override
+  String get notificationPromptTitleBookmark =>
+      'Don\'t forget your saved items';
+
+  @override
+  String get notificationPromptBodyBookmark =>
+      'Turn on reminders to review your saved content on a regular schedule.';
+
+  @override
   String get notificationPromptCtaGrant => 'Turn on reminders';
 
   @override
-  String get notificationPromptCtaDismiss => 'Not now';
+  String get notificationPromptCtaDismiss => 'Maybe later';
 
   @override
   String get notificationDisabledBanner =>

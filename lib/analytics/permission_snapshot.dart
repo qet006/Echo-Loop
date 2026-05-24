@@ -12,6 +12,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/speech_practice_models.dart';
+import '../services/notification_permission_reporter.dart';
 import '../services/speech_practice_platform.dart';
 import 'analytics_service.dart';
 import 'models/event_names.dart';
@@ -161,42 +162,42 @@ class DefaultPermissionProbe implements PermissionProbe {
   @override
   Future<String> readNotificationStatus() async {
     if (kIsWeb) return PermissionSnapshot.statusNotApplicable;
-    final plugin = FlutterLocalNotificationsPlugin();
-    if (Platform.isIOS) {
-      final ios = plugin
-          .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin
-          >();
-      return _mapDarwinOptions(await ios?.checkPermissions());
+    final reporter = _resolveReporter();
+    if (!reporter.isSupported) return PermissionSnapshot.statusNotApplicable;
+    try {
+      final status = await reporter.getAuthorizationStatus();
+      return _mapAuthorization(status);
+    } catch (_) {
+      return PermissionSnapshot.statusUnknown;
     }
-    if (Platform.isMacOS) {
-      final mac = plugin
-          .resolvePlatformSpecificImplementation<
-            MacOSFlutterLocalNotificationsPlugin
-          >();
-      return _mapDarwinOptions(await mac?.checkPermissions());
-    }
-    if (Platform.isAndroid) {
-      final android = plugin
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >();
-      final enabled = await android?.areNotificationsEnabled();
-      if (enabled == null) return PermissionSnapshot.statusUnknown;
-      return enabled
-          ? PermissionSnapshot.statusGranted
-          : PermissionSnapshot.statusDenied;
-    }
-    return PermissionSnapshot.statusNotApplicable;
   }
 
-  /// Darwin（iOS / macOS）授权选项映射；
-  /// `isEnabled` 文档说明同时覆盖 authorized 和 provisional，按 granted 处理。
-  static String _mapDarwinOptions(NotificationsEnabledOptions? opts) {
-    if (opts == null) return PermissionSnapshot.statusNotDetermined;
-    return opts.isEnabled
-        ? PermissionSnapshot.statusGranted
-        : PermissionSnapshot.statusDenied;
+  static NotificationPermissionReporter _resolveReporter() {
+    if (Platform.isMacOS) return MacOSNotificationPermissionReporter();
+    if (Platform.isIOS) {
+      return IOSNotificationPermissionReporter();
+    }
+    if (Platform.isAndroid) {
+      return AndroidNotificationPermissionReporter(
+        FlutterLocalNotificationsPlugin(),
+      );
+    }
+    return const UnsupportedNotificationPermissionReporter();
+  }
+
+  static String _mapAuthorization(NotificationAuthorization status) {
+    switch (status) {
+      case NotificationAuthorization.authorized:
+        return PermissionSnapshot.statusGranted;
+      case NotificationAuthorization.denied:
+        return PermissionSnapshot.statusDenied;
+      case NotificationAuthorization.notDetermined:
+        return PermissionSnapshot.statusNotDetermined;
+      case NotificationAuthorization.restricted:
+        return PermissionSnapshot.statusRestricted;
+      case NotificationAuthorization.unsupported:
+        return PermissionSnapshot.statusNotApplicable;
+    }
   }
 
   static String _mapSpeechStatus(SpeechPracticePermissionStatus s) {

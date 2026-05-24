@@ -1232,8 +1232,12 @@
 
   "notificationPromptTitle": "Lock in what you've learned",
   "notificationPromptBody": "Memory sticks when you review at the right moments. We'll nudge you only when it matters.",
+  "notificationPromptTitleLearning": "Review while it's fresh",
+  "notificationPromptBodyLearning": "Turn on reminders — we'll nudge you at the right time to reinforce what you just learned.",
+  "notificationPromptTitleBookmark": "Don't forget your saved items",
+  "notificationPromptBodyBookmark": "Turn on reminders to review your saved content on a regular schedule.",
   "notificationPromptCtaGrant": "Turn on reminders",
-  "notificationPromptCtaDismiss": "Not now",
+  "notificationPromptCtaDismiss": "Maybe later",
   "notificationDisabledBanner": "Notifications are off. You won't receive review reminders.",
   "notificationDisabledBannerCta": "Open Settings",
   "notificationNotGrantedBanner": "Allow notifications to receive daily review reminders.",

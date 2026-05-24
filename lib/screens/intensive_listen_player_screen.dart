@@ -22,6 +22,8 @@ import '../providers/learning_session/intensive_listen_player_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/listening_practice/bookmark_manager.dart';
 import '../theme/app_theme.dart';
+import '../widgets/notification_permission_dialog.dart'
+    show maybeShowLearningNotificationPrompt;
 import '../widgets/speech_permission_dialog.dart';
 import '../widgets/intensive_listen/intensive_listen_settings_sheet.dart';
 import '../providers/sentence_ai_provider.dart';
@@ -428,6 +430,8 @@ class _IntensiveListenPlayerScreenState
     } catch (e) {
       debugPrint('精听完成处理出错: $e');
     }
+
+    await maybeShowLearningNotificationPrompt(context, ref);
 
     await ref.read(learningSessionProvider.notifier).exitLearningMode();
     if (!mounted) return;

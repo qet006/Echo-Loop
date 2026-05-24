@@ -26,6 +26,8 @@ import '../providers/listening_practice/listening_practice_provider.dart';
 import 'sentence_detail_screen.dart';
 import '../services/app_logger.dart';
 import '../theme/app_theme.dart';
+import '../widgets/notification_permission_dialog.dart'
+    show maybeShowLearningNotificationPrompt;
 import '../widgets/speech_permission_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/review/review_briefing_sheet.dart';
@@ -246,6 +248,8 @@ class _BlindListenPlayerScreenState
     } catch (e) {
       debugPrint('盲听完成处理出错: $e');
     }
+
+    await maybeShowLearningNotificationPrompt(context, ref);
 
     await ref.read(learningSessionProvider.notifier).exitLearningMode();
     if (!mounted) return;

@@ -13,7 +13,6 @@ import 'package:echo_loop/features/onboarding_survey/providers/onboarding_survey
 import 'package:echo_loop/l10n/app_localizations.dart';
 import 'package:echo_loop/providers/notification_permission_provider.dart';
 import 'package:echo_loop/services/notification_permission_service.dart';
-import 'package:echo_loop/services/review_reminder_service.dart';
 import 'package:echo_loop/widgets/notification_permission_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,8 +24,6 @@ class MockAnalyticsService extends Mock implements AnalyticsService {}
 
 class MockNotificationPermissionService extends Mock
     implements NotificationPermissionService {}
-
-class MockReviewReminderService extends Mock implements ReviewReminderService {}
 
 void main() {
   setUpAll(() {
@@ -92,7 +89,7 @@ void main() {
     await pumpAndShow(tester);
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text('Turn on reminders'), findsOneWidget);
-    expect(find.text('Not now'), findsOneWidget);
+    expect(find.text('Maybe later'), findsOneWidget);
   });
 
   testWidgets('点 Turn on → onUserAcceptedPrompt 被调用', (tester) async {
@@ -103,9 +100,9 @@ void main() {
     verifyNever(() => permissionService.onUserDismissedPrompt());
   });
 
-  testWidgets('点 Not now → onUserDismissedPrompt 被调用', (tester) async {
+  testWidgets('点 Maybe later → onUserDismissedPrompt 被调用', (tester) async {
     await pumpAndShow(tester);
-    await tester.tap(find.text('Not now'));
+    await tester.tap(find.text('Maybe later'));
     await tester.pumpAndSettle();
     verify(() => permissionService.onUserDismissedPrompt()).called(1);
     verifyNever(() => permissionService.onUserAcceptedPrompt());

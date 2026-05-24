@@ -1139,6 +1139,7 @@ private final class IOSAudioDecodeHandler: NSObject {
   private var speechPracticeHandler: IOSSpeechPracticeHandler?
   private var textEmbeddingHandler: IOSTextEmbeddingHandler?
   private var audioDecodeHandler: IOSAudioDecodeHandler?
+  private var notificationPermissionHandler: NotificationPermissionHandler?
 
   override func application(
     _ application: UIApplication,
@@ -1196,6 +1197,7 @@ private final class IOSAudioDecodeHandler: NSObject {
     speechPracticeHandler = IOSSpeechPracticeHandler(binaryMessenger: controller.binaryMessenger)
     textEmbeddingHandler = IOSTextEmbeddingHandler(binaryMessenger: controller.binaryMessenger)
     audioDecodeHandler = IOSAudioDecodeHandler(binaryMessenger: controller.binaryMessenger)
+    notificationPermissionHandler = NotificationPermissionHandler(binaryMessenger: controller.binaryMessenger)
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }

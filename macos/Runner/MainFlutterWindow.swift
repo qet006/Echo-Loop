@@ -5,6 +5,7 @@ class MainFlutterWindow: NSWindow {
   private var speechPracticeHandler: MacSpeechPracticeHandler?
   private var textEmbeddingHandler: MacTextEmbeddingHandler?
   private var audioDecodeHandler: MacAudioDecodeHandler?
+  private var notificationPermissionHandler: NotificationPermissionHandler?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -16,6 +17,7 @@ class MainFlutterWindow: NSWindow {
     speechPracticeHandler = MacSpeechPracticeHandler(binaryMessenger: flutterViewController.engine.binaryMessenger)
     textEmbeddingHandler = MacTextEmbeddingHandler(binaryMessenger: flutterViewController.engine.binaryMessenger)
     audioDecodeHandler = MacAudioDecodeHandler(binaryMessenger: flutterViewController.engine.binaryMessenger)
+    notificationPermissionHandler = NotificationPermissionHandler(binaryMessenger: flutterViewController.engine.binaryMessenger)
 
     // 设置最小窗口尺寸，避免内容过窄导致布局混乱
     self.minSize = NSSize(width: 400, height: 600)

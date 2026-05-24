@@ -226,7 +226,7 @@ class _MainShellState extends ConsumerState<MainShell> {
           }
           AppLogger.log('NotifPerm', 'MainShell listener: showing dialog');
           try {
-            await showNotificationPermissionDialog(ctx, ref);
+            await maybeShowBookmarkNotificationPrompt(ctx, ref);
             AppLogger.log('NotifPerm', 'MainShell listener: dialog closed');
           } finally {
             ref

@@ -929,8 +929,12 @@
 
   "notificationPromptTitle": "开启提醒，让记忆更牢",
   "notificationPromptBody": "记得牢的关键是适时回顾。我们只在关键节点轻轻提醒。",
+  "notificationPromptTitleLearning": "记得及时复习",
+  "notificationPromptBodyLearning": "开启提醒，我们会在合适的时间提醒你巩固刚学过的内容。",
+  "notificationPromptTitleBookmark": "收藏后别忘复习",
+  "notificationPromptBodyBookmark": "开启提醒，帮你定时回顾收藏内容。",
   "notificationPromptCtaGrant": "开启提醒",
-  "notificationPromptCtaDismiss": "暂不",
+  "notificationPromptCtaDismiss": "稍后再说",
   "notificationDisabledBanner": "通知已关闭，将无法接收复习提醒。",
   "notificationDisabledBannerCta": "前往设置",
   "notificationNotGrantedBanner": "允许通知，按时收到每日复习提醒。",

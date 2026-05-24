@@ -10,8 +10,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:permission_handler/permission_handler.dart' as ph;
-import 'package:url_launcher/url_launcher.dart' as launcher;
 
 import '../analytics/analytics_providers.dart';
 import '../analytics/models/event_names.dart';
@@ -20,6 +18,7 @@ import '../models/reminder_settings.dart';
 import '../providers/notification_permission_provider.dart';
 import '../providers/reminder_settings_provider.dart';
 import '../services/app_logger.dart';
+import '../services/notification_permission_reporter.dart';
 import '../services/notification_permission_service.dart';
 import '../theme/app_theme.dart';
 
@@ -133,33 +132,9 @@ class _ReminderSettingsScreenState
       Events.notificationSettingsOpenTapped,
       const {},
     );
-    // macOS 上 permission_handler.openAppSettings() 不可靠（旧 URL 失效）。
-    // 用 url_launcher 直接 launch macOS 13+ 的新通知设置 URL。
-    // iOS / Android 仍走 permission_handler，它在这两个平台行为正确。
-    if (!kIsWeb && Platform.isMacOS) {
-      final uri = Uri.parse(
-        'x-apple.systempreferences:com.apple.Notifications-Settings.extension',
-      );
-      final ok = await launcher.launchUrl(uri);
-      AppLogger.log(
-        'NotifPerm',
-        'settings: macOS launchUrl notifications-settings ok=$ok',
-      );
-      if (!ok) {
-        // fallback：尝试旧 URL
-        final legacy = Uri.parse(
-          'x-apple.systempreferences:com.apple.preference.notifications',
-        );
-        final ok2 = await launcher.launchUrl(legacy);
-        AppLogger.log(
-          'NotifPerm',
-          'settings: macOS launchUrl legacy fallback ok=$ok2',
-        );
-      }
-      return;
-    }
-    final ok = await ph.openAppSettings();
-    AppLogger.log('NotifPerm', 'settings: ph.openAppSettings returned $ok');
+    final reporter = ref.read(notificationPermissionReporterProvider);
+    await reporter.openSettings();
+    AppLogger.log('NotifPerm', 'settings: openSettings done');
   }
 
   @override

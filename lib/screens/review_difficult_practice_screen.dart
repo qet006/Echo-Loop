@@ -20,6 +20,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../router/app_router.dart';
+import '../widgets/notification_permission_dialog.dart'
+    show maybeShowLearningNotificationPrompt;
 import '../widgets/speech_permission_dialog.dart';
 import '../database/enums.dart';
 import '../l10n/app_localizations.dart';
@@ -344,6 +346,8 @@ class _ReviewDifficultPracticeScreenState
     } catch (e) {
       debugPrint('难句补练完成处理出错: $e');
     }
+
+    await maybeShowLearningNotificationPrompt(context, ref);
 
     await ref.read(learningSessionProvider.notifier).exitLearningMode();
     if (!mounted) return;
