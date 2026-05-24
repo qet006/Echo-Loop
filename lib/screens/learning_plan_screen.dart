@@ -2851,9 +2851,9 @@ class _BottomButton extends ConsumerWidget {
         context,
         Row(
           children: [
-            Expanded(flex: 1, child: guidedPause),
+            Expanded(flex: 3, child: guidedPause),
             const SizedBox(width: AppSpacing.m),
-            Expanded(flex: 2, child: guidedContinue),
+            Expanded(flex: 5, child: guidedContinue),
           ],
         ),
       );
