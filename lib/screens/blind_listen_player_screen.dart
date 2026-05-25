@@ -94,6 +94,12 @@ class _BlindListenPlayerScreenState
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AppLogger.log('BlindListenScreen', '首帧后启动播放');
       ref.read(blindListenPlayerProvider.notifier).startPlaying();
+      // 从 DB 拉取最新的收藏状态（覆盖 initializeParagraphs 时的同步快照）
+      unawaited(
+        ref
+            .read(blindListenPlayerProvider.notifier)
+            .initializeBookmarks(widget.audioItemId),
+      );
     });
   }
 
@@ -150,6 +156,12 @@ class _BlindListenPlayerScreenState
     );
 
     _isNavigatingToDetail = false;
+
+    // 返回后刷新收藏状态（详情页可能修改了收藏）
+    if (!mounted) return;
+    await ref
+        .read(blindListenPlayerProvider.notifier)
+        .initializeBookmarks(widget.audioItemId);
   }
 
   // ========== 完成处理 ==========
@@ -430,6 +442,7 @@ class _BlindListenPlayerScreenState
           s.displayMode,
           s.settings,
           s.stepFinished,
+          s.bookmarkedSentenceIndices,
         ),
       ),
     );
@@ -546,6 +559,7 @@ class _BlindListenPlayerScreenState
                 : RetellDisplayMode.hideAll,
             keywordMap: const {},
             playingSentenceIndex: playerState.playingSentenceIndex,
+            bookmarkedSentenceIndices: playerState.bookmarkedSentenceIndices,
             onSentenceTap: _handleSentenceTap,
           ),
           contentControls: ConstrainedBox(

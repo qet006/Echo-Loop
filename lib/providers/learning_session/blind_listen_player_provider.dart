@@ -27,6 +27,7 @@ import '../../utils/word_counter.dart';
 import '../audio_engine/audio_engine_provider.dart';
 import '../learned_vocabulary_tracker_provider.dart';
 import '../learning_progress_provider.dart';
+import '../listening_practice/bookmark_manager.dart';
 import '../settings_provider.dart';
 import 'countdown_controller.dart';
 import 'learning_session_provider.dart';
@@ -89,6 +90,9 @@ class BlindListenPlayerState {
   /// 当前步骤是否自然完成（用于 Screen 层检测完成信号）
   final bool stepFinished;
 
+  /// 已收藏句子的全局 index 集合（用于在句子列表上显示只读收藏标记）
+  final Set<int> bookmarkedSentenceIndices;
+
   const BlindListenPlayerState({
     this.currentParagraphIndex = 0,
     this.totalParagraphs = 0,
@@ -105,6 +109,7 @@ class BlindListenPlayerState {
     this.isWaitingForUser = false,
     this.settings = const BlindListenSettings(),
     this.stepFinished = false,
+    this.bookmarkedSentenceIndices = const {},
   });
 
   BlindListenPlayerState copyWith({
@@ -123,6 +128,7 @@ class BlindListenPlayerState {
     bool? isWaitingForUser,
     BlindListenSettings? settings,
     bool? stepFinished,
+    Set<int>? bookmarkedSentenceIndices,
   }) {
     return BlindListenPlayerState(
       currentParagraphIndex:
@@ -144,6 +150,8 @@ class BlindListenPlayerState {
       isWaitingForUser: isWaitingForUser ?? this.isWaitingForUser,
       settings: settings ?? this.settings,
       stepFinished: stepFinished ?? this.stepFinished,
+      bookmarkedSentenceIndices:
+          bookmarkedSentenceIndices ?? this.bookmarkedSentenceIndices,
     );
   }
 }
@@ -249,10 +257,18 @@ class BlindListenPlayer extends _$BlindListenPlayer {
         ? 0
         : startSentenceLocalIndex.clamp(0, paragraphLen - 1);
 
+    // 从句子的 isBookmarked 字段初始化收藏状态（同步可见 → 避免首帧无标记闪烁）
+    final preBookmarked = <int>{
+      for (final paragraph in paragraphs)
+        for (final s in paragraph)
+          if (s.isBookmarked) s.index,
+    };
+
     state = BlindListenPlayerState(
       currentParagraphIndex: safeIndex,
       totalParagraphs: paragraphs.length,
       settings: settings,
+      bookmarkedSentenceIndices: preBookmarked,
     );
     ref.read(analyticsServiceProvider).track(Events.blindListenStart, {
       ...ref.audioEventParams(ref.read(learningSessionProvider).audioItemId),
@@ -371,6 +387,18 @@ class BlindListenPlayer extends _$BlindListenPlayer {
   /// 设置显示模式
   void setDisplayMode(BlindListenDisplayMode mode) {
     state = state.copyWith(displayMode: mode);
+  }
+
+  /// 从数据库加载收藏状态。
+  ///
+  /// 用户在句子详情页可能新增或移除收藏，返回播放页后调用此方法刷新。
+  Future<void> initializeBookmarks(String audioItemId) async {
+    final dao = ref.read(bookmarkDaoProvider);
+    final indices = await BookmarkManager.loadBookmarks(audioItemId, dao: dao);
+    // 同步到段落内的句子对象，保持 Sentence.isBookmarked 一致
+    final allSentences = _paragraphs.expand((p) => p).toList();
+    BookmarkManager.updateSentenceBookmarkStatus(allSentences, indices);
+    state = state.copyWith(bookmarkedSentenceIndices: indices);
   }
 
   /// 进入等待用户状态。
