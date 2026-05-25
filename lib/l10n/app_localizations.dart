@@ -3686,6 +3686,18 @@ abstract class AppLocalizations {
   /// **'Write Feedback'**
   String get writeFeedback;
 
+  /// No description provided for @joinCommunity.
+  ///
+  /// In en, this message translates to:
+  /// **'Join Community'**
+  String get joinCommunity;
+
+  /// No description provided for @networkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to connect. Please check your network and try again.'**
+  String get networkError;
+
   /// No description provided for @viewSourceCode.
   ///
   /// In en, this message translates to:

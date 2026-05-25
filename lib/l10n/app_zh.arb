@@ -835,7 +835,8 @@
   "termsOfService": "服务条款",
   "privacyPolicy": "隐私政策",
   "writeFeedback": "意见反馈",
-
+  "joinCommunity": "加入学习社群",
+  "networkError": "无法连接，请检查网络后重试",
   "viewSourceCode": "查看源代码",
 
   "updateAvailable": "发现新版本 v{version}",

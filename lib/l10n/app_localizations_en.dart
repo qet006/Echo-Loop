@@ -2063,6 +2063,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get writeFeedback => 'Write Feedback';
 
   @override
+  String get joinCommunity => 'Join Community';
+
+  @override
+  String get networkError =>
+      'Unable to connect. Please check your network and try again.';
+
+  @override
   String get viewSourceCode => 'View Source Code';
 
   @override

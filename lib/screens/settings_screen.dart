@@ -46,6 +46,7 @@ import 'playback_settings_screen.dart';
 import 'preferences_viewer_screen.dart';
 import 'storage_browser_screen.dart';
 import 'reminder_settings_screen.dart';
+import '../config/api_config.dart';
 import '../widgets/app_update_dialog.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -96,9 +97,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: AppSpacing.m),
           _buildStudySection(context, ref, l10n),
           const SizedBox(height: AppSpacing.m),
+          _buildAboutSection(context, ref, l10n),
+          const SizedBox(height: AppSpacing.m),
           _buildStorageSection(context, ref, l10n),
           const SizedBox(height: AppSpacing.m),
-          _buildAboutSection(context, ref, l10n),
+          _buildVersionLabel(context, ref, l10n),
           if (showDeveloperOptions) ...[
             const SizedBox(height: AppSpacing.m),
             _buildDeveloperSection(
@@ -306,104 +309,108 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   /// 构建关于信息区域
-  ///
-  /// 包含检查更新、服务条款、隐私政策、意见反馈四个入口，
-  /// 以及底部居中灰色版本号标签。
   Widget _buildAboutSection(
     BuildContext context,
     WidgetRef ref,
     AppLocalizations l10n,
   ) {
-    final packageInfo = ref.watch(packageInfoProvider);
-    // 仅向用户展示 versionName。Android versionCode（commit count）
-    // 是内部递增数字，对用户无意义，不显示。
-    final versionDisplay = packageInfo.version;
     final updateState = ref.watch(appUpdateProvider);
     final isChecking = updateState is AppUpdateChecking;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return _buildSection(
+      context,
+      title: l10n.about,
       children: [
-        _buildSection(
-          context,
-          title: l10n.about,
-          children: [
-            ListTile(
-              leading: _emojiIcon('🔄'),
-              title: Text(l10n.checkForUpdate),
-              trailing: isChecking
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.chevron_right),
-              onTap: isChecking
-                  ? null
-                  : () => _checkForUpdate(context, ref, l10n),
-            ),
-            ListTile(
-              leading: _emojiIcon('📜'),
-              title: Text(l10n.termsOfService),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () =>
-                  launchUrl(Uri.parse('https://www.echo-loop.top/terms')),
-            ),
-            ListTile(
-              leading: _emojiIcon('🔒'),
-              title: Text(l10n.privacyPolicy),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () =>
-                  launchUrl(Uri.parse('https://www.echo-loop.top/privacy')),
-            ),
-            ListTile(
-              leading: _emojiIcon('✉️'),
-              title: Text(l10n.writeFeedback),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => launchUrl(Uri.parse('mailto:support@echo-loop.top')),
-            ),
-            ListTile(
-              leading: SizedBox(
-                width: 32,
-                height: 32,
-                child: Center(
-                  child: FaIcon(
-                    FontAwesomeIcons.github,
-                    size: 22,
-                  ),
-                ),
-              ),
-              title: Text(l10n.viewSourceCode),
-              subtitle: const Text(
-                'github.com/echo-loop/Echo-Loop',
-                style: TextStyle(fontSize: 12),
-              ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => launchUrl(
-                Uri.parse('https://github.com/echo-loop/Echo-Loop/'),
-              ),
-            ),
-          ],
+        ListTile(
+          leading: _emojiIcon('🔄'),
+          title: Text(l10n.checkForUpdate),
+          trailing: isChecking
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.chevron_right),
+          onTap: isChecking
+              ? null
+              : () => _checkForUpdate(context, ref, l10n),
         ),
-        const SizedBox(height: AppSpacing.s),
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => _handleVersionTap(context, ref, l10n),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+        ListTile(
+          leading: _emojiIcon('📜'),
+          title: Text(l10n.termsOfService),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () =>
+              launchUrl(Uri.parse('https://www.echo-loop.top/terms')),
+        ),
+        ListTile(
+          leading: _emojiIcon('🔒'),
+          title: Text(l10n.privacyPolicy),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () =>
+              launchUrl(Uri.parse('https://www.echo-loop.top/privacy')),
+        ),
+        ListTile(
+          leading: _emojiIcon('✉️'),
+          title: Text(l10n.writeFeedback),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => launchUrl(Uri.parse('mailto:support@echo-loop.top')),
+        ),
+        ListTile(
+          leading: _emojiIcon('👥'),
+          title: Text(l10n.joinCommunity),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => launchUrl(Uri.parse('$apiBaseUrl/social')),
+        ),
+        ListTile(
+          leading: SizedBox(
+            width: 32,
+            height: 32,
             child: Center(
-              child: Text(
-                kReleaseMode
-                    ? 'Version $versionDisplay'
-                    : 'Version $versionDisplay (Debug)',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              child: FaIcon(
+                FontAwesomeIcons.github,
+                size: 22,
               ),
             ),
           ),
+          title: Text(l10n.viewSourceCode),
+          subtitle: const Text(
+            'github.com/echo-loop/Echo-Loop',
+            style: TextStyle(fontSize: 12),
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => launchUrl(
+            Uri.parse('https://github.com/echo-loop/Echo-Loop/'),
+          ),
         ),
       ],
+    );
+  }
+
+  /// 版本号标签，置于设置页最底部。
+  /// 连续点击可解锁开发者选项。
+  Widget _buildVersionLabel(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+  ) {
+    final versionDisplay = ref.watch(packageInfoProvider).version;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _handleVersionTap(context, ref, l10n),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: Text(
+            kReleaseMode
+                ? 'Version $versionDisplay'
+                : 'Version $versionDisplay (Debug)',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
     );
   }
 

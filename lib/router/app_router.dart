@@ -53,10 +53,9 @@ abstract class AppRoutes {
     String collectionId,
     String audioId, {
     bool autoStart = false,
-  }) =>
-      autoStart
-          ? '/collections/$collectionId/$audioId/plan?autoStart=true'
-          : '/collections/$collectionId/$audioId/plan';
+  }) => autoStart
+      ? '/collections/$collectionId/$audioId/plan?autoStart=true'
+      : '/collections/$collectionId/$audioId/plan';
 
   /// 播放器页路径
   static String player(String collectionId, String audioId) =>
@@ -88,13 +87,10 @@ abstract class AppRoutes {
 
   /// 独立音频学习计划页路径（不依赖合集）
   /// [autoStart] 为 true 时进入后自动弹出学习任务
-  static String audioLearningPlan(
-    String audioId, {
-    bool autoStart = false,
-  }) =>
+  static String audioLearningPlan(String audioId, {bool autoStart = false}) =>
       autoStart
-          ? '/audio/$audioId/plan?autoStart=true'
-          : '/audio/$audioId/plan';
+      ? '/audio/$audioId/plan?autoStart=true'
+      : '/audio/$audioId/plan';
 
   /// 独立音频播放器页路径（不依赖合集）
   static String audioPlayer(String audioId) => '/audio/$audioId/player';
@@ -119,6 +115,7 @@ abstract class AppRoutes {
 
   /// Onboarding 问卷页路径（仅首启新用户访问）
   static const onboardingSurvey = '/onboarding/survey';
+
 }
 
 /// GoRouter Provider（keepAlive，不可 invalidate）
@@ -154,9 +151,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) {
                       final collectionId =
                           state.pathParameters['collectionId']!;
-                      return CollectionDetailScreen(
-                        collectionId: collectionId,
-                      );
+                      return CollectionDetailScreen(collectionId: collectionId);
                     },
                   ),
                 ],
@@ -244,8 +239,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
           final audioId = state.pathParameters['audioId']!;
-          final autoStart =
-              state.uri.queryParameters['autoStart'] == 'true';
+          final autoStart = state.uri.queryParameters['autoStart'] == 'true';
           return LearningPlanScreen(
             collectionId: null,
             audioItemId: audioId,
@@ -317,8 +311,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final collectionId = state.pathParameters['collectionId']!;
           final audioId = state.pathParameters['audioId']!;
-          final autoStart =
-              state.uri.queryParameters['autoStart'] == 'true';
+          final autoStart = state.uri.queryParameters['autoStart'] == 'true';
           return LearningPlanScreen(
             collectionId: collectionId,
             audioItemId: audioId,

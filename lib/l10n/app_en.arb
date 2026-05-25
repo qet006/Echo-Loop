@@ -1111,7 +1111,8 @@
   "termsOfService": "Terms of Service",
   "privacyPolicy": "Privacy Policy",
   "writeFeedback": "Write Feedback",
-
+  "joinCommunity": "Join Community",
+  "networkError": "Unable to connect. Please check your network and try again.",
   "viewSourceCode": "View Source Code",
 
   "updateAvailable": "New Version v{version}",

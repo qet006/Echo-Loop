@@ -2002,6 +2002,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get writeFeedback => '意见反馈';
 
   @override
+  String get joinCommunity => '加入学习社群';
+
+  @override
+  String get networkError => '无法连接，请检查网络后重试';
+
+  @override
   String get viewSourceCode => '查看源代码';
 
   @override
