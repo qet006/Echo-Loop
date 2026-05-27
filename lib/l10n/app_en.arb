@@ -564,7 +564,7 @@
       "total": { "type": "int" }
     }
   },
-  "listenAndRepeatNoDifficultSentences": "All sentences understood. Listen & repeat auto-completed.",
+  "listenAndRepeatNoDifficultSentences": "No difficult sentences, no listen & repeat needed",
   "exitListenAndRepeatTitle": "Exit Listen & Repeat?",
   "exitListenAndRepeatMessage": "Your progress will be saved. You can continue from where you left off.",
   "listenAndRepeatBriefingTitle": "Listen & Repeat",
@@ -1104,7 +1104,6 @@
   },
   "clearCacheEmpty": "Cache is already empty",
   "confirm": "Confirm",
-  "autoCompletedNoDifficult": "0 difficult sentences, skipped",
   "autoCompletedNoDifficultReview": "0 difficult sentences, skipped",
   "termsOfService": "Terms of Service",
   "privacyPolicy": "Privacy Policy",

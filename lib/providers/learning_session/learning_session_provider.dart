@@ -95,10 +95,10 @@ class LearningSessionState {
   /// 自由练习完成时若该 (stage, subStage) 还未在 completedKeys 内，则写入
   /// stage_completions（[LearningProgressNotifier.recordCompletionIfNew]）
   /// 让 UI 把"跳过"卡切到 ✅。
-  final LearningStage? retellCatchUpStage;
+  final LearningStage? catchUpStage;
 
-  /// 自由练习时用户点击的目标子步骤（与 [retellCatchUpStage] 配套）。
-  final SubStageType? retellCatchUpSubStage;
+  /// 自由练习时用户点击的目标子步骤（与 [catchUpStage] 配套）。
+  final SubStageType? catchUpSubStage;
 
   const LearningSessionState({
     this.learningMode,
@@ -111,8 +111,8 @@ class LearningSessionState {
     this.shadowingSentences,
     this.shadowingStartIndex = 0,
     this.shadowingTargetPlayCount = 3,
-    this.retellCatchUpStage,
-    this.retellCatchUpSubStage,
+    this.catchUpStage,
+    this.catchUpSubStage,
   });
 
   /// 是否处于学习模式中
@@ -135,13 +135,13 @@ class LearningSessionState {
     List<Sentence>? shadowingSentences,
     int? shadowingStartIndex,
     int? shadowingTargetPlayCount,
-    LearningStage? retellCatchUpStage,
-    SubStageType? retellCatchUpSubStage,
+    LearningStage? catchUpStage,
+    SubStageType? catchUpSubStage,
     bool clearLearningMode = false,
     bool clearSavedSettings = false,
     bool clearAudioItemId = false,
     bool clearShadowingSentences = false,
-    bool clearRetellCatchUp = false,
+    bool clearCatchUp = false,
   }) {
     return LearningSessionState(
       learningMode: clearLearningMode
@@ -162,12 +162,12 @@ class LearningSessionState {
       shadowingStartIndex: shadowingStartIndex ?? this.shadowingStartIndex,
       shadowingTargetPlayCount:
           shadowingTargetPlayCount ?? this.shadowingTargetPlayCount,
-      retellCatchUpStage: clearRetellCatchUp
+      catchUpStage: clearCatchUp
           ? null
-          : (retellCatchUpStage ?? this.retellCatchUpStage),
-      retellCatchUpSubStage: clearRetellCatchUp
+          : (catchUpStage ?? this.catchUpStage),
+      catchUpSubStage: clearCatchUp
           ? null
-          : (retellCatchUpSubStage ?? this.retellCatchUpSubStage),
+          : (catchUpSubStage ?? this.catchUpSubStage),
     );
   }
 }
@@ -355,6 +355,33 @@ class LearningSession extends _$LearningSession {
     final tracker = _readLearnedVocabularyTracker();
     if (tracker == null) return;
     await tracker.flush();
+  }
+
+  /// 设置自由练习"补做"目标 (stage, subStage)。
+  ///
+  /// 自由练习完成时，若该 (stage, subStage) 之前被跳过，则写入 stage_completions
+  /// 并回收跳过状态（见 [LearningProgressNotifier.recordCompletionIfNew]）。
+  /// 复述走 [enterRetellMode] 的 catchUp 参数；其余任务（盲听/精听/跟读/难句补练）
+  /// 由各自由练习入口在进入后调用本方法显式设置，传 null 清除。
+  void setCatchUp(LearningStage? stage, SubStageType? subStage) {
+    state = state.copyWith(
+      catchUpStage: stage,
+      catchUpSubStage: subStage,
+      clearCatchUp: stage == null,
+    );
+  }
+
+  /// 若当前会话设置了自由练习"补做"目标，则将其记为完成。
+  ///
+  /// 幂等：已完成则 no-op；之前被跳过则回收为完成（清除跳过标记）。
+  /// 由各自由练习播放器在完成退出时调用。
+  Future<void> recordCatchUpCompletionIfAny(String audioItemId) async {
+    final stage = state.catchUpStage;
+    final subStage = state.catchUpSubStage;
+    if (stage == null || subStage == null) return;
+    await ref
+        .read(learningProgressNotifierProvider.notifier)
+        .recordCompletionIfNew(audioItemId, stage, subStage);
   }
 
   /// 进入全文盲听模式
@@ -629,9 +656,9 @@ class LearningSession extends _$LearningSession {
       audioItemId: audioItemId,
       savedSettings: currentSettings,
       isFreePlay: isFreePlay,
-      retellCatchUpStage: catchUpStage,
-      retellCatchUpSubStage: catchUpSubStage,
-      clearRetellCatchUp: catchUpStage == null,
+      catchUpStage: catchUpStage,
+      catchUpSubStage: catchUpSubStage,
+      clearCatchUp: catchUpStage == null,
     );
 
     // 暂停 LP 的 stream 监听

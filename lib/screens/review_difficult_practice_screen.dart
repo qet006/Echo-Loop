@@ -298,6 +298,9 @@ class _ReviewDifficultPracticeScreenState
               .resetToStart();
         },
         onExit: () async {
+          await ref
+              .read(learningSessionProvider.notifier)
+              .recordCatchUpCompletionIfAny(widget.audioItemId);
           await ref.read(learningSessionProvider.notifier).exitLearningMode();
           if (mounted) context.pop();
         },

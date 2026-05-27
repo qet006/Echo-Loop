@@ -174,6 +174,19 @@ void main() {
       expect(cleared.audioItemId, isNull);
     });
 
+    test('copyWith 设置 / 清除自由练习补做目标 catchUp', () {
+      final state = const LearningSessionState().copyWith(
+        catchUpStage: LearningStage.firstLearn,
+        catchUpSubStage: SubStageType.intensiveListen,
+      );
+      expect(state.catchUpStage, LearningStage.firstLearn);
+      expect(state.catchUpSubStage, SubStageType.intensiveListen);
+
+      final cleared = state.copyWith(clearCatchUp: true);
+      expect(cleared.catchUpStage, isNull);
+      expect(cleared.catchUpSubStage, isNull);
+    });
+
     test('isFreePlay 默认为 false', () {
       const state = LearningSessionState();
       expect(state.isFreePlay, false);

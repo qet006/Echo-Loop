@@ -562,6 +562,8 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
       style: FilledButton.styleFrom(
         backgroundColor: theme.colorScheme.surfaceContainerHighest,
         foregroundColor: theme.colorScheme.onSurfaceVariant,
+        // 纯黑深色主题下底色与背景接近，加描边保证按钮边界清晰
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
       ),
       child: Text(skipLabel, maxLines: 1, overflow: TextOverflow.ellipsis),
     );

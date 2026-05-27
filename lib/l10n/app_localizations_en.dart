@@ -1076,7 +1076,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get listenAndRepeatNoDifficultSentences =>
-      'All sentences understood. Listen & repeat auto-completed.';
+      'No difficult sentences, no listen & repeat needed';
 
   @override
   String get exitListenAndRepeatTitle => 'Exit Listen & Repeat?';
@@ -2038,9 +2038,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get confirm => 'Confirm';
-
-  @override
-  String get autoCompletedNoDifficult => '0 difficult sentences, skipped';
 
   @override
   String get autoCompletedNoDifficultReview => '0 difficult sentences, skipped';

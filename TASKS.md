@@ -1,7 +1,31 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-05-26
-> 当前焦点：学习 Tab 加入社群入口（已完成）
+> 最后更新：2026-05-27
+> 当前焦点：全任务跳过功能（已完成）
+
+## 已完成：给所有学习任务加「跳过」功能（首次学习首个盲听除外）
+
+- [x] `LearningProgress` 新增 `canSkipCurrentSubStage` getter：仅首次学习的第一个盲听（firstLearn:blindListen）不可跳过，其余子步骤（首次学习的精听/跟读/复述、所有复习阶段任务含复习盲听）均可跳过
+- [x] `_doSkipCore` 增加防御性护栏：`!canSkipCurrentSubStage` 时早返回，UI 之外兜底
+- [x] 新增共享组件 `lib/widgets/common/briefing_action_row.dart`：统一「开始练习」+ 可选「跳过」按钮布局，与复述简报跳过视觉一致
+- [x] 精听 / 跟读 / 复习简报弹窗加 `onSkip` 形参并改用 `BriefingActionRow`；盲听段落弹窗透传 `skipLabel`/`onSkip`
+- [x] `learning_plan_screen.dart` 新增 `_buildSkipCallback()`，各任务入口按 `canSkipCurrentSubStage` 守卫传 `onSkip`（首次学习盲听因此自动隐藏跳过按钮）
+- [x] 跳过为直接跳过、无确认弹窗，文案复用 `retellSkip`（「跳过」/「Skip」）
+- [x] 跳过按钮加 `outlineVariant` 描边，修复纯黑深色主题下底色与背景接近、边界不清的问题（`BriefingActionRow` 与 `paragraph_selection_sheet` 两处）
+- [x] 连带跳过：`skipCurrentSubStage` 新增 `_autoSkipShadowingIfNoDifficult` 钩子——跳过后落到「难句跟读」且该音频无难句书签时自动连带跳过（精听被跳过通常无难句，跟读无内容可练）；判定以真实书签数为准
+- [x] 跟读无难句自动完成后去掉自动打开复述引导弹窗（避免打扰、修复开启自动跳过复述时位置错位），snackbar 设为 3 秒，回到计划页
+- [x] 「难句跟读」无难句的三处文案统一为「没有难句，无需跟读」（继续学习 snackbar / 步骤卡点击 snackbar / 步骤副标题），删除无用 key `autoCompletedNoDifficult`
+- [x] 修复跳过步骤在当前阶段内不可点击自由练习的 bug：`canFreePlay` 纳入 `isSkipped`（首次学习区 + 复习区）
+- [x] 跳过的任务在自由练习完成后回收为已完成：泛化 session 的 `catchUp*`（原 `retellCatchUp*`）+ 新增 `setCatchUp` / `recordCatchUpCompletionIfAny`，接入盲听/精听/跟读/复习难句补练四类自由练习完成回调（复述原已支持）
+
+### 验证
+- [x] `flutter analyze`：仅 1 条既有无关的 `unused_import` warning（learning_progress_provider.dart:19，非本次引入）
+- [x] `flutter test test/models/learning_progress_test.dart test/providers/learning_progress_provider_test.dart test/widgets/intensive_listen_briefing_sheet_test.dart`：129 tests passed
+- [x] 新增单测：model `canSkipCurrentSubStage`；provider 首次盲听跳过无操作 / 首次精听可跳过 / 复习盲听可跳过；widget 跳过按钮显隐与回调
+
+**完成时间**: 2026-05-27
+
+---
 
 ## 已完成：学习 Tab 加入学习社群邀请卡片
 

@@ -1051,7 +1051,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get listenAndRepeatNoDifficultSentences => '精听全部听懂，跟读已自动完成';
+  String get listenAndRepeatNoDifficultSentences => '没有难句，无需跟读';
 
   @override
   String get exitListenAndRepeatTitle => '退出跟读？';
@@ -1979,9 +1979,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get confirm => '确认';
-
-  @override
-  String get autoCompletedNoDifficult => '0 个难句，已跳过';
 
   @override
   String get autoCompletedNoDifficultReview => '0 个难句，已跳过';

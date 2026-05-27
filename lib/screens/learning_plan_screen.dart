@@ -155,6 +155,22 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
     return lpState;
   }
 
+  /// 构造"跳过当前子步骤"的回调。
+  ///
+  /// 首次学习的第一个盲听不可跳过（[LearningProgress.canSkipCurrentSubStage]
+  /// 为 false），此时返回 null，简报弹窗据此隐藏「跳过」按钮。
+  VoidCallback? _buildSkipCallback() {
+    final progress = ref
+        .read(learningProgressNotifierProvider)
+        .progressMap[widget.audioItemId];
+    if (!(progress?.canSkipCurrentSubStage ?? false)) return null;
+    return () async {
+      await ref
+          .read(learningProgressNotifierProvider.notifier)
+          .skipCurrentSubStage(widget.audioItemId);
+    };
+  }
+
   /// 处理"开始学习/继续学习"按钮点击
   void _handleStartLearning(BuildContext context, LearningProgress? progress) {
     final now = ref.read(nowProvider)();
@@ -240,6 +256,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
             break;
         }
       },
+      onSkip: _buildSkipCallback(),
     );
   }
 
@@ -297,6 +314,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
     final progressForSpeed = ref
         .read(learningProgressNotifierProvider)
         .progressMap[widget.audioItemId];
+    final skip = _buildSkipCallback();
     showBlindListenParagraphSheet(
       context: context,
       sentences: sentences,
@@ -305,6 +323,8 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       defaultPlaybackSpeed: progressForSpeed != null
           ? defaultPlaybackSpeedFor(progressForSpeed.difficulty, stage)
           : 1.0,
+      skipLabel: skip != null ? l10n.retellSkip : null,
+      onSkip: skip,
       onStartPractice: (targetDuration, pauseMultiplier, playbackSpeed) async {
         final paragraphs = groupSentencesIntoParagraphs(
           sentences,
@@ -554,12 +574,16 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       skipSilenceEnabled: ref.read(appSettingsProvider).skipSilenceEnabled,
     );
 
+    // 首次学习的第一个盲听不可跳过，_buildSkipCallback 在此返回 null（无跳过按钮）
+    final skip = _buildSkipCallback();
     showBlindListenParagraphSheet(
       context: context,
       sentences: sentences,
       estimatedDurationText: estimatedDuration != null
           ? formatEstimatedDuration(l10n, estimatedDuration)
           : null,
+      skipLabel: skip != null ? l10n.retellSkip : null,
+      onSkip: skip,
       onStartPractice: (targetDuration, pauseMultiplier, playbackSpeed) async {
         final paragraphs = groupSentencesIntoParagraphs(
           sentences,
@@ -636,6 +660,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
           ),
         );
       },
+      onSkip: _buildSkipCallback(),
     );
   }
 
@@ -673,15 +698,19 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
     if (!context.mounted) return;
 
     if (difficultIndices.isEmpty) {
-      // 无难句 → 自动完成跟读，推进到复述
+      // 无难句 → 自动完成跟读，回到计划页让用户自行决定下一步。
+      // 不自动打开复述引导：复述是开麦说话的任务，强推会打扰；且开启
+      // 自动跳过复述时位置已推过复述，硬编码打开会指向错误子步骤。
       await ref
           .read(learningProgressNotifierProvider.notifier)
           .completeCurrentSubStage(widget.audioItemId);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.listenAndRepeatNoDifficultSentences)),
+        SnackBar(
+          content: Text(l10n.listenAndRepeatNoDifficultSentences),
+          duration: const Duration(seconds: 3),
+        ),
       );
-      _startRetelling(context);
       return;
     }
 
@@ -731,6 +760,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
           ),
         );
       },
+      onSkip: _buildSkipCallback(),
     );
   }
 
@@ -1615,7 +1645,7 @@ class _FirstStudySection extends ConsumerWidget {
                         .valueOrNull ??
                     0;
                 if (isCompleted && bookmarkCount == 0) {
-                  subtitle = l10n.autoCompletedNoDifficult;
+                  subtitle = l10n.listenAndRepeatNoDifficultSentences;
                 } else if (isCompleted || isCurrent) {
                   subtitle = _buildShadowingSubtitle(ref, l10n);
                 }
@@ -1626,12 +1656,12 @@ class _FirstStudySection extends ConsumerWidget {
                 }
               }
 
-              // 已完成或过去阶段跳过的步骤都支持点击进入自由练习。
-              // （过去阶段跳过的复述：用户当时关掉了复述、现在重开后想补做）
+              // 已完成、已跳过（含当前阶段内跳过）或过去阶段的步骤都支持点击进入自由练习。
+              // （跳过的步骤用户随时可补做，不必等大阶段推进）
               final isPast =
                   progress != null &&
                   firstLearnStage.index < progress!.currentStage.index;
-              final canFreePlay = isCompleted || isPast;
+              final canFreePlay = isCompleted || isSkipped || isPast;
               VoidCallback? onTap;
               if (canFreePlay && subStage == SubStageType.blindListen) {
                 onTap = () => _startFreePlayBlindListen(context, ref);
@@ -1649,7 +1679,12 @@ class _FirstStudySection extends ConsumerWidget {
                 if (bookmarkCount == 0) {
                   onTap = () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l10n.autoCompletedNoDifficult)),
+                      SnackBar(
+                        content: Text(
+                          l10n.listenAndRepeatNoDifficultSentences,
+                        ),
+                        duration: const Duration(seconds: 3),
+                      ),
                     );
                   };
                 } else {
@@ -1747,14 +1782,15 @@ class _FirstStudySection extends ConsumerWidget {
         final settings = BlindListenSettings.fromMultiplier(
           pauseMultiplier,
         ).copyWith(playbackSpeed: playbackSpeed);
-        await ref
-            .read(learningSessionProvider.notifier)
-            .enterBlindListenMode(
-              audioItemId,
-              isFreePlay: true,
-              paragraphs: paragraphs,
-              settings: settings,
-            );
+        final notifier = ref.read(learningSessionProvider.notifier);
+        await notifier.enterBlindListenMode(
+          audioItemId,
+          isFreePlay: true,
+          paragraphs: paragraphs,
+          settings: settings,
+        );
+        // 补做语义：首次学习盲听不可跳过，传 firstLearn:blindListen 仅作幂等占位
+        notifier.setCatchUp(LearningStage.firstLearn, SubStageType.blindListen);
         if (context.mounted) {
           context.push(AppRoutes.blindListenPlayer(collectionId, audioItemId));
         }
@@ -1783,15 +1819,19 @@ class _FirstStudySection extends ConsumerWidget {
       estimatedDuration: intensiveEstimate,
       defaultPlaybackSpeed: 1.0,
       onStartPractice: (playbackSpeed, pauseMultiplier) async {
-        await ref
-            .read(learningSessionProvider.notifier)
-            .enterIntensiveListenMode(
-              audioItemId,
-              lpState.sentences,
-              isFreePlay: true,
-              playbackSpeed: playbackSpeed,
-              pauseMultiplier: pauseMultiplier,
-            );
+        final notifier = ref.read(learningSessionProvider.notifier);
+        await notifier.enterIntensiveListenMode(
+          audioItemId,
+          lpState.sentences,
+          isFreePlay: true,
+          playbackSpeed: playbackSpeed,
+          pauseMultiplier: pauseMultiplier,
+        );
+        // 补做语义：跳过的精听完成后回收为已完成
+        notifier.setCatchUp(
+          LearningStage.firstLearn,
+          SubStageType.intensiveListen,
+        );
         if (context.mounted) {
           context.push(
             AppRoutes.intensiveListenPlayer(collectionId, audioItemId),
@@ -1869,6 +1909,10 @@ class _FirstStudySection extends ConsumerWidget {
               playbackSpeed: playbackSpeed,
               pauseMultiplier: pauseMultiplier,
             );
+        // 补做语义：跳过的难句跟读完成后回收为已完成
+        ref
+            .read(learningSessionProvider.notifier)
+            .setCatchUp(LearningStage.firstLearn, SubStageType.listenAndRepeat);
         if (context.mounted) {
           context.push(
             AppRoutes.listenAndRepeatPlayer(collectionId, audioItemId),
@@ -2382,14 +2426,15 @@ class _ReviewRoundSection extends ConsumerWidget {
         final settings = BlindListenSettings.fromMultiplier(
           pauseMultiplier,
         ).copyWith(playbackSpeed: playbackSpeed);
-        await ref
-            .read(learningSessionProvider.notifier)
-            .enterBlindListenMode(
-              audioItemId,
-              isFreePlay: true,
-              paragraphs: paragraphs,
-              settings: settings,
-            );
+        final notifier = ref.read(learningSessionProvider.notifier);
+        await notifier.enterBlindListenMode(
+          audioItemId,
+          isFreePlay: true,
+          paragraphs: paragraphs,
+          settings: settings,
+        );
+        // 补做语义：复习盲听可被跳过，完成后回收为已完成
+        notifier.setCatchUp(review.stage, SubStageType.blindListen);
         if (context.mounted) {
           context.push(AppRoutes.blindListenPlayer(collectionId, audioItemId));
         }
@@ -2430,15 +2475,19 @@ class _ReviewRoundSection extends ConsumerWidget {
       estimatedDuration: estimated,
       defaultPlaybackSpeed: defaultSpeed,
       onStartPractice: (playbackSpeed, pauseMultiplier) async {
-        await ref
-            .read(learningSessionProvider.notifier)
-            .enterReviewDifficultPracticeMode(
-              audioItemId,
-              lpState.sentences,
-              isFreePlay: true,
-              playbackSpeed: playbackSpeed,
-              pauseMultiplier: pauseMultiplier,
-            );
+        final notifier = ref.read(learningSessionProvider.notifier);
+        await notifier.enterReviewDifficultPracticeMode(
+          audioItemId,
+          lpState.sentences,
+          isFreePlay: true,
+          playbackSpeed: playbackSpeed,
+          pauseMultiplier: pauseMultiplier,
+        );
+        // 补做语义：跳过的复习难句补练完成后回收为已完成
+        notifier.setCatchUp(
+          review.stage,
+          SubStageType.reviewDifficultPractice,
+        );
         if (context.mounted) {
           context.push(
             AppRoutes.reviewDifficultPractice(collectionId, audioItemId),
@@ -2680,12 +2729,12 @@ class _ReviewRoundSection extends ConsumerWidget {
                 }
               }
 
-              // 已完成或过去阶段跳过的子步骤都支持点击进入自由练习。
-              // （过去阶段跳过的复述：用户当时关掉了复述、现在重开后想补做）
+              // 已完成、已跳过（含当前阶段内跳过）或过去阶段的子步骤都支持点击进入自由练习。
+              // （跳过的步骤用户随时可补做，不必等大阶段推进）
               final isPast =
                   progress != null &&
                   review.stage.index < progress!.currentStage.index;
-              final canFreePlay = isCompleted || isPast;
+              final canFreePlay = isCompleted || isSkipped || isPast;
               VoidCallback? onTap;
               if (canFreePlay) {
                 // 无难句自动完成的补练步骤：点击只显示提示

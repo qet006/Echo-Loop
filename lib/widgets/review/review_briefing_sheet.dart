@@ -4,6 +4,7 @@ import '../../database/enums.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/difficult_practice_settings.dart';
 import '../../theme/app_theme.dart';
+import '../common/briefing_action_row.dart';
 
 /// 复习步骤提示弹窗。
 ///
@@ -13,6 +14,7 @@ import '../../theme/app_theme.dart';
 ///   以及句间停顿倍数（-1.0 = 自动/smart，>0 = multiplier 模式）。
 ///   句间停顿下拉仅在 [SubStageType.reviewDifficultPractice] 子步骤显示，
 ///   其余子步骤回调 pauseMultiplier 固定为 -1.0。
+/// [onSkip] 可选，提供时在"开始练习"左侧显示「跳过」按钮，点击直接跳过当前任务。
 Future<void> showReviewBriefingSheet({
   required BuildContext context,
   required LearningStage stage,
@@ -21,6 +23,7 @@ Future<void> showReviewBriefingSheet({
   double defaultPlaybackSpeed = 1.0,
   required void Function(double playbackSpeed, double pauseMultiplier)
   onStartPractice,
+  VoidCallback? onSkip,
 }) {
   return showModalBottomSheet(
     context: context,
@@ -34,6 +37,7 @@ Future<void> showReviewBriefingSheet({
       estimatedDuration: estimatedDuration,
       defaultPlaybackSpeed: defaultPlaybackSpeed,
       onStartPractice: onStartPractice,
+      onSkip: onSkip,
     ),
   );
 }
@@ -48,6 +52,7 @@ class _ReviewBriefingSheet extends StatefulWidget {
   final double defaultPlaybackSpeed;
   final void Function(double playbackSpeed, double pauseMultiplier)
   onStartPractice;
+  final VoidCallback? onSkip;
 
   const _ReviewBriefingSheet({
     required this.stage,
@@ -55,6 +60,7 @@ class _ReviewBriefingSheet extends StatefulWidget {
     this.estimatedDuration,
     required this.defaultPlaybackSpeed,
     required this.onStartPractice,
+    this.onSkip,
   });
 
   @override
@@ -245,16 +251,19 @@ class _ReviewBriefingSheetState extends State<_ReviewBriefingSheet> {
             ),
           ],
           const SizedBox(height: AppSpacing.l),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () {
-                Navigator.of(context).pop();
-                widget.onStartPractice(_playbackSpeed, _pauseMultiplier);
-              },
-              icon: const Icon(Icons.play_arrow),
-              label: Text(l10n.startPractice),
-            ),
+          BriefingActionRow(
+            startLabel: l10n.startPractice,
+            onStart: () {
+              Navigator.of(context).pop();
+              widget.onStartPractice(_playbackSpeed, _pauseMultiplier);
+            },
+            skipLabel: widget.onSkip != null ? l10n.retellSkip : null,
+            onSkip: widget.onSkip == null
+                ? null
+                : () {
+                    Navigator.of(context).pop();
+                    widget.onSkip!();
+                  },
           ),
         ],
       ),

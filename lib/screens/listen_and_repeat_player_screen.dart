@@ -24,6 +24,7 @@ import '../utils/wakelock_mixin.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/learning_plan_provider.dart';
 import '../providers/learning_progress_provider.dart';
+import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/speech/speech_recording_controller.dart';
 import '../providers/audio_engine/audio_engine_provider.dart';
 import '../providers/listen_and_repeat/listen_and_repeat_controller.dart';
@@ -261,6 +262,9 @@ class _ListenAndRepeatPlayerScreenState
           await ctrl.startPlaying();
         },
         onExit: () async {
+          await ref
+              .read(learningSessionProvider.notifier)
+              .recordCatchUpCompletionIfAny(widget.audioItemId);
           await ctrl.clearBreakpoint(isFreePlay: true);
           await ctrl.exitLearningMode();
           if (mounted) context.pop();

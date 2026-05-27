@@ -407,7 +407,7 @@
       "total": { "type": "int" }
     }
   },
-  "listenAndRepeatNoDifficultSentences": "精听全部听懂，跟读已自动完成",
+  "listenAndRepeatNoDifficultSentences": "没有难句，无需跟读",
   "exitListenAndRepeatTitle": "退出跟读？",
   "exitListenAndRepeatMessage": "进度已保存，下次可从断点继续。",
   "listenAndRepeatBriefingTitle": "难句跟读",
@@ -828,7 +828,6 @@
   },
   "clearCacheEmpty": "缓存已为空",
   "confirm": "确认",
-  "autoCompletedNoDifficult": "0 个难句，已跳过",
   "autoCompletedNoDifficultReview": "0 个难句，已跳过",
   "termsOfService": "服务条款",
   "privacyPolicy": "隐私政策",

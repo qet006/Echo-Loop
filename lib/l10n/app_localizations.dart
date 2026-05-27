@@ -2009,7 +2009,7 @@ abstract class AppLocalizations {
   /// No description provided for @listenAndRepeatNoDifficultSentences.
   ///
   /// In en, this message translates to:
-  /// **'All sentences understood. Listen & repeat auto-completed.'**
+  /// **'No difficult sentences, no listen & repeat needed'**
   String get listenAndRepeatNoDifficultSentences;
 
   /// No description provided for @exitListenAndRepeatTitle.
@@ -3643,12 +3643,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Confirm'**
   String get confirm;
-
-  /// No description provided for @autoCompletedNoDifficult.
-  ///
-  /// In en, this message translates to:
-  /// **'0 difficult sentences, skipped'**
-  String get autoCompletedNoDifficult;
 
   /// No description provided for @autoCompletedNoDifficultReview.
   ///

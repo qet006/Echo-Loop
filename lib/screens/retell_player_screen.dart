@@ -570,8 +570,8 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
 
       // 「补做」语义：用户从过去阶段的跳过卡片进入自由练习并完成 → 写入
       // stage_completions（幂等，已记录则 no-op）。让 UI 把灰色卡切到 ✅。
-      final catchUpStage = sessionState.retellCatchUpStage;
-      final catchUpSub = sessionState.retellCatchUpSubStage;
+      final catchUpStage = sessionState.catchUpStage;
+      final catchUpSub = sessionState.catchUpSubStage;
       if (catchUpStage != null && catchUpSub != null) {
         await ref
             .read(learningProgressNotifierProvider.notifier)

@@ -8,12 +8,14 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/intensive_listen_settings.dart';
 import '../../theme/app_theme.dart';
+import '../common/briefing_action_row.dart';
 
 /// 显示精听简报底部弹窗
 ///
 /// [defaultPlaybackSpeed] 默认播放速度（默认 1.0），用户可在弹窗里改。
 /// [onStartPractice] 点击"开始练习"时回调，参数为用户最终选定的速度
 ///   以及句间停顿倍数（-1.0 = 自动/smart 模式，>0 = multiplier 模式）。
+/// [onSkip] 可选，提供时在"开始练习"左侧显示「跳过」按钮，点击直接跳过当前任务。
 Future<void> showIntensiveListenBriefingSheet({
   required BuildContext context,
   required int sentenceCount,
@@ -21,6 +23,7 @@ Future<void> showIntensiveListenBriefingSheet({
   double defaultPlaybackSpeed = 1.0,
   required void Function(double playbackSpeed, double pauseMultiplier)
   onStartPractice,
+  VoidCallback? onSkip,
 }) {
   return showModalBottomSheet(
     context: context,
@@ -33,6 +36,7 @@ Future<void> showIntensiveListenBriefingSheet({
       estimatedDuration: estimatedDuration,
       defaultPlaybackSpeed: defaultPlaybackSpeed,
       onStartPractice: onStartPractice,
+      onSkip: onSkip,
     ),
   );
 }
@@ -54,12 +58,16 @@ class IntensiveListenBriefingSheet extends StatefulWidget {
   final void Function(double playbackSpeed, double pauseMultiplier)
   onStartPractice;
 
+  /// 跳过当前任务回调，提供时显示「跳过」按钮
+  final VoidCallback? onSkip;
+
   const IntensiveListenBriefingSheet({
     super.key,
     required this.sentenceCount,
     this.estimatedDuration,
     this.defaultPlaybackSpeed = 1.0,
     required this.onStartPractice,
+    this.onSkip,
   });
 
   @override
@@ -270,17 +278,20 @@ class _IntensiveListenBriefingSheetState
           ),
           const SizedBox(height: AppSpacing.l),
 
-          // 开始练习按钮
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () {
-                Navigator.of(context).pop();
-                widget.onStartPractice(_playbackSpeed, _pauseMultiplier);
-              },
-              icon: const Icon(Icons.play_arrow),
-              label: Text(l10n.startPractice),
-            ),
+          // 开始练习按钮（+ 可选跳过）
+          BriefingActionRow(
+            startLabel: l10n.startPractice,
+            onStart: () {
+              Navigator.of(context).pop();
+              widget.onStartPractice(_playbackSpeed, _pauseMultiplier);
+            },
+            skipLabel: widget.onSkip != null ? l10n.retellSkip : null,
+            onSkip: widget.onSkip == null
+                ? null
+                : () {
+                    Navigator.of(context).pop();
+                    widget.onSkip!();
+                  },
           ),
         ],
       ),

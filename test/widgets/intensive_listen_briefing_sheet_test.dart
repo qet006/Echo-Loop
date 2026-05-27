@@ -131,6 +131,61 @@ void main() {
     expect(selectedPause, -1.0);
   });
 
+  testWidgets('不传 onSkip 时不显示跳过按钮', (tester) async {
+    await tester.pumpWidget(
+      createTestApp(
+        Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () {
+              showIntensiveListenBriefingSheet(
+                context: context,
+                sentenceCount: 10,
+                onStartPractice: (_, _) {},
+              );
+            },
+            child: const Text('Open'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Skip'), findsNothing);
+  });
+
+  testWidgets('传 onSkip 时显示跳过按钮，点击触发回调', (tester) async {
+    var skipped = false;
+    await tester.pumpWidget(
+      createTestApp(
+        Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () {
+              showIntensiveListenBriefingSheet(
+                context: context,
+                sentenceCount: 10,
+                onStartPractice: (_, _) {},
+                onSkip: () => skipped = true,
+              );
+            },
+            child: const Text('Open'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Skip'), findsOneWidget);
+
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+
+    expect(skipped, isTrue);
+  });
+
   testWidgets('选择 3x 后回传 3.0', (tester) async {
     double? selectedPause;
     await tester.pumpWidget(

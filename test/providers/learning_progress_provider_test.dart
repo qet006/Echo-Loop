@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:echo_loop/database/app_database.dart' as db;
+import 'package:echo_loop/database/daos/bookmark_dao.dart';
 import 'package:echo_loop/database/daos/learning_progress_dao.dart';
 import 'package:echo_loop/database/daos/stage_completion_dao.dart';
 import 'package:echo_loop/database/enums.dart';
@@ -18,6 +19,8 @@ import '../helpers/mock_providers.dart';
 class MockLearningProgressDao extends Mock implements LearningProgressDao {}
 
 class MockStageCompletionDao extends Mock implements StageCompletionDao {}
+
+class MockBookmarkDao extends Mock implements BookmarkDao {}
 
 /// 测试用 Notifier：继承真实逻辑，覆盖 build() 注入初始状态，
 /// 同时保留生产 build() 中安装的 settings → reconcile 监听器。
@@ -62,6 +65,7 @@ class _TestLearningSettingsNotifier extends Notifier<LearningSettings>
 void main() {
   late MockLearningProgressDao mockDao;
   late MockStageCompletionDao mockStageCompletionDao;
+  late MockBookmarkDao mockBookmarkDao;
 
   setUpAll(() {
     // 注册 Companion 类型的 fallback 值
@@ -92,6 +96,7 @@ void main() {
   setUp(() {
     mockDao = MockLearningProgressDao();
     mockStageCompletionDao = MockStageCompletionDao();
+    mockBookmarkDao = MockBookmarkDao();
 
     // 默认 stub
     when(() => mockDao.upsert(any())).thenAnswer((_) async {});
@@ -103,14 +108,27 @@ void main() {
     when(
       () => mockStageCompletionDao.deleteByAudioId(any()),
     ).thenAnswer((_) async {});
+    // 默认无难句书签
+    when(
+      () => mockBookmarkDao.getBookmarkedIndices(any()),
+    ).thenAnswer((_) async => <int>{});
   });
 
   /// 创建带 mock DAO 的 ProviderContainer
+  ///
+  /// [bookmarks] 控制 mock 书签 DAO 返回的难句索引集合，用于验证
+  /// 「难句跟读无难句连带跳过」逻辑。
   ProviderContainer createContainer(
     LearningProgressState initialState, {
     NowGetter? nowGetter,
     bool autoSkipRetell = false,
+    Set<int>? bookmarks,
   }) {
+    if (bookmarks != null) {
+      when(
+        () => mockBookmarkDao.getBookmarkedIndices(any()),
+      ).thenAnswer((_) async => bookmarks);
+    }
     final container = ProviderContainer(
       overrides: [
         learningProgressNotifierProvider.overrideWith(
@@ -118,6 +136,7 @@ void main() {
         ),
         learningProgressDaoProvider.overrideWithValue(mockDao),
         stageCompletionDaoProvider.overrideWithValue(mockStageCompletionDao),
+        bookmarkDaoProvider.overrideWithValue(mockBookmarkDao),
         if (nowGetter != null) nowProvider.overrideWithValue(nowGetter),
         analyticsOverride(),
         notificationPermissionOverride(),
@@ -754,6 +773,123 @@ void main() {
         expect(after.currentSubStage, SubStageType.blindListen);
       },
     );
+  });
+
+  // ========== Group 1b: skipCurrentSubStage — 手动跳过护栏 ==========
+
+  group('skipCurrentSubStage', () {
+    test('首次学习的第一个盲听不可跳过：无操作', () async {
+      final now = DateTime(2026, 3, 1, 10, 0);
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.blindListen,
+        currentStageStartedAt: now,
+        updatedAt: now,
+      );
+
+      final container = createContainer(
+        LearningProgressState(progressMap: {'a1': progress}),
+        nowGetter: () => now,
+      );
+
+      await notifier(container).skipCurrentSubStage('a1');
+
+      final after = readProgress(container, 'a1')!;
+      // 位置不变，且未写入跳过集合
+      expect(after.currentStage, LearningStage.firstLearn);
+      expect(after.currentSubStage, SubStageType.blindListen);
+      expect(after.skippedSubStageKeys, isEmpty);
+    });
+
+    test('首次学习精听可跳过（有难句时停在跟读）：intensiveListen → listenAndRepeat', () async {
+      final now = DateTime(2026, 3, 1, 10, 0);
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.intensiveListen,
+        currentStageStartedAt: now,
+        updatedAt: now,
+      );
+
+      // 有难句书签 → 跟读有内容，不连带跳过
+      final container = createContainer(
+        LearningProgressState(progressMap: {'a1': progress}),
+        nowGetter: () => now,
+        bookmarks: const {0, 3},
+      );
+
+      await notifier(container).skipCurrentSubStage('a1');
+
+      final after = readProgress(container, 'a1')!;
+      expect(after.currentStage, LearningStage.firstLearn);
+      expect(after.currentSubStage, SubStageType.listenAndRepeat);
+      expect(
+        after.skippedSubStageKeys.contains('firstLearn:intensiveListen'),
+        isTrue,
+      );
+    });
+
+    test('跳过精听且无难句时连带跳过跟读：intensiveListen → retell', () async {
+      final now = DateTime(2026, 3, 1, 10, 0);
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.intensiveListen,
+        currentStageStartedAt: now,
+        updatedAt: now,
+      );
+
+      // 无难句书签（默认）→ 跟读无内容，连带跳过到复述
+      final container = createContainer(
+        LearningProgressState(progressMap: {'a1': progress}),
+        nowGetter: () => now,
+      );
+
+      await notifier(container).skipCurrentSubStage('a1');
+
+      final after = readProgress(container, 'a1')!;
+      expect(after.currentStage, LearningStage.firstLearn);
+      expect(after.currentSubStage, SubStageType.retell);
+      expect(
+        after.skippedSubStageKeys.contains('firstLearn:intensiveListen'),
+        isTrue,
+      );
+      expect(
+        after.skippedSubStageKeys.contains('firstLearn:listenAndRepeat'),
+        isTrue,
+      );
+    });
+
+    test('复习阶段的盲听可跳过：review1 v1 blindListen → reviewDifficultPractice', () async {
+      final now = DateTime(2026, 3, 5, 10, 0);
+      final completedAt = now.subtract(const Duration(days: 2));
+      // 显式 stamp review1=1 → v1 plan = [blindListen, difficult, retellPara]
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.review1,
+        currentSubStage: SubStageType.blindListen,
+        lastStageCompletedAt: completedAt,
+        currentStageStartedAt: now,
+        updatedAt: now,
+        planVersionsByStage: const {LearningStage.review1: 1},
+      );
+
+      final container = createContainer(
+        LearningProgressState(progressMap: {'a1': progress}),
+        nowGetter: () => now,
+      );
+
+      await notifier(container).skipCurrentSubStage('a1');
+
+      final after = readProgress(container, 'a1')!;
+      expect(after.currentStage, LearningStage.review1);
+      expect(after.currentSubStage, SubStageType.reviewDifficultPractice);
+      expect(
+        after.skippedSubStageKeys.contains('review1:blindListen'),
+        isTrue,
+      );
+    });
   });
 
   // ========== Group 2: 断点保存与清除 ==========

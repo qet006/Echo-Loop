@@ -417,7 +417,28 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
   /// - 推进后调 [_autoSkipRetellIfEnabled]（连续吃掉相邻复述位置）
   Future<void> skipCurrentSubStage(String audioItemId) async {
     final ok = await _doSkipCore(audioItemId, source: 'manual');
-    if (ok) await _autoSkipRetellIfEnabled(audioItemId);
+    if (!ok) return;
+    // 跳过精听等环节后落到「难句跟读」且无难句时，连带跳过（见下方钩子）
+    await _autoSkipShadowingIfNoDifficult(audioItemId);
+    await _autoSkipRetellIfEnabled(audioItemId);
+  }
+
+  /// 难句跟读连带跳过钩子：跳过推进后若新位置是「难句跟读」
+  /// ([SubStageType.listenAndRepeat]) 且该音频没有任何难句书签，跟读无内容
+  /// 可练，自动连带跳过。
+  ///
+  /// 典型场景：用户跳过逐句精听（标注难句的环节）后落到难句跟读，此时通常
+  /// 没有难句，跟读应一并跳过，避免用户进入一个空任务。判定以真实书签数为准，
+  /// 而非"精听是否被跳过"——书签也可能来自其它途径。
+  Future<void> _autoSkipShadowingIfNoDifficult(String audioItemId) async {
+    final p = state.progressMap[audioItemId];
+    if (p == null || p.isCompleted) return;
+    if (p.currentSubStage != SubStageType.listenAndRepeat) return;
+    final bookmarks = await ref
+        .read(bookmarkDaoProvider)
+        .getBookmarkedIndices(audioItemId);
+    if (bookmarks.isNotEmpty) return;
+    await _doSkipCore(audioItemId, source: 'auto_no_difficult');
   }
 
   /// [skipCurrentSubStage] / [_autoSkipRetellIfEnabled] 共用的 skip 实现内核。
@@ -428,6 +449,8 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     if (progress == null || progress.isCompleted) return false;
     final checkNow = ref.read(nowProvider)();
     if (progress.isReviewLockedAt(checkNow)) return false;
+    // 首次学习的第一个盲听不可跳过（UI 之外的兜底护栏）
+    if (!progress.canSkipCurrentSubStage) return false;
 
     final stage = progress.currentStage;
     final subStage = progress.currentSubStage;

@@ -196,6 +196,9 @@ class _BlindListenPlayerScreenState
       },
       onExit: () async {
         await ref
+            .read(learningSessionProvider.notifier)
+            .recordCatchUpCompletionIfAny(widget.audioItemId);
+        await ref
             .read(learningProgressNotifierProvider.notifier)
             .saveBlindListenSentenceIndex(
               widget.audioItemId,

@@ -43,6 +43,42 @@ void main() {
       expect(progress.completedReviewStages, 0);
     });
 
+    test('canSkipCurrentSubStage — 仅首次学习的第一个盲听不可跳过', () {
+      // 首次学习盲听 → 不可跳过
+      expect(
+        LearningProgress(audioItemId: 'a1', updatedAt: now)
+            .canSkipCurrentSubStage,
+        false,
+      );
+      // 首次学习其余子步骤 → 可跳过
+      for (final sub in const [
+        SubStageType.intensiveListen,
+        SubStageType.listenAndRepeat,
+        SubStageType.retell,
+      ]) {
+        expect(
+          LearningProgress(
+            audioItemId: 'a1',
+            currentStage: LearningStage.firstLearn,
+            currentSubStage: sub,
+            updatedAt: now,
+          ).canSkipCurrentSubStage,
+          true,
+          reason: 'firstLearn:$sub 应可跳过',
+        );
+      }
+      // 复习阶段的盲听 → 可跳过
+      expect(
+        LearningProgress(
+          audioItemId: 'a1',
+          currentStage: LearningStage.review1,
+          currentSubStage: SubStageType.blindListen,
+          updatedAt: now,
+        ).canSkipCurrentSubStage,
+        true,
+      );
+    });
+
     test('首次学习第 2 个子步骤进行中（已完成 blindListen）', () {
       final progress = LearningProgress(
         audioItemId: 'audio-1',

@@ -13,6 +13,7 @@ import 'common/paragraph_selection_sheet.dart';
 ///
 /// [stageLabel] 可选的阶段名（如"第三轮复习"），显示在标题下方
 /// [estimatedDurationText] 可选的预估时长文本，显示在说明下方
+/// [skipLabel]/[onSkip] 可选，提供时显示「跳过」按钮，点击直接跳过当前任务
 Future<void> showBlindListenParagraphSheet({
   required BuildContext context,
   required List<Sentence> sentences,
@@ -25,6 +26,8 @@ Future<void> showBlindListenParagraphSheet({
     double playbackSpeed,
   )
   onStartPractice,
+  String? skipLabel,
+  VoidCallback? onSkip,
 }) {
   final l10n = AppLocalizations.of(context)!;
   return showParagraphSelectionSheet(
@@ -40,6 +43,8 @@ Future<void> showBlindListenParagraphSheet({
     pauseMultiplierOptions: const [0.5, 1.0, 1.5, 2.0, 3.0],
     stageLabel: stageLabel,
     estimatedDurationText: estimatedDurationText,
+    skipLabel: skipLabel,
+    onSkip: onSkip,
     // 盲听不显示可见词比例（仅复述用），第三个回调参数忽略
     onStartPractice: (_, _, _) {},
     onStartPracticeWithPlaybackSpeed: (duration, multiplier, _, speed) =>

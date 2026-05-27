@@ -171,6 +171,14 @@ class LearningProgress {
   /// 是否已完成全部学习
   bool get isCompleted => currentStage == LearningStage.completed;
 
+  /// 当前子步骤是否允许跳过。
+  ///
+  /// 首次学习的第一个盲听不可跳过——保证用户至少完整盲听一次原文。
+  /// 其余子步骤（首次学习的精听/跟读/复述、所有复习阶段任务含复习盲听）均可跳过。
+  bool get canSkipCurrentSubStage =>
+      !(currentStage == LearningStage.firstLearn &&
+          currentSubStage == SubStageType.blindListen);
+
   /// 下次复习可用时间（仅复习阶段有意义）
   ///
   /// 基于 [lastStageCompletedAt] + 当前阶段的 [intervalHours] 计算。
