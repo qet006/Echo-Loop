@@ -23,6 +23,7 @@ import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/blind_listen_player_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
+import '../providers/new_user_guide_provider.dart';
 import 'sentence_detail_screen.dart';
 import '../services/app_logger.dart';
 import '../theme/app_theme.dart';
@@ -37,6 +38,7 @@ import '../widgets/common/paragraph_practice_scaffold.dart';
 import '../widgets/common/playback_controls.dart';
 import '../widgets/common/paragraph_sentence_list_card.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
+import '../widgets/guide_flow.dart';
 import '../widgets/player_hotkey_scope.dart';
 
 /// 盲听播放器页面
@@ -69,6 +71,15 @@ class _BlindListenPlayerScreenState
 
   /// 是否正在跳转句子详情页，防止快速点击重复 push
   bool _isNavigatingToDetail = false;
+
+  /// 是否正在 seek 同步阶段（_cancelAll + state.copyWith）。
+  /// seekToSentence 内 _playCurrentParagraph 是 unawaited，guard 只 hold
+  /// 同步阶段（几十 ms），不阻塞下一次点击。
+  bool _isSeeking = false;
+
+  /// 新手引导：编号区 / 主体区 Showcase key（随 State 生命周期存在）
+  final GlobalKey _guideNumberKey = GlobalKey(debugLabel: 'guideSentenceNumber');
+  final GlobalKey _guideBodyKey = GlobalKey(debugLabel: 'guideSentenceBody');
   ProviderSubscription<BlindListenPlayerState>? _playerSubscription;
   StreamSubscription<Duration>? _silenceSkipSub;
 
@@ -126,10 +137,28 @@ class _BlindListenPlayerScreenState
 
   // ========== 句子点击 ==========
 
-  /// 点击句子 → 暂停播放 → 进入句子详情页
+  /// 点击句子编号 → 从该句开始播放
+  ///
+  /// guard 只 hold seekToSentence 的同步阶段（Provider 内 _cancelAll + state.copyWith
+  /// 完成立即返回，_playCurrentParagraph 是 unawaited 异步执行）。
+  /// 用 guard 隔离与 _handleSentenceDetail 的 pause+navigate 并发：避免 pause 写完
+  /// state 后被 _playCurrentParagraph 同步部分覆盖。
+  Future<void> _handleSentencePlayFrom(Sentence sentence) async {
+    if (_isSeeking) return;
+    _isSeeking = true;
+    try {
+      await ref
+          .read(blindListenPlayerProvider.notifier)
+          .seekToSentence(sentence.index);
+    } finally {
+      _isSeeking = false;
+    }
+  }
+
+  /// 点击句子主体（文本/书签）→ 暂停播放 → 进入句子详情页
   ///
   /// 与复述任务行为一致：导航前停止音频，返回后由用户手动恢复播放。
-  Future<void> _handleSentenceTap(Sentence sentence) async {
+  Future<void> _handleSentenceDetail(Sentence sentence) async {
     if (_isNavigatingToDetail) return;
     _isNavigatingToDetail = true;
 
@@ -195,6 +224,8 @@ class _BlindListenPlayerScreenState
         await ref.read(learningSessionProvider.notifier).replayBlindListen();
       },
       onExit: () async {
+        // 在 pop 前置 _isExiting，避免 PopScope 重入 _handleExit 反向回写断点
+        _isExiting = true;
         await ref
             .read(learningSessionProvider.notifier)
             .recordCatchUpCompletionIfAny(widget.audioItemId);
@@ -267,6 +298,9 @@ class _BlindListenPlayerScreenState
     if (!mounted) return;
     await maybeShowLearningNotificationPrompt(context, ref);
 
+    // 在 exitLearningMode + pop / navigate 之前置 _isExiting，
+    // 避免 PopScope 重入 _handleExit 反向回写断点。
+    _isExiting = true;
     await ref.read(learningSessionProvider.notifier).exitLearningMode();
     if (!mounted) return;
 
@@ -352,6 +386,10 @@ class _BlindListenPlayerScreenState
   }
 
   Future<void> _handleExit() async {
+    // 防重入：完成弹窗 / _exit 内 context.pop() 会被 PopScope 拦截再触发 _handleExit，
+    // 导致反向回写断点（覆盖完成弹窗写入的 null）。
+    if (_isExiting) return;
+
     final l10n = AppLocalizations.of(context)!;
     final sessionState = ref.read(learningSessionProvider);
 
@@ -385,6 +423,26 @@ class _BlindListenPlayerScreenState
 
   Future<void> _exit() async {
     _isExiting = true;
+    // 退出前显式落盘当前句索引（与复述 _handleExit 行为对齐）。
+    // 完成 / 自由练习完成走 _showCompleteDialog / _showFreePlayCompleteDialog 显式清空 null，
+    // 不走这里。
+    try {
+      final sessionState = ref.read(learningSessionProvider);
+      final globalIdx = ref
+          .read(blindListenPlayerProvider.notifier)
+          .currentSentenceGlobalIndex;
+      if (globalIdx != null) {
+        await ref
+            .read(learningProgressNotifierProvider.notifier)
+            .saveBlindListenSentenceIndex(
+              widget.audioItemId,
+              globalIdx,
+              isFreePlay: sessionState.isFreePlay,
+            );
+      }
+    } catch (e) {
+      debugPrint('盲听退出保存断点失败: $e');
+    }
     if (mounted) context.pop();
     await ref.read(learningSessionProvider.notifier).exitLearningMode();
   }
@@ -502,6 +560,24 @@ class _BlindListenPlayerScreenState
     final sentences = player.currentParagraphSentences;
     final paragraphDuration = player.currentParagraphDuration;
 
+    // 新手引导：编号→开播、文本→讲解。统一挂在第 1 句（idx=0），首项最显眼。
+    const guideTargetLocalIdx = 0;
+    final numberStep = GuideStep(
+      key: _guideNumberKey,
+      description: l10n.guideSentenceTileNumberDescription,
+    );
+    final bodyStep = GuideStep(
+      key: _guideBodyKey,
+      description: l10n.guideSentenceTileBodyDescription,
+    );
+    final guideFlows = <GuideFlow>[
+      GuideFlow(
+        flowId: GuideFlowIds.sentenceTileTour,
+        shouldRun: sentences.isNotEmpty,
+        steps: [numberStep, bodyStep],
+      ),
+    ];
+
     return LearningHotkeyScope(
       onPlayPause: () {
         if (playerState.isPauseCountdown) {
@@ -529,7 +605,9 @@ class _BlindListenPlayerScreenState
           if (didPop) return;
           await _handleExit();
         },
-        child: ParagraphPracticeScaffold(
+        child: GuideFlowSequenceHost(
+          flows: guideFlows,
+          child: ParagraphPracticeScaffold(
           title: l10n.blindListenAppBarTitle,
           onClose: _handleExit,
           onOpenSettings: _openSettings,
@@ -563,7 +641,11 @@ class _BlindListenPlayerScreenState
             keywordMap: const {},
             playingSentenceIndex: playerState.playingSentenceIndex,
             bookmarkedSentenceIndices: playerState.bookmarkedSentenceIndices,
-            onSentenceTap: _handleSentenceTap,
+            onSentenceTap: _handleSentenceDetail,
+            onSentencePlayFrom: _handleSentencePlayFrom,
+            guideTargetLocalIdx: guideTargetLocalIdx,
+            numberAreaGuideStep: numberStep,
+            bodyAreaGuideStep: bodyStep,
           ),
           contentControls: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 44),
@@ -724,6 +806,7 @@ class _BlindListenPlayerScreenState
           statusSuffixText: _formatSpeed(playerState.settings.playbackSpeed),
           l10n: l10n,
           theme: theme,
+        ),
         ),
       ),
     );

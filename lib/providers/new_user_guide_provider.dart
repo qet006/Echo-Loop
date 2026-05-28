@@ -90,6 +90,7 @@ abstract final class GuideFlowIds {
   static const intensiveListenCantUnderstand =
       'intensive_listen_cant_understand';
   static const sentenceAnnotationTour = 'sentence_annotation_tour';
+  static const sentenceTileTour = 'sentence_tile_tour';
 
   static const active = [
     mainShellVisitLibrary,
@@ -108,6 +109,7 @@ abstract final class GuideFlowIds {
     favoritesVocabularyReview,
     intensiveListenCantUnderstand,
     sentenceAnnotationTour,
+    sentenceTileTour,
   ];
 
   static const legacy = [

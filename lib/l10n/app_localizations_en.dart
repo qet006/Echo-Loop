@@ -2716,6 +2716,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tap here when a sentence is hard to follow. It will be auto-marked as difficult and you\'ll enter single-sentence analysis mode.';
 
   @override
+  String get guideSentenceTileNumberDescription =>
+      'Tap the number to play from this sentence.';
+
+  @override
+  String get guideSentenceTileBodyDescription =>
+      'Tap the sentence to view the explanation.';
+
+  @override
   String get guideSentenceAnnotationSentenceDescription =>
       'Tap any word to open the dictionary; long-press the sentence to copy the text.';
 

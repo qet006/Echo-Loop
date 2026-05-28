@@ -242,7 +242,32 @@ class AudioEngine extends _$AudioEngine {
       return;
     }
 
+    // 在播放中切到同段另一句时，旧 position 可能仍落在新 clip 范围内，
+    // 导致 play() 沿用旧 position 而非跳到 clip 起点。
+    // 显式 seek 到 clip 相对起点（Duration.zero）保证从目标句开始播放。
+    await _audioPlayer.seek(Duration.zero);
+
+    if (!isActiveSession(sessionId)) {
+      AppLogger.log(
+        'AudioEngine',
+        '⚠ playRangeOnce SKIPPED after seek: session $sessionId 已过期 '
+            '(current=${state.sessionId})',
+      );
+      return;
+    }
+
+    // play() 是真正启动音频的点，必须最后一次 check session：
+    // 上游 pause / seek 在并发场景下可能在 setClip → seek(0) 期间 bump session，
+    // 不在这里拦住会让旧 session 启动一段短暂的播放再被 stop。
     await _audioPlayer.play();
+    if (!isActiveSession(sessionId)) {
+      AppLogger.log(
+        'AudioEngine',
+        '⚠ playRangeOnce: session $sessionId 在 play() 后已过期，主动 pause',
+      );
+      await _audioPlayer.pause();
+      return;
+    }
 
     AppLogger.log(
       'AudioEngine',

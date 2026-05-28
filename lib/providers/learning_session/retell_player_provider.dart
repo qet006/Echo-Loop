@@ -527,6 +527,7 @@ class RetellPlayer extends _$RetellPlayer {
   /// 重新开始：重置到第一段，重新播放
   Future<void> restart() async {
     await _cancelAll();
+    _resumeStartLocalSentenceIndex = 0;
     state = RetellPlayerState(
       currentParagraphIndex: 0,
       totalParagraphs: _paragraphs.length,
@@ -545,14 +546,20 @@ class RetellPlayer extends _$RetellPlayer {
   /// 暂停播放
   ///
   /// 使旧 session 失效 + 真正停止底层音频播放。
-  /// resume 时从段落开头重新播放（不是从暂停位置继续），
-  /// 因为复述练习需要连贯听完整段。
+  /// 同时把当前播放句记到 `_resumeStartLocalSentenceIndex`（仅内存），
+  /// 这样 resume 时从该句开头开播，而不是段头重播。
+  /// 持久化由播放推进时 async 写 + 退出页 await 写两路负责，pause 本身不写盘。
   Future<void> pause() async {
+    // 先快照，避免 stopPlayback 期间异步事件污染 playingSentenceIndex
+    final snapshotIdx = state.playingSentenceIndex;
     final engine = ref.read(audioEngineProvider.notifier);
     _sessionId = engine.newSession();
     _positionSub?.cancel();
     _invalidateRetellCountdown();
     await engine.stopPlayback();
+    if (snapshotIdx >= 0) {
+      _resumeStartLocalSentenceIndex = snapshotIdx;
+    }
     state = state.copyWith(
       isPlaying: false,
       isRetellCountdown: false,
@@ -564,11 +571,64 @@ class RetellPlayer extends _$RetellPlayer {
   /// 恢复播放
   Future<void> resume() async {
     if (state.phase == RetellPhase.listening) {
-      await _playCurrentParagraph();
+      // 短段（≤10s）也消费断点偏移，保证 pause 后从当前句开头开播
+      await _playCurrentParagraph(forceOffset: true);
     } else {
       // 复述阶段恢复倒计时，从 controller 读取实际剩余时间
       _startRetellCountdown(_countdown.remaining);
     }
+  }
+
+  /// 跳转到指定全局句索引并开播。
+  ///
+  /// - 强制切回 listening phase + 清所有倒计时标志（即使在 retelling phase 也能跳）
+  /// - 跨段：重置 currentRepeatCount / displayMode / userOverrodeDisplayMode
+  /// - 同段：保留 currentRepeatCount / displayMode（用户已切的 keywordsOnly 不被冲掉）
+  /// - 调用方负责取消正在进行的录音
+  Future<void> seekToSentence(int globalSentenceIndex) async {
+    int? targetParaIdx;
+    int? targetLocalIdx;
+    for (var p = 0; p < _paragraphs.length; p++) {
+      for (var s = 0; s < _paragraphs[p].length; s++) {
+        if (_paragraphs[p][s].index == globalSentenceIndex) {
+          targetParaIdx = p;
+          targetLocalIdx = s;
+          break;
+        }
+      }
+      if (targetParaIdx != null) break;
+    }
+    if (targetParaIdx == null || targetLocalIdx == null) return;
+
+    await _cancelAll();
+
+    if (targetParaIdx != state.currentParagraphIndex) {
+      state = state.copyWith(
+        currentParagraphIndex: targetParaIdx,
+        phase: RetellPhase.listening,
+        currentRepeatCount: 1,
+        playingSentenceIndex: -1,
+        isRetellCountdown: false,
+        isCountdownPaused: false,
+        isCountdownFastForward: false,
+        isWaitingForUser: false,
+        displayMode: RetellDisplayMode.hideAll,
+        userOverrodeDisplayMode: false,
+      );
+    } else {
+      // 同段：保留 displayMode / userOverrodeDisplayMode，仅清倒计时和等待态
+      state = state.copyWith(
+        phase: RetellPhase.listening,
+        isRetellCountdown: false,
+        isCountdownPaused: false,
+        isCountdownFastForward: false,
+        isWaitingForUser: false,
+      );
+    }
+
+    // 不 await _playCurrentParagraph：seekToSentence 调用方需要立即解锁 guard 接受
+    // 下一次点击。后续 _playCurrentParagraph 内部用 session id 兜底并发竞态。
+    unawaited(_playCurrentParagraph(startLocalIdxOverride: targetLocalIdx));
   }
 
   /// 跳转到下一段
@@ -589,6 +649,8 @@ class RetellPlayer extends _$RetellPlayer {
     }
 
     await _cancelAll();
+    // 防 pause 残留断点污染下一段起播位置
+    _resumeStartLocalSentenceIndex = 0;
     state = state.copyWith(
       currentParagraphIndex: state.currentParagraphIndex + 1,
       phase: RetellPhase.listening,
@@ -609,6 +671,7 @@ class RetellPlayer extends _$RetellPlayer {
     if (state.currentParagraphIndex <= 0) return;
 
     await _cancelAll();
+    _resumeStartLocalSentenceIndex = 0;
     state = state.copyWith(
       currentParagraphIndex: state.currentParagraphIndex - 1,
       phase: RetellPhase.listening,
@@ -660,6 +723,8 @@ class RetellPlayer extends _$RetellPlayer {
   /// 取消倒计时，回到 listening 阶段重新播放。
   Future<void> replayDuringCountdown() async {
     _invalidateRetellCountdown();
+    // 重听语义 = 从段头开播，清掉 pause 可能残留的断点
+    _resumeStartLocalSentenceIndex = 0;
     state = state.copyWith(
       isRetellCountdown: false,
       isCountdownPaused: false,
@@ -678,7 +743,10 @@ class RetellPlayer extends _$RetellPlayer {
     bool afterCurrentParagraph = false,
     bool stopImmediately = false,
   }) {
-    if (state.isWaitingForUser || state.stepFinished) return;
+    if (state.stepFinished) return;
+    // stopImmediately=true 表示调用方要求强制停止；即使当前已在 waiting 态
+    // 也要再走一遍 session bump + stopPlayback，避免遗漏底层音频清理。
+    if (!stopImmediately && state.isWaitingForUser) return;
 
     if (!stopImmediately &&
         state.phase == RetellPhase.listening &&
@@ -800,25 +868,44 @@ class RetellPlayer extends _$RetellPlayer {
   /// 使用局部变量 `sid` 捕获 sessionId，防止 pause/其他操作
   /// 覆写实例变量 `_sessionId` 后导致 guard 失效。
   ///
-  /// 首次播放该段且段时长 > 10s 时，使用 `_resumeStartLocalSentenceIndex`
-  /// 段内偏移开播；用完一次立即清零，后续重复 / 下一段从段头开播。
-  Future<void> _playCurrentParagraph() async {
+  /// 起播句决策（按优先级）：
+  /// 1. [startLocalIdxOverride] 非空：直接使用（来自 `seekToSentence` 等用户主动操作），
+  ///    同时**不重置 displayMode**（保留用户当前的查看模式）
+  /// 2. [forceOffset] = true：消费 `_resumeStartLocalSentenceIndex`（不看段时长，用于 resume）
+  /// 3. 否则按断点续学：段时长 > 10s 时消费字段，否则段头开播
+  ///
+  /// `_resumeStartLocalSentenceIndex` 用完一次立即清零。
+  Future<void> _playCurrentParagraph({
+    int? startLocalIdxOverride,
+    bool forceOffset = false,
+  }) async {
     final sentences = currentParagraphSentences;
     if (sentences.isEmpty) return;
 
-    final paragraphDuration =
-        sentences.last.endTime - sentences.first.startTime;
-    final useOffset =
-        _resumeStartLocalSentenceIndex > 0 &&
-        _resumeStartLocalSentenceIndex < sentences.length &&
-        paragraphDuration > _resumeMinParagraphDuration;
-    final startLocalIdx = useOffset ? _resumeStartLocalSentenceIndex : 0;
-    _resumeStartLocalSentenceIndex = 0; // 只用一次
+    final int startLocalIdx;
+    final bool fromOverride = startLocalIdxOverride != null;
+    if (fromOverride) {
+      startLocalIdx = startLocalIdxOverride.clamp(0, sentences.length - 1);
+      _resumeStartLocalSentenceIndex = 0;
+    } else {
+      final paragraphDuration =
+          sentences.last.endTime - sentences.first.startTime;
+      final useOffset =
+          _resumeStartLocalSentenceIndex > 0 &&
+          _resumeStartLocalSentenceIndex < sentences.length &&
+          (forceOffset || paragraphDuration > _resumeMinParagraphDuration);
+      startLocalIdx = useOffset ? _resumeStartLocalSentenceIndex : 0;
+      _resumeStartLocalSentenceIndex = 0; // 只用一次
+    }
 
     final engine = ref.read(audioEngineProvider.notifier);
     _sessionId = engine.newSession();
     final sid = _sessionId; // 捕获局部变量
 
+    // override 模式下不重置 displayMode（同段 seek 保留用户视图）；其他模式按既有逻辑
+    final RetellDisplayMode? nextDisplayMode = fromOverride
+        ? null
+        : (state.userOverrodeDisplayMode ? null : RetellDisplayMode.hideAll);
     state = state.copyWith(
       phase: RetellPhase.listening,
       isPlaying: true,
@@ -826,9 +913,7 @@ class RetellPlayer extends _$RetellPlayer {
       isRetellCountdown: false,
       isWaitingForUser: false,
       stepFinished: false,
-      displayMode: state.userOverrodeDisplayMode
-          ? null
-          : RetellDisplayMode.hideAll,
+      displayMode: nextDisplayMode,
     );
     _persistCurrentSentenceIndexAsync();
 

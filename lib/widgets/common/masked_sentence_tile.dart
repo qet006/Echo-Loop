@@ -13,11 +13,18 @@ import '../../models/retell_settings.dart';
 import '../../models/sentence.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/keyword_extraction.dart';
+import '../guide_flow.dart';
 
 /// Wrap 子元素间距（px）— 模拟自然空格宽度
 const _wordSpacing = 4.0;
 
 /// 遮盖句子 Tile
+///
+/// 两个独立点击区：
+/// - **编号区**（左侧 48dp 宽，撑满 tile 全高）：`onPlayFromTap`，点击从该句开播。
+///   当前播放句的编号位置渲染 ▶ play_arrow 图标，提示"点击=播放"。
+/// - **主体区**（右侧 Expanded）：`onDetailTap`，点击进入句子讲解页。
+///   保留原"整行点击进讲解"语义不变（仅可点击区域改为文本 + 书签所在区域）。
 class MaskedSentenceTile extends StatelessWidget {
   /// 句子数据
   final Sentence sentence;
@@ -34,8 +41,17 @@ class MaskedSentenceTile extends StatelessWidget {
   /// 是否已收藏（只读标记）
   final bool isBookmarked;
 
-  /// 点击整行回调
-  final VoidCallback? onTap;
+  /// 点击编号区回调：从该句开始播放
+  final VoidCallback? onPlayFromTap;
+
+  /// 点击主体（文本/书签）区回调：进入句子讲解页
+  final VoidCallback? onDetailTap;
+
+  /// 新手引导：编号区 GuideStep（非空时包 GuideTarget 高亮编号区）
+  final GuideStep? numberAreaGuideStep;
+
+  /// 新手引导：主体区 GuideStep（非空时包 GuideTarget 高亮文本区）
+  final GuideStep? bodyAreaGuideStep;
 
   const MaskedSentenceTile({
     super.key,
@@ -44,19 +60,18 @@ class MaskedSentenceTile extends StatelessWidget {
     required this.keywordIndices,
     required this.isPlayingSentence,
     this.isBookmarked = false,
-    this.onTap,
+    this.onPlayFromTap,
+    this.onDetailTap,
+    this.numberAreaGuideStep,
+    this.bodyAreaGuideStep,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final content = AnimatedContainer(
+    return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.m,
-        vertical: AppSpacing.s,
-      ),
       decoration: BoxDecoration(
         color: isPlayingSentence
             ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
@@ -70,45 +85,38 @@ class MaskedSentenceTile extends StatelessWidget {
           ),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 句子序号 + 内容 + 收藏标记
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 24,
-                child: Text(
-                  '${sentence.index + 1}',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _wrapWithGuide(
+              numberAreaGuideStep,
+              _SentenceNumberHitArea(
+                displayNumber: sentence.index + 1,
+                isPlayingSentence: isPlayingSentence,
+                theme: theme,
+                onTap: onPlayFromTap,
+              ),
+            ),
+            Expanded(
+              child: _wrapWithGuide(
+                bodyAreaGuideStep,
+                _SentenceBodyHitArea(
+                  theme: theme,
+                  isBookmarked: isBookmarked,
+                  onTap: onDetailTap,
+                  child: _buildMaskedText(theme, tokenize(sentence.text)),
                 ),
               ),
-              Expanded(child: _buildMaskedText(theme, tokenize(sentence.text))),
-              if (isBookmarked)
-                Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: Icon(Icons.bookmark, size: 14, color: Colors.amber),
-                ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
-
-    if (onTap != null) {
-      return InkWell(
-        onTap: onTap,
-        // 背景色在 AnimatedContainer 上，涟漪会被遮挡，改用高亮反馈
-        splashColor: Colors.transparent,
-        highlightColor: theme.colorScheme.primary.withValues(alpha: 0.08),
-        child: content,
-      );
-    }
-    return content;
   }
+
+  Widget _wrapWithGuide(GuideStep? step, Widget child) =>
+      step == null ? child : GuideTarget(step: step, child: child);
 
   /// 构建遮盖文本
   Widget _buildMaskedText(ThemeData theme, List<String> words) {
@@ -150,6 +158,110 @@ class MaskedSentenceTile extends StatelessWidget {
           theme: theme,
         ),
     ];
+  }
+}
+
+/// 编号点击区
+///
+/// 固定 48dp 宽（≥ Material a11y 触达基线），撑满 tile 全高。
+/// 当前播放句渲染 ▶ play_arrow（与正在播放视觉绑定），否则渲染数字。
+class _SentenceNumberHitArea extends StatelessWidget {
+  final int displayNumber;
+  final bool isPlayingSentence;
+  final VoidCallback? onTap;
+  final ThemeData theme;
+
+  const _SentenceNumberHitArea({
+    required this.displayNumber,
+    required this.isPlayingSentence,
+    required this.theme,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final inner = SizedBox(
+      width: 48,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s),
+        child: Center(
+          child: isPlayingSentence
+              ? Icon(
+                  Icons.play_arrow,
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                )
+              : Text(
+                  '$displayNumber',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+        ),
+      ),
+    );
+
+    if (onTap == null) return inner;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        // 背景在外层 AnimatedContainer 上，splash 会被遮挡，仅用 highlight 反馈
+        splashColor: Colors.transparent,
+        highlightColor: theme.colorScheme.primary.withValues(alpha: 0.12),
+        child: inner,
+      ),
+    );
+  }
+}
+
+/// 主体点击区（文本 + 书签）
+///
+/// 撑满剩余宽度，撑满 tile 全高。点击进入句子讲解页。
+class _SentenceBodyHitArea extends StatelessWidget {
+  final ThemeData theme;
+  final bool isBookmarked;
+  final VoidCallback? onTap;
+  final Widget child;
+
+  const _SentenceBodyHitArea({
+    required this.theme,
+    required this.isBookmarked,
+    required this.child,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final inner = Padding(
+      padding: const EdgeInsets.only(
+        right: AppSpacing.m,
+        top: AppSpacing.s,
+        bottom: AppSpacing.s,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(child: child),
+          if (isBookmarked)
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Icon(Icons.bookmark, size: 14, color: Colors.amber),
+            ),
+        ],
+      ),
+    );
+
+    if (onTap == null) return inner;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        splashColor: Colors.transparent,
+        highlightColor: theme.colorScheme.primary.withValues(alpha: 0.08),
+        child: inner,
+      ),
+    );
   }
 }
 

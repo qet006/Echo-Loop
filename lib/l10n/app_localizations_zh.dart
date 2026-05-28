@@ -2626,6 +2626,12 @@ class AppLocalizationsZh extends AppLocalizations {
       '遇到听不懂的句子时点这里，会自动标记为难句并进入单句解析模式。';
 
   @override
+  String get guideSentenceTileNumberDescription => '点击编号从这句开始播放。';
+
+  @override
+  String get guideSentenceTileBodyDescription => '点击句子查看讲解。';
+
+  @override
   String get guideSentenceAnnotationSentenceDescription =>
       '点击任意单词可查看词典；长按句子可复制文字。';
 

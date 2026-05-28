@@ -885,6 +885,9 @@ class FakeBlindListenPlayer extends BlindListenPlayer {
   Future<void> initializeBookmarks(String audioItemId) async {}
 
   @override
+  Future<void> seekToSentence(int globalSentenceIndex) async {}
+
+  @override
   void disposePlayer() {
     state = const BlindListenPlayerState();
   }
@@ -1262,6 +1265,33 @@ class FakeRetellPlayer extends RetellPlayer {
       isRetellCountdown: false,
       isPlaying: true,
       displayMode: RetellDisplayMode.keywordsOnly,
+    );
+  }
+
+  @override
+  Future<void> seekToSentence(int globalSentenceIndex) async {
+    int? paraIdx;
+    int? localIdx;
+    for (var p = 0; p < testParagraphs.length; p++) {
+      for (var s = 0; s < testParagraphs[p].length; s++) {
+        if (testParagraphs[p][s].index == globalSentenceIndex) {
+          paraIdx = p;
+          localIdx = s;
+          break;
+        }
+      }
+      if (paraIdx != null) break;
+    }
+    if (paraIdx == null || localIdx == null) return;
+    state = state.copyWith(
+      currentParagraphIndex: paraIdx,
+      phase: RetellPhase.listening,
+      isPlaying: true,
+      playingSentenceIndex: localIdx,
+      isRetellCountdown: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+      isWaitingForUser: false,
     );
   }
 

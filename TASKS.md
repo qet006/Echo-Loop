@@ -1,7 +1,38 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-05-27
-> 当前焦点：全任务跳过功能（已完成）
+> 最后更新：2026-05-28
+> 当前焦点：盲听 / 段落复述句子编号跳播 + 暂停到当前句（已完成）
+
+## 已完成：盲听 / 段落复述句子编号跳播 + 暂停到当前句
+
+把句子 item 拆成两个独立点击区：编号区点击从该句开播，主体区点击进讲解页；暂停语义改为"暂停在当前句"，resume 时从该句开头开播。老用户肌肉记忆零破坏（点文本→讲解 行为不变）。
+
+### Provider 层（统一字段争用模型）
+- [x] 抛弃 `_resumeStartLocalSentenceIndex` 字段被多源争用的方案：`_playCurrentParagraph` 新增 `{int? startLocalIdxOverride, bool forceOffset = false}` 参数。字段仅留给 `initializeParagraphs` 首次断点续学，其他来源（pause / seek）走显式入参或 forceOffset，消除字段争用
+- [x] 盲听 Provider：新增 `currentSentenceGlobalIndex` getter（与复述对齐）+ `seekToSentence(globalIdx)`（跨段重置 currentRepeatCount/displayMode/倒计时标志，同段保留）+ 改 `pause()` 快照 playingSentenceIndex 写入 `_resumeStartLocalSentenceIndex`（仅内存）+ 改 `resume()` 用 forceOffset:true + `goToNext/PreviousParagraph`/`restart` 入口显式清零字段
+- [x] 复述 Provider：补 `seekToSentence(globalIdx)`（强制切 listening + 清所有 countdown 标志，同段 seek 保留 displayMode）+ 改 `pause()` 同盲听快照 + 改 `resume()` listening 分支 forceOffset:true + `goToNext/PreviousParagraph`/`restart`/`replayDuringCountdown` 入口清零字段 + `_playCurrentParagraph(startLocalIdxOverride)` 时不重置 displayMode
+
+### Widget 层（编号区独立 InkWell + ▶ 图标）
+- [x] `MaskedSentenceTile` 拆为两个并列 hit area：左侧 `_SentenceNumberHitArea`（固定 48dp 宽，撑满 tile 全高，独立 InkWell + onPlayFromTap，当前播放句渲染 `Icons.play_arrow`，其他句渲染数字）+ 右侧 `_SentenceBodyHitArea`（Expanded + onDetailTap，文本 + 书签）。原 `onTap` 重命名为 `onDetailTap`
+- [x] `ParagraphSentenceListCard` 新增 `onSentencePlayFrom` 透传到 `MaskedSentenceTile.onPlayFromTap`
+
+### Screen 层
+- [x] 盲听 Screen：新增 `_handleSentencePlayFrom`（`_isSeeking` guard + `seekToSentence`）；原 `_handleSentenceTap` 改名 `_handleSentenceDetail`；`_exit()` pop 前补齐 `await saveBlindListenSentenceIndex`（与复述 `_handleExit` 对齐）
+- [x] 复述 Screen：新增 `_handleSentencePlayFrom`（关键顺序：enterWaitingForUser(stopImmediately:true) → cancelActiveRecording → clearRecording → seekToSentence，避免 idle listener 误启动倒计时）；原 `_handleSentenceTap` 改名 `_handleSentenceDetail`
+
+### 测试（新增 24 个用例）
+- [x] 盲听 Provider 单测（13 个）：seekToSentence 同段/跨段/短段/写盘、pause 快照、pause→resume 短段也生效、pause→goToNext/Prev 不污染、初始未播放 pause 不写脏断点、currentSentenceGlobalIndex 退化等
+- [x] 复述 Provider 单测（4 个）：seekToSentence 同段保留 displayMode、跨段重置 displayMode、retelling phase 切回 listening + 清等待态、pause→goToNext 不污染
+- [x] Widget 单测（7 个）：编号区/文本区独立 hit 分发、播放句渲染 play_arrow、宽度≥48dp 触达基线、书签位置不变、callback null 时不渲染 InkWell
+- [x] Screen 单测（复述新增 1 个）：点击编号区调用 `seekToSentence` 不进入讲解页；既有"点击文本进 detail"用例继续通过
+
+### 验证
+- [x] `flutter analyze`：0 error（issues 全部为预先存在的 info/warning，未引入新问题）
+- [x] `flutter test`：2338 个测试全过（+24 个新增），11 个预先存在的 skip
+
+**完成时间**: 2026-05-28
+
+---
 
 ## 已完成：给所有学习任务加「跳过」功能（首次学习首个盲听除外）
 

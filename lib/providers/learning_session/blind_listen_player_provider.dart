@@ -284,6 +284,18 @@ class BlindListenPlayer extends _$BlindListenPlayer {
       ? _paragraphs[state.currentParagraphIndex]
       : [];
 
+  /// 当前播放句的全局 index（用于断点持久化 / 句子跳转入参）。
+  ///
+  /// 未开播时退化为当前段首句的全局 index；段落为空时返回 null。
+  int? get currentSentenceGlobalIndex {
+    final sentences = currentParagraphSentences;
+    if (sentences.isEmpty) return null;
+    final localIdx = state.playingSentenceIndex >= 0
+        ? state.playingSentenceIndex.clamp(0, sentences.length - 1)
+        : 0;
+    return sentences[localIdx].index;
+  }
+
   /// 全部段落的句子总数（用于以句子粒度展示进度）
   int get totalSentenceCount => _paragraphs.fold(0, (sum, p) => sum + p.length);
 
@@ -312,13 +324,21 @@ class BlindListenPlayer extends _$BlindListenPlayer {
 
   /// 暂停播放
   ///
-  /// 使旧 session 失效 + 停止音频，resume 时从段落开头重播。
+  /// 使旧 session 失效 + 停止音频。
+  /// 同时把当前播放句记到 `_resumeStartLocalSentenceIndex`（仅内存），
+  /// 这样 resume 时从该句开头开播，而不是段头重播。
+  /// 持久化由播放推进时的 async 写 + 退出页 await 写两路负责，pause 本身不写盘。
   Future<void> pause() async {
+    // 第一时间快照，避免 stopPlayback 期间的异步事件污染 playingSentenceIndex
+    final snapshotIdx = state.playingSentenceIndex;
     final engine = ref.read(audioEngineProvider.notifier);
     _sessionId = engine.newSession();
     _positionSub?.cancel();
     _invalidateCountdown();
     await engine.stopPlayback();
+    if (snapshotIdx >= 0) {
+      _resumeStartLocalSentenceIndex = snapshotIdx;
+    }
     state = state.copyWith(
       isPlaying: false,
       isPauseCountdown: false,
@@ -327,8 +347,61 @@ class BlindListenPlayer extends _$BlindListenPlayer {
   }
 
   /// 恢复播放
+  ///
+  /// 短段（≤10s）也消费 `_resumeStartLocalSentenceIndex` 偏移，
+  /// 保证 pause 在短段中后段时 resume 仍从断点句开头开播。
   Future<void> resume() async {
-    await _playCurrentParagraph();
+    await _playCurrentParagraph(forceOffset: true);
+  }
+
+  /// 跳转到指定全局句索引并开播。
+  ///
+  /// - 跨段：切段 + 重置 currentRepeatCount / displayMode / 倒计时标志
+  /// - 同段：保留 currentRepeatCount / displayMode，只清倒计时 / 等待态
+  /// - 复用 `_playCurrentParagraph(startLocalIdxOverride)` 路径，绕开 10s 阈值
+  Future<void> seekToSentence(int globalSentenceIndex) async {
+    int? targetParaIdx;
+    int? targetLocalIdx;
+    for (var p = 0; p < _paragraphs.length; p++) {
+      for (var s = 0; s < _paragraphs[p].length; s++) {
+        if (_paragraphs[p][s].index == globalSentenceIndex) {
+          targetParaIdx = p;
+          targetLocalIdx = s;
+          break;
+        }
+      }
+      if (targetParaIdx != null) break;
+    }
+    if (targetParaIdx == null || targetLocalIdx == null) return;
+
+    await _cancelAll();
+    // _cancelAll 不动 _resumeStartLocalSentenceIndex；这里通过 override 显式传句索引，
+    // _playCurrentParagraph 会把字段清零，避免后续路径误用。
+
+    if (targetParaIdx != state.currentParagraphIndex) {
+      state = state.copyWith(
+        currentParagraphIndex: targetParaIdx,
+        currentRepeatCount: 1,
+        hasCompletedCurrentParagraphPlayback: false,
+        isPauseCountdown: false,
+        isCountdownPaused: false,
+        isCountdownFastForward: false,
+        playingSentenceIndex: -1,
+        isWaitingForUser: false,
+        displayMode: BlindListenDisplayMode.hideAll,
+      );
+    } else {
+      state = state.copyWith(
+        isPauseCountdown: false,
+        isCountdownPaused: false,
+        isCountdownFastForward: false,
+        isWaitingForUser: false,
+      );
+    }
+
+    // 不 await _playCurrentParagraph：seekToSentence 调用方需要立即解锁 guard 接受
+    // 下一次点击。后续 _playCurrentParagraph 内部用 session id 兜底并发竞态。
+    unawaited(_playCurrentParagraph(startLocalIdxOverride: targetLocalIdx));
   }
 
   /// 跳转到下一段
@@ -341,6 +414,8 @@ class BlindListenPlayer extends _$BlindListenPlayer {
     }
 
     await _cancelAll();
+    // 防 pause 残留断点污染下一段起播位置
+    _resumeStartLocalSentenceIndex = 0;
     state = state.copyWith(
       currentParagraphIndex: state.currentParagraphIndex + 1,
       currentRepeatCount: 1,
@@ -359,6 +434,7 @@ class BlindListenPlayer extends _$BlindListenPlayer {
     if (state.currentParagraphIndex <= 0) return;
 
     await _cancelAll();
+    _resumeStartLocalSentenceIndex = 0;
     state = state.copyWith(
       currentParagraphIndex: state.currentParagraphIndex - 1,
       currentRepeatCount: 1,
@@ -375,6 +451,7 @@ class BlindListenPlayer extends _$BlindListenPlayer {
   /// 重新开始：重置到第一段
   Future<void> restart() async {
     await _cancelAll();
+    _resumeStartLocalSentenceIndex = 0;
     state = BlindListenPlayerState(
       currentParagraphIndex: 0,
       totalParagraphs: _paragraphs.length,
@@ -549,21 +626,33 @@ class BlindListenPlayer extends _$BlindListenPlayer {
 
   /// 播放当前段落
   ///
-  /// 首次播放该段且段时长 > 10s 时，使用 `_resumeStartLocalSentenceIndex`
-  /// 段内偏移开播；用完一次立即清零，后续重复 / 下一段从段头开播。
-  Future<void> _playCurrentParagraph() async {
+  /// 起播句决策（按优先级）：
+  /// 1. [startLocalIdxOverride] 非空：直接使用（来自 `seekToSentence` 等用户主动操作）
+  /// 2. [forceOffset] = true：消费 `_resumeStartLocalSentenceIndex`（不看段时长，用于 resume）
+  /// 3. 否则按断点续学：段时长 > 10s 时消费字段，否则段头开播
+  ///
+  /// `_resumeStartLocalSentenceIndex` 用完一次立即清零，避免下次重听 / 下一段误用。
+  Future<void> _playCurrentParagraph({
+    int? startLocalIdxOverride,
+    bool forceOffset = false,
+  }) async {
     final sentences = currentParagraphSentences;
     if (sentences.isEmpty) return;
 
-    // 计算段内起播句：仅在段时长 > 阈值时使用断点偏移
-    final paragraphDuration =
-        sentences.last.endTime - sentences.first.startTime;
-    final useOffset =
-        _resumeStartLocalSentenceIndex > 0 &&
-        _resumeStartLocalSentenceIndex < sentences.length &&
-        paragraphDuration > _resumeMinParagraphDuration;
-    final startLocalIdx = useOffset ? _resumeStartLocalSentenceIndex : 0;
-    _resumeStartLocalSentenceIndex = 0; // 只用一次
+    final int startLocalIdx;
+    if (startLocalIdxOverride != null) {
+      startLocalIdx = startLocalIdxOverride.clamp(0, sentences.length - 1);
+      _resumeStartLocalSentenceIndex = 0;
+    } else {
+      final paragraphDuration =
+          sentences.last.endTime - sentences.first.startTime;
+      final useOffset =
+          _resumeStartLocalSentenceIndex > 0 &&
+          _resumeStartLocalSentenceIndex < sentences.length &&
+          (forceOffset || paragraphDuration > _resumeMinParagraphDuration);
+      startLocalIdx = useOffset ? _resumeStartLocalSentenceIndex : 0;
+      _resumeStartLocalSentenceIndex = 0; // 只用一次
+    }
 
     final engine = ref.read(audioEngineProvider.notifier);
     _sessionId = engine.newSession();

@@ -21,6 +21,7 @@ import '../providers/learning_progress_provider.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/learning_session/retell_player_provider.dart';
+import '../providers/new_user_guide_provider.dart';
 import '../widgets/notification_permission_dialog.dart'
     show maybeShowLearningNotificationPrompt;
 import '../widgets/common/recording_button.dart' show RecordingButtonMode;
@@ -37,6 +38,7 @@ import '../widgets/common/countdown_chip.dart';
 import '../widgets/common/repeat_practice_panel.dart';
 import '../widgets/common/paragraph_practice_scaffold.dart';
 import '../widgets/common/paragraph_sentence_list_card.dart';
+import '../widgets/guide_flow.dart';
 import '../widgets/common/paragraph_visibility_controls.dart';
 import '../widgets/retell/retell_settings_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
@@ -66,6 +68,13 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
 
   /// 是否正在跳转到句子详情页，防止连点
   bool _isNavigatingToDetail = false;
+
+  /// seekToSentence 同步阶段 guard（同 blind_listen 注释）。
+  bool _isSeeking = false;
+
+  /// 新手引导：编号区 / 主体区 Showcase key（随 State 生命周期存在）
+  final GlobalKey _guideNumberKey = GlobalKey(debugLabel: 'retellGuideSentenceNumber');
+  final GlobalKey _guideBodyKey = GlobalKey(debugLabel: 'retellGuideSentenceBody');
 
   /// 是否正在退出页面，防止退出过程中 listener 触发弹窗
   bool _isExiting = false;
@@ -466,6 +475,8 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
 
   /// 处理退出
   Future<void> _handleExit() async {
+    // 防重入：完成弹窗 / _exit 内 context.pop() 会被 PopScope 拦截再触发 _handleExit。
+    if (_isExiting) return;
     _isExiting = true;
     await _cancelRecordingAndPlayback();
     ref.read(retellPlayerProvider.notifier).pause();
@@ -715,8 +726,54 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     await showRetellSettingsSheet(context);
   }
 
-  /// 点击句子 → 立即停止播放 → 进入句子详情页 → 返回后刷新收藏
-  Future<void> _handleSentenceTap(Sentence sentence) async {
+  /// 点击句子编号 → 从该句开始播放
+  ///
+  /// 分场景处理：
+  /// - **listening 阶段**：seekToSentence 内 _cancelAll 已经处理音频清理，
+  ///   不走 enterWaitingForUser（否则 phase 短暂变 retelling 造成 UI 闪烁）。
+  /// - **retelling / countdown 阶段**：先 enterWaitingForUser(stopImmediately:true)
+  ///   保证状态机不在录音中，再取消录音，最后 seek。顺序参照 _handleSentenceTap
+  ///   既有正确顺序：先 waiting → 后 cancel，避免 cancel 触发的 idle 监听器
+  ///   误启动段间倒计时（troubleshooting 7.1 同款风险）。
+  Future<void> _handleSentencePlayFrom(Sentence sentence) async {
+    if (_isSeeking) return;
+    _isSeeking = true;
+    try {
+      final playerState = ref.read(retellPlayerProvider);
+      final recordingState = ref.read(retellRecordingControllerProvider);
+
+      // listening 阶段（非倒计时）：seekToSentence 直接处理，避免 phase 闪烁
+      final isPureListening =
+          playerState.phase == RetellPhase.listening &&
+          !playerState.isRetellCountdown;
+
+      if (!isPureListening) {
+        ref
+            .read(retellPlayerProvider.notifier)
+            .enterWaitingForUser(stopImmediately: true);
+      }
+
+      if (recordingState.phase == RetellRecordingPhase.recording) {
+        await ref
+            .read(retellRecordingControllerProvider.notifier)
+            .cancelActiveRecording();
+      }
+      await ref
+          .read(retellRecordingControllerProvider.notifier)
+          .clearRecording();
+
+      // seekToSentence 内 _playCurrentParagraph 是 unawaited，
+      // 调用本身在 _cancelAll + state.copyWith 后立即返回，guard 短时释放。
+      await ref
+          .read(retellPlayerProvider.notifier)
+          .seekToSentence(sentence.index);
+    } finally {
+      _isSeeking = false;
+    }
+  }
+
+  /// 点击句子主体（文本/书签）→ 立即停止播放 → 进入句子详情页 → 返回后刷新收藏
+  Future<void> _handleSentenceDetail(Sentence sentence) async {
     if (_isNavigatingToDetail) return;
     _isNavigatingToDetail = true;
 
@@ -817,6 +874,25 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     // 录音结果（从 controller state 获取）
     final currentAttempt = retellRecState.currentAttempt;
 
+    // 新手引导：编号→开播、文本→讲解。统一挂在第 1 句（idx=0），首项最显眼。
+    // 盲听和复述共用同一个 flow id —— 用户先在任一页看过就不再弹另一页。
+    const guideTargetLocalIdx = 0;
+    final numberStep = GuideStep(
+      key: _guideNumberKey,
+      description: l10n.guideSentenceTileNumberDescription,
+    );
+    final bodyStep = GuideStep(
+      key: _guideBodyKey,
+      description: l10n.guideSentenceTileBodyDescription,
+    );
+    final guideFlows = <GuideFlow>[
+      GuideFlow(
+        flowId: GuideFlowIds.sentenceTileTour,
+        shouldRun: sentences.isNotEmpty,
+        steps: [numberStep, bodyStep],
+      ),
+    ];
+
     return wakelockBody(
       child: LearningHotkeyScope(
         onPlayPause: () {
@@ -836,7 +912,9 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
             if (didPop) return;
             await _handleExit();
           },
-          child: ParagraphPracticeScaffold(
+          child: GuideFlowSequenceHost(
+            flows: guideFlows,
+            child: ParagraphPracticeScaffold(
             title: l10n.retellTitle,
             onClose: _handleExit,
             onOpenSettings: _openSettings,
@@ -868,7 +946,11 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
                   ? state.playingSentenceIndex
                   : -1,
               bookmarkedSentenceIndices: state.bookmarkedSentenceIndices,
-              onSentenceTap: _handleSentenceTap,
+              onSentenceTap: _handleSentenceDetail,
+              onSentencePlayFrom: _handleSentencePlayFrom,
+              guideTargetLocalIdx: guideTargetLocalIdx,
+              numberAreaGuideStep: numberStep,
+              bodyAreaGuideStep: bodyStep,
             ),
             contentControls: state.settings.keywordMethod != KeywordMethod.off
                 ? ParagraphVisibilityControls(
@@ -946,6 +1028,7 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
             statusSuffixText: _formatSpeed(state.settings.playbackSpeed),
             l10n: l10n,
             theme: theme,
+          ),
           ),
         ),
       ),

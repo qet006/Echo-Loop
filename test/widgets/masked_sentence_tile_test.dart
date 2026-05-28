@@ -129,4 +129,142 @@ void main() {
       expect(hideAllCount, 5);
     });
   });
+
+  group('MaskedSentenceTile 双 hit area', () {
+    /// 构造带双 callback 的 tile
+    Widget _buildInteractiveTile({
+      required Sentence sentence,
+      bool isPlayingSentence = false,
+      bool isBookmarked = false,
+      VoidCallback? onPlayFromTap,
+      VoidCallback? onDetailTap,
+    }) {
+      return createTestApp(
+        MaskedSentenceTile(
+          sentence: sentence,
+          displayMode: RetellDisplayMode.showAll,
+          keywordIndices: const {},
+          isPlayingSentence: isPlayingSentence,
+          isBookmarked: isBookmarked,
+          onPlayFromTap: onPlayFromTap,
+          onDetailTap: onDetailTap,
+        ),
+      );
+    }
+
+    testWidgets('点击编号区触发 onPlayFromTap，不触发 onDetailTap', (tester) async {
+      var playFromCount = 0;
+      var detailCount = 0;
+      await tester.pumpWidget(
+        _buildInteractiveTile(
+          sentence: _sentence('Hello world', index: 0),
+          onPlayFromTap: () => playFromCount += 1,
+          onDetailTap: () => detailCount += 1,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 编号 "1" 文本
+      await tester.tap(find.text('1'));
+      await tester.pump();
+
+      expect(playFromCount, 1);
+      expect(detailCount, 0);
+    });
+
+    testWidgets('点击文本区触发 onDetailTap，不触发 onPlayFromTap', (tester) async {
+      var playFromCount = 0;
+      var detailCount = 0;
+      await tester.pumpWidget(
+        _buildInteractiveTile(
+          sentence: _sentence('Hello world', index: 0),
+          onPlayFromTap: () => playFromCount += 1,
+          onDetailTap: () => detailCount += 1,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 点击文本 "Hello"
+      await tester.tap(find.text('Hello'));
+      await tester.pump();
+
+      expect(detailCount, 1);
+      expect(playFromCount, 0);
+    });
+
+    testWidgets('isPlayingSentence=true 时编号位置渲染 play_arrow 图标', (tester) async {
+      await tester.pumpWidget(
+        _buildInteractiveTile(
+          sentence: _sentence('Hello world', index: 4),
+          isPlayingSentence: true,
+          onPlayFromTap: () {},
+          onDetailTap: () {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.play_arrow), findsOneWidget);
+      // 不再渲染数字 "5"
+      expect(find.text('5'), findsNothing);
+    });
+
+    testWidgets('isPlayingSentence=false 时编号位置渲染数字', (tester) async {
+      await tester.pumpWidget(
+        _buildInteractiveTile(
+          sentence: _sentence('Hello world', index: 4),
+          isPlayingSentence: false,
+          onPlayFromTap: () {},
+          onDetailTap: () {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('5'), findsOneWidget);
+      expect(find.byIcon(Icons.play_arrow), findsNothing);
+    });
+
+    testWidgets('编号点击区宽度 ≥ 48dp（Material a11y 触达基线）', (tester) async {
+      await tester.pumpWidget(
+        _buildInteractiveTile(
+          sentence: _sentence('Hello world', index: 0),
+          onPlayFromTap: () {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 编号文本 "1" 的祖先 SizedBox 至少 48dp 宽
+      final sizedBoxes = tester.widgetList<SizedBox>(
+        find.ancestor(of: find.text('1'), matching: find.byType(SizedBox)),
+      );
+      final hasAtLeast48 = sizedBoxes.any((s) => (s.width ?? 0) >= 48);
+      expect(hasAtLeast48, true);
+    });
+
+    testWidgets('isBookmarked=true 时书签图标渲染在文本区', (tester) async {
+      await tester.pumpWidget(
+        _buildInteractiveTile(
+          sentence: _sentence('Hello world', index: 0),
+          isBookmarked: true,
+          onPlayFromTap: () {},
+          onDetailTap: () {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.bookmark), findsOneWidget);
+    });
+
+    testWidgets('callback 为 null 时不渲染 InkWell（仍可视）', (tester) async {
+      await tester.pumpWidget(
+        _buildInteractiveTile(sentence: _sentence('Hello world', index: 0)),
+      );
+      await tester.pumpAndSettle();
+
+      // 没有 callback，内容仍渲染
+      expect(find.text('Hello'), findsOneWidget);
+      expect(find.text('1'), findsOneWidget);
+      // 不应有 InkWell（两个 hit area 都 onTap=null）
+      expect(find.byType(InkWell), findsNothing);
+    });
+  });
 }

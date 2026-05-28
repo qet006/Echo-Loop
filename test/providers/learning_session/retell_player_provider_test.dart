@@ -193,6 +193,54 @@ class CountdownNavigationTestAudioEngine extends AudioEngine {
   }
 }
 
+/// playRange 立刻返回并失效 session，避免 RetellPlayer 自动进入 retelling phase。
+class _SeekTestAudioEngine extends AudioEngine {
+  int _sessionId = 0;
+  Duration? lastPlayStart;
+
+  @override
+  AudioEngineState build() => const AudioEngineState();
+
+  @override
+  Stream<Duration> get absolutePositionStream => const Stream.empty();
+
+  @override
+  Stream<ja.PlayerState> get playerStateStream => const Stream.empty();
+
+  @override
+  bool get isPlaying => false;
+
+  @override
+  Duration get currentPosition => Duration.zero;
+
+  @override
+  int newSession() {
+    _sessionId += 1;
+    return _sessionId;
+  }
+
+  @override
+  bool isActiveSession(int id) => id == _sessionId;
+
+  @override
+  Future<void> playRangeOnce(
+    Duration start,
+    Duration end,
+    int sessionId,
+  ) async {
+    lastPlayStart = start;
+    // 立刻失效 session：RetellPlayer 进入 sessionStillActive=false 的 return 分支，
+    // 不会自动推进到 retelling phase，state 停在 listening。
+    _sessionId += 1;
+  }
+
+  @override
+  Future<void> setSpeed(double speed) async {}
+
+  @override
+  Future<void> stopPlayback() async {}
+}
+
 class DelayedRetellTestAudioEngine extends AudioEngine {
   int _sessionId = 0;
 
@@ -739,6 +787,237 @@ void main() {
         countdownContainer.read(retellPlayerProvider).currentParagraphIndex,
         1,
       );
+    });
+  });
+
+  group('RetellPlayer seekToSentence', () {
+    /// 构造 N 段 × M 句 的等长段落
+    List<List<Sentence>> buildParagraphs({
+      required int paragraphCount,
+      required int sentencesPerParagraph,
+      int sentenceDurationMs = 2000,
+    }) {
+      final paragraphs = <List<Sentence>>[];
+      var globalIdx = 0;
+      var cursorMs = 0;
+      for (var p = 0; p < paragraphCount; p++) {
+        final paragraph = <Sentence>[];
+        for (var s = 0; s < sentencesPerParagraph; s++) {
+          paragraph.add(
+            Sentence(
+              index: globalIdx,
+              text: 'p${p}_s$s',
+              startTime: Duration(milliseconds: cursorMs),
+              endTime: Duration(milliseconds: cursorMs + sentenceDurationMs),
+            ),
+          );
+          globalIdx += 1;
+          cursorMs += sentenceDurationMs;
+        }
+        paragraphs.add(paragraph);
+      }
+      return paragraphs;
+    }
+
+    test('同段 seek 保留 displayMode（如用户已切 showAll）', () async {
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(_SeekTestAudioEngine.new),
+          learningSessionProvider.overrideWith(
+            () => _PassiveLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.retell,
+                audioItemId: 'audio-1',
+              ),
+            ),
+          ),
+          learningProgressNotifierProvider.overrideWith(
+            _InMemoryLearningProgressNotifier.new,
+          ),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(retellPlayerProvider.notifier);
+      final paragraphs = buildParagraphs(
+        paragraphCount: 1,
+        sentencesPerParagraph: 5,
+      );
+      notifier.initialize(paragraphs);
+      notifier.setDisplayMode(RetellDisplayMode.showAll);
+
+      await notifier.seekToSentence(2);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      final state = container.read(retellPlayerProvider);
+      // 同段 seek 不重置 displayMode（保留 showAll + userOverrodeDisplayMode）
+      expect(state.displayMode, RetellDisplayMode.showAll);
+      expect(state.userOverrodeDisplayMode, true);
+      expect(state.phase, RetellPhase.listening);
+    });
+
+    test('跨段 seek 重置 displayMode 和 userOverrodeDisplayMode', () async {
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(_SeekTestAudioEngine.new),
+          learningSessionProvider.overrideWith(
+            () => _PassiveLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.retell,
+                audioItemId: 'audio-1',
+              ),
+            ),
+          ),
+          learningProgressNotifierProvider.overrideWith(
+            _InMemoryLearningProgressNotifier.new,
+          ),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(retellPlayerProvider.notifier);
+      final paragraphs = buildParagraphs(
+        paragraphCount: 2,
+        sentencesPerParagraph: 4,
+      );
+      notifier.initialize(paragraphs);
+      notifier.setDisplayMode(RetellDisplayMode.showAll);
+
+      // 跨段 seek 到段 1 第 2 句（globalIdx = 6）
+      await notifier.seekToSentence(6);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      final state = container.read(retellPlayerProvider);
+      expect(state.currentParagraphIndex, 1);
+      expect(state.currentRepeatCount, 1);
+      expect(state.displayMode, RetellDisplayMode.hideAll);
+      expect(state.userOverrodeDisplayMode, false);
+    });
+
+    test('retelling phase 中 seek 强制切回 listening + 清等待态', () async {
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(_SeekTestAudioEngine.new),
+          learningSessionProvider.overrideWith(
+            () => _PassiveLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.retell,
+                audioItemId: 'audio-1',
+              ),
+            ),
+          ),
+          learningProgressNotifierProvider.overrideWith(
+            _InMemoryLearningProgressNotifier.new,
+          ),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(retellPlayerProvider.notifier);
+      final paragraphs = buildParagraphs(
+        paragraphCount: 1,
+        sentencesPerParagraph: 5,
+      );
+      notifier.initialize(paragraphs);
+
+      // 模拟用户在播放中进入"等待用户操作"，phase 切到 retelling
+      notifier.enterWaitingForUser(stopImmediately: true);
+      expect(
+        container.read(retellPlayerProvider).phase,
+        RetellPhase.retelling,
+      );
+      expect(
+        container.read(retellPlayerProvider).isWaitingForUser,
+        true,
+      );
+
+      await notifier.seekToSentence(3);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      final state = container.read(retellPlayerProvider);
+      expect(state.phase, RetellPhase.listening);
+      expect(state.isWaitingForUser, false);
+      expect(state.isRetellCountdown, false);
+      expect(state.isCountdownPaused, false);
+      expect(state.isCountdownFastForward, false);
+    });
+  });
+
+  group('RetellPlayer pause 快照', () {
+    /// 构造 N 段 × M 句 的等长段落
+    List<List<Sentence>> buildParagraphs({
+      required int paragraphCount,
+      required int sentencesPerParagraph,
+      int sentenceDurationMs = 2000,
+    }) {
+      final paragraphs = <List<Sentence>>[];
+      var globalIdx = 0;
+      var cursorMs = 0;
+      for (var p = 0; p < paragraphCount; p++) {
+        final paragraph = <Sentence>[];
+        for (var s = 0; s < sentencesPerParagraph; s++) {
+          paragraph.add(
+            Sentence(
+              index: globalIdx,
+              text: 'p${p}_s$s',
+              startTime: Duration(milliseconds: cursorMs),
+              endTime: Duration(milliseconds: cursorMs + sentenceDurationMs),
+            ),
+          );
+          globalIdx += 1;
+          cursorMs += sentenceDurationMs;
+        }
+        paragraphs.add(paragraph);
+      }
+      return paragraphs;
+    }
+
+    test('pause → goToNextParagraph 下一段从段首开播（不污染）', () async {
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(_SeekTestAudioEngine.new),
+          learningSessionProvider.overrideWith(
+            () => _PassiveLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.retell,
+                audioItemId: 'audio-1',
+              ),
+            ),
+          ),
+          learningProgressNotifierProvider.overrideWith(
+            _InMemoryLearningProgressNotifier.new,
+          ),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(retellPlayerProvider.notifier);
+      final paragraphs = buildParagraphs(
+        paragraphCount: 2,
+        sentencesPerParagraph: 5,
+      );
+      notifier.initialize(paragraphs);
+
+      // 进入段 0 第 3 句，然后 pause
+      await notifier.seekToSentence(3);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      await notifier.pause();
+
+      // 跳到下一段：段 1 应从段首句开播，不带入段 0 idx=3 偏移
+      await notifier.goToNextParagraph();
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      final state = container.read(retellPlayerProvider);
+      expect(state.currentParagraphIndex, 1);
+      expect(state.playingSentenceIndex, 0);
     });
   });
 }
