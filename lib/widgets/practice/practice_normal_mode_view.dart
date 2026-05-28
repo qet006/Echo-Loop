@@ -263,9 +263,16 @@ class PracticeNormalModeView extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
         minimumSize: const Size(0, 48),
       ),
-      child: Text(
-        l10n.intensiveListenCantUnderstand,
-        style: theme.textTheme.titleSmall,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.question_mark, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            l10n.intensiveListenCantUnderstand,
+            style: theme.textTheme.titleSmall,
+          ),
+        ],
       ),
     );
     final step = cantUnderstandStep;

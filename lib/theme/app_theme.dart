@@ -252,6 +252,18 @@ class AppTheme {
         ),
       ),
 
+      // OutlinedButton 主题：与 FilledButton 形状对齐（圆角 16），
+      // 避免对话框「完成 / 继续」并排时一个胶囊一个圆角矩形造成视觉不一致。
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+      ),
+
       // 分割线主题
       dividerTheme: DividerThemeData(
         color: colorScheme.outlineVariant,
