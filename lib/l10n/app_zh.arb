@@ -92,7 +92,31 @@
   "disableAutoScroll": "禁用自动滚动",
   "audioFileNotFound": "音频文件未找到。文件可能已被删除。",
   "pickAudioFileFailed": "选择音频文件失败",
+  "audioUnsupportedFormat": "不支持的音频格式：{ext}。仅支持 MP3、WAV、M4A、AAC、FLAC。",
+  "@audioUnsupportedFormat": {
+    "placeholders": {
+      "ext": {
+        "type": "String"
+      }
+    }
+  },
+  "audioErrorUnsupportedTitle": "不支持的音频格式",
+  "audioErrorGenericTitle": "添加音频失败",
   "pickTranscriptFileFailed": "选择字幕文件失败",
+  "subtitleUnsupportedFormat": "不支持 .{ext} 格式的字幕，仅支持 SRT 和 VTT 文件。",
+  "@subtitleUnsupportedFormat": {
+    "placeholders": {
+      "ext": {
+        "type": "String"
+      }
+    }
+  },
+  "subtitleFormatInvalid": "字幕格式无效，仅支持标准的 SRT 或 VTT 文件。",
+  "subtitleFileEmpty": "字幕文件为空或已损坏，未发现任何字幕条目。",
+  "subtitleErrorUnsupportedTitle": "不支持的字幕格式",
+  "subtitleErrorInvalidTitle": "字幕格式无效",
+  "subtitleErrorEmptyTitle": "未发现字幕内容",
+  "subtitleErrorGenericTitle": "上传失败",
   "fileExists": "文件已存在",
   "fileExistsMessage": "已存在名为「{name}」的音频文件，请先删除原音频后再导入。",
   "ok": "确定",

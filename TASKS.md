@@ -1,7 +1,33 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-05-28
-> 当前焦点：盲听 / 段落复述句子编号跳播 + 暂停到当前句（已完成）
+> 最后更新：2026-05-29
+> 当前焦点：字幕上传失败不再"假成功"（已完成）
+
+## 已完成：字幕上传失败不再"假成功"，明确区分格式不支持 / 无效 / 空
+
+修复 SRT/VTT 上传链路的静默失败：之前用户上传 .lrc / .ass 改名、损坏文件、空文件时会"看起来成功"（写入 transcriptPath + 0 句 0 词），后续精听陷入异常分支，且会覆盖已有正确字幕。现在三种失败都有明确 SnackBar 提示，且**校验在落沙盒之前**，原字幕不会被覆盖。
+
+### 解析器层
+- [x] `lib/services/subtitle_parser.dart` 新增 `SubtitleParseErrorKind` 枚举（unsupportedFormat / formatInvalid / empty）和 `SubtitleParseException`
+- [x] 新增 `SubtitleParser.parseSubtitleStrict()`：先验扩展名白名单（srt/vtt 大小写不敏感），再走解析器，最后查 0 cue
+- [x] 保留 `SubtitleParser.parseSubtitle()` 原容错语义（运行时加载已存量字幕不能崩）
+
+### 上传入口
+- [x] `lib/utils/transcript_picker.dart` 的 `pickAndSaveTranscript()`：path 模式下**先校验再落沙盒**（坏文件不污染已有同名字幕）；bytes/stream 模式下兜底先落再校验、失败时删除
+- [x] `uploadTranscriptForAudio()` 增 `on SubtitleParseException` 分支，导出公共 `subtitleParseErrorMessage(l10n, e)` 给其他入口复用
+- [x] `lib/widgets/manage_subtitles_sheet.dart` 的 `_handleLocalUpload` 同样接入 `SubtitleParseException` 处理
+
+### 文案
+- [x] ARB 新增三条 key：`subtitleUnsupportedFormat`（带 ext 占位）/ `subtitleFormatInvalid` / `subtitleFileEmpty`，中英文齐全
+
+### 测试
+- [x] `test/services/subtitle_parser_test.dart` 新增 16 个 `parseSubtitleStrict` 用例：成功路径（SRT/VTT 标准 + 大小写扩展名）、unsupportedFormat（.lrc/.ass/.ssa/.txt/无扩展名）、formatInvalid（文件不存在/二进制/.ass 内容改名）、empty（空文件/仅 WEBVTT 头/仅 NOTE 块）
+- [x] `flutter analyze` 我改的 3 个文件 + 测试均 0 issue
+- [x] `flutter test` 全量回归 2369 测试全过，无回归
+
+**完成时间**: 2026-05-29
+
+---
 
 ## 已完成：盲听 / 段落复述句子编号跳播 + 暂停到当前句
 

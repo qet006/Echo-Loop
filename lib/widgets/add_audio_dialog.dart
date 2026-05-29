@@ -7,6 +7,8 @@
 // 支持一次选择多个音频文件批量添加。
 // 单文件添加成功后返回 [AudioItem] 供调用方弹出字幕确认；
 // 多文件直接添加，不弹字幕确认。
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,6 +30,16 @@ typedef _PickedAudio = ({
   String fileName,
   int fileSize,
 });
+
+/// 内联错误提示种类
+enum _AudioErrorKind { unsupportedFormat, generic }
+
+/// 内联错误条数据
+class _InlineError {
+  final _AudioErrorKind kind;
+  final String message;
+  const _InlineError(this.kind, this.message);
+}
 
 /// 添加音频对话框 — 支持批量选择
 ///
@@ -56,17 +68,48 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
   /// 用户选择的合集 ID（仅 collectionId == null 时使用）
   String? _selectedCollectionId;
 
+  /// 内联错误状态（避免 SnackBar 被 dialog scrim 遮蔽）
+  _InlineError? _error;
+  Timer? _errorClearTimer;
+
+  @override
+  void dispose() {
+    _errorClearTimer?.cancel();
+    super.dispose();
+  }
+
+  /// 显示内联错误条，6 秒后自动消失，重复触发重置倒计时
+  void _showInlineError(_InlineError err) {
+    _errorClearTimer?.cancel();
+    setState(() => _error = err);
+    _errorClearTimer = Timer(const Duration(seconds: 6), () {
+      if (!mounted) return;
+      setState(() => _error = null);
+    });
+  }
+
+  void _dismissInlineError() {
+    _errorClearTimer?.cancel();
+    setState(() => _error = null);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final colorScheme = Theme.of(context).colorScheme;
+    // 自适应宽度：默认 AlertDialog 在窄屏（如 360dp 手机）会被 insetPadding 挤到
+    // 极窄，文件名只能显示省略号；这里把侧边 inset 收紧到 16dp，并按屏幕宽度的
+    // 90% 取宽（封顶 560dp，符合 Material 3 dialog 上限）。
+    final screenWidth = MediaQuery.of(context).size.width;
+    final dialogWidth = (screenWidth - 32).clamp(280.0, 560.0);
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text(
         widget.collectionId != null ? l10n.addAudioToCollection : l10n.addAudio,
         textAlign: TextAlign.center,
       ),
       content: SizedBox(
-        width: 400,
+        width: dialogWidth,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -76,6 +119,41 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
                 onPressed: _isLoading ? null : _pickAudioFiles,
                 icon: const Icon(Icons.audiotrack),
                 label: Text(l10n.selectAudioFile),
+              ),
+            ),
+            // 内联错误提示（淡入 + 上滑，6 秒自动消失）
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, anim) => FadeTransition(
+                  opacity: anim,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, -0.08),
+                      end: Offset.zero,
+                    ).animate(anim),
+                    child: child,
+                  ),
+                ),
+                child: _error == null
+                    ? const SizedBox(
+                        key: ValueKey('no-err'),
+                        width: double.infinity,
+                      )
+                    : Padding(
+                        key: ValueKey(_error!.message),
+                        padding: const EdgeInsets.only(top: 12),
+                        child: _buildInlineErrorCard(
+                          Theme.of(context),
+                          l10n,
+                          _error!,
+                        ),
+                      ),
               ),
             ),
             // 已选文件列表
@@ -164,16 +242,12 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
 
   /// 构建单个文件行（单行：图标 + 文件名 + 大小 + 删除）
   Widget _buildFileRow(_PickedAudio file, int index, ColorScheme colorScheme) {
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      padding: const EdgeInsets.only(left: 10, top: 4, bottom: 4, right: 4),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
           Icon(Icons.audio_file_outlined, size: 18, color: colorScheme.primary),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               file.fileName,
@@ -181,34 +255,27 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          Expanded(
-            child: Text(
-              _formatFileSize(file.fileSize),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+          const SizedBox(width: 8),
+          Text(
+            _formatFileSize(file.fileSize),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: IconButton(
-                icon: Icon(
-                  Icons.close,
-                  size: 16,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(),
-                onPressed: _isLoading
-                    ? null
-                    : () => setState(() {
-                        _pickedFiles = List.of(_pickedFiles)..removeAt(index);
-                      }),
-              ),
+          IconButton(
+            icon: Icon(
+              Icons.close,
+              size: 16,
+              color: colorScheme.onSurfaceVariant,
             ),
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.all(4),
+            constraints: const BoxConstraints(),
+            onPressed: _isLoading
+                ? null
+                : () => setState(() {
+                    _pickedFiles = List.of(_pickedFiles)..removeAt(index);
+                  }),
           ),
         ],
       ),
@@ -220,6 +287,88 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  /// 内联错误提示卡片（与 ManageSubtitlesSheet 视觉一致：浅灰描边 + 橙色图标徽章）
+  Widget _buildInlineErrorCard(
+    ThemeData theme,
+    AppLocalizations l10n,
+    _InlineError err,
+  ) {
+    final colorScheme = theme.colorScheme;
+    final accent = Colors.orange.shade700;
+
+    final (IconData icon, String title) = switch (err.kind) {
+      _AudioErrorKind.unsupportedFormat => (
+        Icons.audiotrack_outlined,
+        l10n.audioErrorUnsupportedTitle,
+      ),
+      _AudioErrorKind.generic => (
+        Icons.error_outline,
+        l10n.audioErrorGenericTitle,
+      ),
+    };
+
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      label: '$title. ${err.message}',
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(12, 8, 4, 10),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colorScheme.outlineVariant, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 第一行：图标 + 标题 + 关闭
+            Row(
+              children: [
+                Icon(icon, size: 18, color: accent),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: _dismissInlineError,
+                  icon: const Icon(Icons.close, size: 18),
+                  color: colorScheme.onSurfaceVariant,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 28,
+                    height: 28,
+                  ),
+                  tooltip:
+                      MaterialLocalizations.of(context).closeButtonTooltip,
+                ),
+              ],
+            ),
+            // 第二行：详细描述（与标题左对齐，占满剩余宽度）
+            Padding(
+              padding: const EdgeInsets.fromLTRB(26, 2, 4, 0),
+              child: Text(
+                err.message,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// 构建合集下拉选择框
@@ -256,7 +405,15 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
       final FilePickerResult? result;
       const extensions = ['mp3', 'wav', 'm4a', 'aac', 'flac'];
 
-      if (!kIsWeb && Platform.isIOS) {
+      if (!kIsWeb && Platform.isAndroid) {
+        // Android SAF 在 FileType.custom + EXTRA_MIME_TYPES 多扩展名场景下
+        // 会按精确 MIME 匹配，导致 m4a/flac 等被设备索引成非标 MIME 的文件被灰掉、无法选中。
+        // 改用 FileType.audio（audio/*），picker 端不过滤具体类型，我们自己按扩展名白名单过滤。
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.audio,
+          allowMultiple: true,
+        );
+      } else if (!kIsWeb && Platform.isIOS) {
         result = await FilePicker.platform.pickFiles(
           type: FileType.custom,
           allowedExtensions: extensions,
@@ -275,8 +432,19 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
       }
 
       if (result != null && result.files.isNotEmpty) {
+        final supportedSet = extensions.toSet();
         final List<_PickedAudio> picked = [];
+        final List<String> rejectedExts = [];
+
         for (final file in result.files) {
+          final ext = path
+              .extension(file.name)
+              .replaceFirst('.', '')
+              .toLowerCase();
+          if (!supportedSet.contains(ext)) {
+            rejectedExts.add(ext.isNotEmpty ? ext : '?');
+            continue;
+          }
           final dest = await _savePickedFileToSandbox(file, 'audios');
           picked.add((
             path: dest,
@@ -285,15 +453,27 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
             fileSize: file.size,
           ));
         }
+
         if (!mounted) return;
-        setState(() => _pickedFiles = picked);
+        if (rejectedExts.isNotEmpty) {
+          final l10n = AppLocalizations.of(context)!;
+          final extList = rejectedExts.toSet().map((e) => '.$e').join(', ');
+          _showInlineError(_InlineError(
+            _AudioErrorKind.unsupportedFormat,
+            l10n.audioUnsupportedFormat(extList),
+          ));
+        }
+        if (picked.isNotEmpty) {
+          setState(() => _pickedFiles = picked);
+        }
       }
     } catch (e) {
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${l10n.pickAudioFileFailed}: $e')),
-        );
+        _showInlineError(_InlineError(
+          _AudioErrorKind.generic,
+          '${l10n.pickAudioFileFailed}: $e',
+        ));
       }
     }
   }

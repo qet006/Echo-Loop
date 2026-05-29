@@ -12,6 +12,7 @@ import 'package:path/path.dart' as path;
 import '../models/audio_item.dart';
 import '../providers/audio_library_provider.dart';
 import '../l10n/app_localizations.dart';
+import '../services/subtitle_parser.dart';
 import 'transcript_stats.dart';
 
 /// 选择并保存字幕文件到沙盒，返回相对路径。用户取消返回 null。
@@ -39,7 +40,29 @@ Future<String?> pickAndSaveTranscript() async {
   if (result == null || result.files.isEmpty) return null;
 
   final file = result.files.single;
-  return _saveFileToSandbox(file, 'transcripts');
+
+  // 落沙盒前先严格校验，失败时直接抛 SubtitleParseException 由上层处理；
+  // 这样不会污染已存在的同名字幕，也不会留下垃圾文件。
+  if (file.path != null) {
+    await SubtitleParser.parseSubtitleStrict(file.path!);
+    return _saveFileToSandbox(file, 'transcripts');
+  }
+
+  // 仅 bytes / stream 的场景（基本只在 web）：先落沙盒再校验，失败时清理。
+  final savedRel = await _saveFileToSandbox(file, 'transcripts');
+  try {
+    final dataDir = await getAppDataDirectory();
+    final savedFull = path.join(dataDir.path, savedRel);
+    await SubtitleParser.parseSubtitleStrict(savedFull);
+    return savedRel;
+  } catch (_) {
+    final dataDir = await getAppDataDirectory();
+    final savedFull = path.join(dataDir.path, savedRel);
+    try {
+      await File(savedFull).delete();
+    } catch (_) {}
+    rethrow;
+  }
 }
 
 /// 为音频上传字幕（含已有字幕覆盖确认）
@@ -93,11 +116,31 @@ Future<void> uploadTranscriptForAudio(
             wordCount: stats.$2,
           ),
         );
+  } on SubtitleParseException catch (e) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(subtitleParseErrorMessage(l10n, e))),
+    );
   } catch (e) {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${l10n.pickTranscriptFileFailed}: $e')),
     );
+  }
+}
+
+/// 把 [SubtitleParseException] 映射为本地化的提示文案。
+String subtitleParseErrorMessage(
+  AppLocalizations l10n,
+  SubtitleParseException e,
+) {
+  switch (e.kind) {
+    case SubtitleParseErrorKind.unsupportedFormat:
+      return l10n.subtitleUnsupportedFormat(e.detail ?? '?');
+    case SubtitleParseErrorKind.formatInvalid:
+      return l10n.subtitleFormatInvalid;
+    case SubtitleParseErrorKind.empty:
+      return l10n.subtitleFileEmpty;
   }
 }
 

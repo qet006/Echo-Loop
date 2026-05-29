@@ -287,7 +287,41 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pickAudioFileFailed => '选择音频文件失败';
 
   @override
+  String audioUnsupportedFormat(String ext) {
+    return '不支持的音频格式：$ext。仅支持 MP3、WAV、M4A、AAC、FLAC。';
+  }
+
+  @override
+  String get audioErrorUnsupportedTitle => '不支持的音频格式';
+
+  @override
+  String get audioErrorGenericTitle => '添加音频失败';
+
+  @override
   String get pickTranscriptFileFailed => '选择字幕文件失败';
+
+  @override
+  String subtitleUnsupportedFormat(String ext) {
+    return '不支持 .$ext 格式的字幕，仅支持 SRT 和 VTT 文件。';
+  }
+
+  @override
+  String get subtitleFormatInvalid => '字幕格式无效，仅支持标准的 SRT 或 VTT 文件。';
+
+  @override
+  String get subtitleFileEmpty => '字幕文件为空或已损坏，未发现任何字幕条目。';
+
+  @override
+  String get subtitleErrorUnsupportedTitle => '不支持的字幕格式';
+
+  @override
+  String get subtitleErrorInvalidTitle => '字幕格式无效';
+
+  @override
+  String get subtitleErrorEmptyTitle => '未发现字幕内容';
+
+  @override
+  String get subtitleErrorGenericTitle => '上传失败';
 
   @override
   String get fileExists => '文件已存在';

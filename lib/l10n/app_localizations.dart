@@ -650,11 +650,71 @@ abstract class AppLocalizations {
   /// **'Failed to select audio file'**
   String get pickAudioFileFailed;
 
+  /// No description provided for @audioUnsupportedFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported audio format: {ext}. Only MP3, WAV, M4A, AAC, FLAC are supported.'**
+  String audioUnsupportedFormat(String ext);
+
+  /// No description provided for @audioErrorUnsupportedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported audio format'**
+  String get audioErrorUnsupportedTitle;
+
+  /// No description provided for @audioErrorGenericTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to add audio'**
+  String get audioErrorGenericTitle;
+
   /// No description provided for @pickTranscriptFileFailed.
   ///
   /// In en, this message translates to:
   /// **'Failed to select transcript file'**
   String get pickTranscriptFileFailed;
+
+  /// No description provided for @subtitleUnsupportedFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported subtitle format: .{ext}. Only SRT and VTT files are supported.'**
+  String subtitleUnsupportedFormat(String ext);
+
+  /// No description provided for @subtitleFormatInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid subtitle format. Only standard SRT and VTT files are supported.'**
+  String get subtitleFormatInvalid;
+
+  /// No description provided for @subtitleFileEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle file is empty or corrupted — no subtitle entries found.'**
+  String get subtitleFileEmpty;
+
+  /// No description provided for @subtitleErrorUnsupportedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported subtitle format'**
+  String get subtitleErrorUnsupportedTitle;
+
+  /// No description provided for @subtitleErrorInvalidTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid subtitle format'**
+  String get subtitleErrorInvalidTitle;
+
+  /// No description provided for @subtitleErrorEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No subtitle entries found'**
+  String get subtitleErrorEmptyTitle;
+
+  /// No description provided for @subtitleErrorGenericTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload failed'**
+  String get subtitleErrorGenericTitle;
 
   /// No description provided for @fileExists.
   ///

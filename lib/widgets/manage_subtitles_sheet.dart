@@ -2,6 +2,8 @@
 //
 // 提供本地上传、AI 转录和删除字幕三种操作。
 // AI 转录在后台运行，弹窗关闭后任务继续。
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:universal_io/io.dart';
@@ -15,6 +17,7 @@ import '../providers/listening_practice/listening_practice_provider.dart';
 import '../providers/new_user_guide_provider.dart';
 import '../providers/transcription_task_provider.dart';
 import '../l10n/app_localizations.dart';
+import '../services/subtitle_parser.dart';
 import '../theme/app_theme.dart';
 import '../utils/transcript_picker.dart';
 import '../utils/transcript_stats.dart';
@@ -22,6 +25,16 @@ import 'guide_flow.dart';
 
 /// 字幕操作选项
 enum _SubtitleAction { localUpload, aiTranscription }
+
+/// 内联错误提示的种类（决定图标和标题，文案外部传入）。
+enum _UploadErrorKind { unsupportedFormat, formatInvalid, empty, generic }
+
+/// 内联错误条的数据载体。
+class _InlineError {
+  final _UploadErrorKind kind;
+  final String message;
+  const _InlineError(this.kind, this.message);
+}
 
 /// 管理字幕底部弹窗
 ///
@@ -44,6 +57,11 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
 
   /// 是否刚打开弹窗（用于首帧跳过残留终态的渲染）
   bool _initialClear = true;
+
+  /// 本地上传失败时的内联错误（null 表示无错误）。
+  /// 用 sheet 内联卡片而非 SnackBar，是为了规避 modal bottom sheet 内 SnackBar 被遮挡的问题。
+  _InlineError? _error;
+  Timer? _errorClearTimer;
 
   // Guide step keys
   final _keyAiTranscription = GlobalKey();
@@ -71,6 +89,27 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
     } else {
       _initialClear = false;
     }
+  }
+
+  @override
+  void dispose() {
+    _errorClearTimer?.cancel();
+    super.dispose();
+  }
+
+  /// 显示内联错误条，6 秒后自动消失。重复触发会重置倒计时。
+  void _showInlineError(_InlineError err) {
+    _errorClearTimer?.cancel();
+    setState(() => _error = err);
+    _errorClearTimer = Timer(const Duration(seconds: 6), () {
+      if (!mounted) return;
+      setState(() => _error = null);
+    });
+  }
+
+  void _dismissInlineError() {
+    _errorClearTimer?.cancel();
+    setState(() => _error = null);
   }
 
   @override
@@ -175,6 +214,42 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
                 ),
               ),
               const SizedBox(height: AppSpacing.m),
+              // 内联错误提示（淡入 + 上滑，sheet 高度平滑变化；6 秒自动消失）
+              AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, anim) => FadeTransition(
+                    opacity: anim,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, -0.08),
+                        end: Offset.zero,
+                      ).animate(anim),
+                      child: child,
+                    ),
+                  ),
+                  child: _error == null
+                      ? const SizedBox(
+                          key: ValueKey('no-err'),
+                          width: double.infinity,
+                        )
+                      : Padding(
+                          key: ValueKey(_error!.message),
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.m,
+                            0,
+                            AppSpacing.m,
+                            AppSpacing.m,
+                          ),
+                          child: _buildInlineErrorCard(theme, l10n, _error!),
+                        ),
+                ),
+              ),
               // 进度模式 或 选择模式
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
@@ -376,6 +451,106 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
   }
 
   /// 构建空转录结果视图（音频无人声）
+  /// 上传失败的内联错误卡片。
+  ///
+  /// 风格与 [_buildOptionTile] 对齐：浅灰描边卡片 + 左侧圆角图标徽章 +
+  /// 标题/描述两行文字 + 右上角关闭按钮。语义色用 amber 而非红色：
+  /// 这三种错误均属"用户改个文件就好"的可纠正级别，红色 errorContainer
+  /// 会让人误以为是不可逆故障。
+  Widget _buildInlineErrorCard(
+    ThemeData theme,
+    AppLocalizations l10n,
+    _InlineError err,
+  ) {
+    final colorScheme = theme.colorScheme;
+    final accent = Colors.orange.shade700; // 与 _buildEmptyResultView 同色系
+
+    final (IconData icon, String title) = switch (err.kind) {
+      _UploadErrorKind.unsupportedFormat => (
+        Icons.extension_off_outlined,
+        l10n.subtitleErrorUnsupportedTitle,
+      ),
+      _UploadErrorKind.formatInvalid => (
+        Icons.description_outlined,
+        l10n.subtitleErrorInvalidTitle,
+      ),
+      _UploadErrorKind.empty => (
+        Icons.inbox_outlined,
+        l10n.subtitleErrorEmptyTitle,
+      ),
+      _UploadErrorKind.generic => (
+        Icons.error_outline,
+        l10n.subtitleErrorGenericTitle,
+      ),
+    };
+
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      label: '$title. ${err.message}',
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.s + 4,
+          AppSpacing.s,
+          AppSpacing.xs,
+          AppSpacing.s + 2,
+        ),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colorScheme.outlineVariant, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 第一行：图标 + 标题 + 关闭按钮
+            Row(
+              children: [
+                Icon(icon, size: 18, color: accent),
+                const SizedBox(width: AppSpacing.s),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: _dismissInlineError,
+                  icon: const Icon(Icons.close, size: 18),
+                  color: colorScheme.onSurfaceVariant,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 28,
+                    height: 28,
+                  ),
+                  tooltip:
+                      MaterialLocalizations.of(context).closeButtonTooltip,
+                ),
+              ],
+            ),
+            // 第二行：详细描述（与标题左对齐，占满剩余宽度）
+            Padding(
+              padding: const EdgeInsets.fromLTRB(26, 2, AppSpacing.xs, 0),
+              child: Text(
+                err.message,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyResultView(AppLocalizations l10n, ThemeData theme) {
     return Padding(
       key: const ValueKey('empty-result'),
@@ -735,11 +910,21 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
         EventParams.audioName: audioItem.name,
       });
       if (context.mounted) Navigator.pop(context);
+    } on SubtitleParseException catch (e) {
+      if (!mounted) return;
+      final kind = switch (e.kind) {
+        SubtitleParseErrorKind.unsupportedFormat =>
+          _UploadErrorKind.unsupportedFormat,
+        SubtitleParseErrorKind.formatInvalid => _UploadErrorKind.formatInvalid,
+        SubtitleParseErrorKind.empty => _UploadErrorKind.empty,
+      };
+      _showInlineError(_InlineError(kind, subtitleParseErrorMessage(l10n, e)));
     } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${l10n.pickTranscriptFileFailed}: $e')),
-      );
+      if (!mounted) return;
+      _showInlineError(_InlineError(
+        _UploadErrorKind.generic,
+        '${l10n.pickTranscriptFileFailed}: $e',
+      ));
     }
   }
 

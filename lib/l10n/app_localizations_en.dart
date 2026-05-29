@@ -289,7 +289,43 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pickAudioFileFailed => 'Failed to select audio file';
 
   @override
+  String audioUnsupportedFormat(String ext) {
+    return 'Unsupported audio format: $ext. Only MP3, WAV, M4A, AAC, FLAC are supported.';
+  }
+
+  @override
+  String get audioErrorUnsupportedTitle => 'Unsupported audio format';
+
+  @override
+  String get audioErrorGenericTitle => 'Failed to add audio';
+
+  @override
   String get pickTranscriptFileFailed => 'Failed to select transcript file';
+
+  @override
+  String subtitleUnsupportedFormat(String ext) {
+    return 'Unsupported subtitle format: .$ext. Only SRT and VTT files are supported.';
+  }
+
+  @override
+  String get subtitleFormatInvalid =>
+      'Invalid subtitle format. Only standard SRT and VTT files are supported.';
+
+  @override
+  String get subtitleFileEmpty =>
+      'Subtitle file is empty or corrupted — no subtitle entries found.';
+
+  @override
+  String get subtitleErrorUnsupportedTitle => 'Unsupported subtitle format';
+
+  @override
+  String get subtitleErrorInvalidTitle => 'Invalid subtitle format';
+
+  @override
+  String get subtitleErrorEmptyTitle => 'No subtitle entries found';
+
+  @override
+  String get subtitleErrorGenericTitle => 'Upload failed';
 
   @override
   String get fileExists => 'File Exists';

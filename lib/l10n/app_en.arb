@@ -99,7 +99,31 @@
   "disableAutoScroll": "Disable auto-scroll",
   "audioFileNotFound": "Audio file not found. The file may have been deleted.",
   "pickAudioFileFailed": "Failed to select audio file",
+  "audioUnsupportedFormat": "Unsupported audio format: {ext}. Only MP3, WAV, M4A, AAC, FLAC are supported.",
+  "@audioUnsupportedFormat": {
+    "placeholders": {
+      "ext": {
+        "type": "String"
+      }
+    }
+  },
+  "audioErrorUnsupportedTitle": "Unsupported audio format",
+  "audioErrorGenericTitle": "Failed to add audio",
   "pickTranscriptFileFailed": "Failed to select transcript file",
+  "subtitleUnsupportedFormat": "Unsupported subtitle format: .{ext}. Only SRT and VTT files are supported.",
+  "@subtitleUnsupportedFormat": {
+    "placeholders": {
+      "ext": {
+        "type": "String"
+      }
+    }
+  },
+  "subtitleFormatInvalid": "Invalid subtitle format. Only standard SRT and VTT files are supported.",
+  "subtitleFileEmpty": "Subtitle file is empty or corrupted — no subtitle entries found.",
+  "subtitleErrorUnsupportedTitle": "Unsupported subtitle format",
+  "subtitleErrorInvalidTitle": "Invalid subtitle format",
+  "subtitleErrorEmptyTitle": "No subtitle entries found",
+  "subtitleErrorGenericTitle": "Upload failed",
   "fileExists": "File Exists",
   "fileExistsMessage": "An audio file named \"{name}\" already exists. Please delete the original audio first.",
   "@fileExistsMessage": {
