@@ -3216,6 +3216,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authProviderComingSoon => 'Coming soon';
 
   @override
+  String get authGoogleUnavailable =>
+      'Google sign-in is unavailable on this device. Use an email code instead.';
+
+  @override
   String get authPasswordlessHint =>
       'No password needed. We will email you a one-time code.';
 
@@ -3402,6 +3406,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authSignedOutStatus => 'Signed out';
+
+  @override
+  String get authSignedInWithApple => 'Signed in with Apple';
+
+  @override
+  String get authSignedInWithGoogle => 'Signed in with Google';
+
+  @override
+  String get authAppleAccount => 'Apple account';
+
+  @override
+  String get authGoogleAccount => 'Google account';
 
   @override
   String get authSignOut => 'Sign Out';

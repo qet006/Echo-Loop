@@ -9,8 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 Widget _app(GoRouter router) {
@@ -34,6 +34,10 @@ GoRouter _authRouter({
   Future<void> Function(String email)? onSendOtp,
   Future<void> Function(String email, String token)? onVerifyOtp,
   Future<void> Function(String email)? onResendOtp,
+  Future<void> Function()? onAppleSignIn,
+  Future<void> Function()? onGoogleSignIn,
+  bool isAppleSignInSupported = true,
+  bool isGoogleSignInSupported = false,
   String initialLocation = AppRoutes.login,
 }) {
   return GoRouter(
@@ -41,7 +45,12 @@ GoRouter _authRouter({
     routes: [
       GoRoute(
         path: AppRoutes.login,
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) => LoginScreen(
+          onAppleSignIn: onAppleSignIn,
+          onGoogleSignIn: onGoogleSignIn,
+          isAppleSignInSupportedOverride: isAppleSignInSupported,
+          isGoogleSignInSupportedOverride: isGoogleSignInSupported,
+        ),
       ),
       GoRoute(
         path: AppRoutes.emailSignIn,
@@ -104,9 +113,141 @@ void main() {
       findsNothing,
     );
     expect(find.text('Continue with Apple'), findsOneWidget);
-    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.text('Continue with Google'), findsNothing);
     expect(find.text('Continue with Email Code'), findsOneWidget);
     expect(find.byType(TextFormField), findsNothing);
+  });
+
+  testWidgets('Android 平台只显示 Google 和邮箱登录入口', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        _authRouter(
+          isAppleSignInSupported: false,
+          isGoogleSignInSupported: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Continue with Apple'), findsNothing);
+    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.text('Continue with Email Code'), findsOneWidget);
+  });
+
+  testWidgets('Apple 平台只显示 Apple 和邮箱登录入口', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        _authRouter(
+          isAppleSignInSupported: true,
+          isGoogleSignInSupported: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Continue with Apple'), findsOneWidget);
+    expect(find.text('Continue with Google'), findsNothing);
+    expect(find.text('Continue with Email Code'), findsOneWidget);
+  });
+
+  testWidgets('点击 Apple 登录会调用统一登录动作并进入设置页', (tester) async {
+    var signInCalled = false;
+    final router = _authRouter(
+      onAppleSignIn: () async {
+        signInCalled = true;
+      },
+    );
+
+    await tester.pumpWidget(_app(router));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Continue with Apple'));
+    await tester.pumpAndSettle();
+
+    expect(signInCalled, isTrue);
+    expect(find.text('Settings'), findsOneWidget);
+  });
+
+  testWidgets('点击 Google 登录会调用统一登录动作并进入设置页', (tester) async {
+    var signInCalled = false;
+    final router = _authRouter(
+      isAppleSignInSupported: false,
+      isGoogleSignInSupported: true,
+      onGoogleSignIn: () async {
+        signInCalled = true;
+      },
+    );
+
+    await tester.pumpWidget(_app(router));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Continue with Google'));
+    await tester.pumpAndSettle();
+
+    expect(signInCalled, isTrue);
+    expect(find.text('Settings'), findsOneWidget);
+  });
+
+  testWidgets('Google 登录不可用异常会提示改用邮箱验证码', (tester) async {
+    final router = _authRouter(
+      isAppleSignInSupported: false,
+      isGoogleSignInSupported: true,
+      onGoogleSignIn: () async {
+        throw const AuthException('Google identity token is missing.');
+      },
+    );
+
+    await tester.pumpWidget(_app(router));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Continue with Google'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Google sign-in is unavailable on this device. Use an email code instead.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Google identity token is missing.'), findsNothing);
+  });
+
+  testWidgets('用户取消 Google 登录不显示错误提示', (tester) async {
+    final router = _authRouter(
+      isAppleSignInSupported: false,
+      isGoogleSignInSupported: true,
+      onGoogleSignIn: () async {
+        throw const GoogleSignInException(
+          code: GoogleSignInExceptionCode.canceled,
+        );
+      },
+    );
+
+    await tester.pumpWidget(_app(router));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Continue with Google'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Something went wrong. Try again.'), findsNothing);
+    expect(find.text('Settings'), findsNothing);
+  });
+
+  testWidgets('Apple 登录异常会映射为用户文案', (tester) async {
+    final router = _authRouter(
+      onAppleSignIn: () async {
+        throw AuthException('Supabase auth is not configured.');
+      },
+    );
+
+    await tester.pumpWidget(_app(router));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Continue with Apple'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Authentication is not configured yet.'), findsOneWidget);
+    expect(find.text('Supabase auth is not configured.'), findsNothing);
   });
 
   testWidgets('点击邮箱后进入单邮箱 OTP 页面', (tester) async {
@@ -414,34 +555,136 @@ void main() {
     expect(find.text('Sign in to Echo Loop'), findsNothing);
   });
 
-  testWidgets('三个登录方式图标左侧对齐且尺寸一致', (tester) async {
+  testWidgets('账号页 Apple 登录显示 Apple 账户和完整邮箱', (tester) async {
+    final user = User(
+      id: 'user-1',
+      appMetadata: const {
+        'provider': 'apple',
+        'providers': ['apple'],
+      },
+      userMetadata: const {},
+      aud: 'authenticated',
+      email: 'mbfpw8sdy7@privaterelay.appleid.com',
+      createdAt: '2026-06-04T00:00:00.000Z',
+    );
+    final session = Session(
+      accessToken: 'token',
+      tokenType: 'bearer',
+      user: user,
+      refreshToken: 'refresh',
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          supabaseSessionProvider.overrideWith((ref) => Stream.value(session)),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          supportedLocales: const [Locale('en'), Locale('zh')],
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          theme: AppTheme.light(),
+          home: const AccountScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Apple account'), findsOneWidget);
+    expect(find.text('mbfpw8sdy7@privaterelay.appleid.com'), findsOneWidget);
+    expect(find.text('mbfpw8sd...@erelay.appleid.com'), findsNothing);
+  });
+
+  testWidgets('账号页 Google 登录显示 Google 账户和完整邮箱', (tester) async {
+    final user = User(
+      id: 'user-1',
+      appMetadata: const {
+        'provider': 'google',
+        'providers': ['google'],
+      },
+      userMetadata: const {},
+      aud: 'authenticated',
+      email: 'long.google.account@example.com',
+      createdAt: '2026-06-04T00:00:00.000Z',
+    );
+    final session = Session(
+      accessToken: 'token',
+      tokenType: 'bearer',
+      user: user,
+      refreshToken: 'refresh',
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          supabaseSessionProvider.overrideWith((ref) => Stream.value(session)),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          supportedLocales: const [Locale('en'), Locale('zh')],
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          theme: AppTheme.light(),
+          home: const AccountScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Google account'), findsOneWidget);
+    expect(find.text('long.google.account@example.com'), findsOneWidget);
+  });
+
+  test('账号显示登录方式优先使用 Supabase identities provider', () {
+    final user = User(
+      id: 'user-1',
+      appMetadata: const {},
+      userMetadata: const {},
+      aud: 'authenticated',
+      email: 'user@example.com',
+      createdAt: '2026-06-04T00:00:00.000Z',
+      identities: const [
+        UserIdentity(
+          id: 'identity-1',
+          userId: 'user-1',
+          identityData: {},
+          identityId: 'identity-1',
+          provider: 'google',
+          createdAt: '2026-06-04T00:00:00.000Z',
+          lastSignInAt: '2026-06-04T00:00:00.000Z',
+        ),
+      ],
+    );
+
+    expect(authDisplayProviderForUser(user), AuthDisplayProvider.google);
+  });
+
+  testWidgets('可见登录方式图标左侧对齐且尺寸一致', (tester) async {
     await tester.pumpWidget(_app(_authRouter()));
     await tester.pumpAndSettle();
 
     final appleIcon = find.byIcon(Icons.apple);
-    final googleIcon = find.byWidgetPredicate(
-      (widget) =>
-          widget is FaIcon &&
-          widget.icon?.codePoint == FontAwesomeIcons.google.codePoint &&
-          widget.icon?.fontFamily == FontAwesomeIcons.google.fontFamily,
-    );
     final emailIcon = find.byIcon(Icons.mail_outline_rounded);
 
     expect(appleIcon, findsOneWidget);
-    expect(googleIcon, findsOneWidget);
     expect(emailIcon, findsOneWidget);
 
     final appleRect = tester.getRect(appleIcon);
-    final googleRect = tester.getRect(googleIcon);
     final emailRect = tester.getRect(emailIcon);
 
-    expect(appleRect.left, googleRect.left);
     expect(appleRect.left, emailRect.left);
     expect(appleRect.width, 22);
-    expect(googleRect.width, 22);
     expect(emailRect.width, 22);
     expect(appleRect.height, 22);
-    expect(googleRect.height, 22);
     expect(emailRect.height, 22);
   });
 }

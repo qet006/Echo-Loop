@@ -99,10 +99,7 @@ void main() {
         expect(find.text('Privacy Policy'), findsOneWidget);
         expect(find.text('Write Feedback'), findsOneWidget);
         // 版本标签在页面底部，需要滚动到可见
-        await tester.scrollUntilVisible(
-          find.textContaining('Version'),
-          200,
-        );
+        await tester.scrollUntilVisible(find.textContaining('Version'), 200);
         await tester.pumpAndSettle();
         expect(find.text('Version 1.0.0 (Debug)'), findsOneWidget);
       });
@@ -137,6 +134,114 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('user@example.com'), findsOneWidget);
+      });
+
+      testWidgets('Apple 登录在账号入口显示 Apple 登录方式', (tester) async {
+        final user = User(
+          id: 'user-1',
+          appMetadata: const {
+            'provider': 'apple',
+            'providers': ['apple'],
+          },
+          userMetadata: const {},
+          aud: 'authenticated',
+          email: 'mbfpw8sdy7@privaterelay.appleid.com',
+          createdAt: '2026-06-04T00:00:00.000Z',
+        );
+        final session = Session(
+          accessToken: 'token',
+          tokenType: 'bearer',
+          user: user,
+          refreshToken: 'refresh',
+        );
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const SettingsScreen(),
+            overrides: [
+              ...buildOverrides(),
+              supabaseSessionProvider.overrideWith(
+                (ref) => Stream<Session?>.value(session),
+              ),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('mbfpw8sdy7@privaterelay.appleid.com'), findsNothing);
+        expect(find.text('Signed in with Apple'), findsOneWidget);
+      });
+
+      testWidgets('Google 登录在账号入口显示 Google 登录方式', (tester) async {
+        final user = User(
+          id: 'user-1',
+          appMetadata: const {
+            'provider': 'google',
+            'providers': ['google'],
+          },
+          userMetadata: const {},
+          aud: 'authenticated',
+          email: 'long.google.account@example.com',
+          createdAt: '2026-06-04T00:00:00.000Z',
+        );
+        final session = Session(
+          accessToken: 'token',
+          tokenType: 'bearer',
+          user: user,
+          refreshToken: 'refresh',
+        );
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const SettingsScreen(),
+            overrides: [
+              ...buildOverrides(),
+              supabaseSessionProvider.overrideWith(
+                (ref) => Stream<Session?>.value(session),
+              ),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('long.google.account@example.com'), findsNothing);
+        expect(find.text('Signed in with Google'), findsOneWidget);
+      });
+
+      testWidgets('邮箱登录不通过 Apple relay 域名误判登录方式', (tester) async {
+        final user = User(
+          id: 'user-1',
+          appMetadata: const {
+            'provider': 'email',
+            'providers': ['email'],
+          },
+          userMetadata: const {},
+          aud: 'authenticated',
+          email: 'mbfpw8sdy7@privaterelay.appleid.com',
+          createdAt: '2026-06-04T00:00:00.000Z',
+        );
+        final session = Session(
+          accessToken: 'token',
+          tokenType: 'bearer',
+          user: user,
+          refreshToken: 'refresh',
+        );
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const SettingsScreen(),
+            overrides: [
+              ...buildOverrides(),
+              supabaseSessionProvider.overrideWith(
+                (ref) => Stream<Session?>.value(session),
+              ),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Signed in with Apple'), findsNothing);
+        expect(find.text('mbfpw8sd...@ay.appleid.com'), findsOneWidget);
       });
 
       testWidgets('显示外观标题', (tester) async {

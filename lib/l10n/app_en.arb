@@ -1632,6 +1632,7 @@
   "authContinueWithApple": "Continue with Apple",
   "authContinueWithGoogle": "Continue with Google",
   "authProviderComingSoon": "Coming soon",
+  "authGoogleUnavailable": "Google sign-in is unavailable on this device. Use an email code instead.",
   "authPasswordlessHint": "No password needed. We will email you a one-time code.",
   "authEmailTitle": "Email sign in",
   "authEmailOtpTitle": "Continue with email",
@@ -1701,5 +1702,9 @@
   "authPrivacyPolicy": "Privacy Policy",
   "authSignedInStatus": "Signed in",
   "authSignedOutStatus": "Signed out",
+  "authSignedInWithApple": "Signed in with Apple",
+  "authSignedInWithGoogle": "Signed in with Google",
+  "authAppleAccount": "Apple account",
+  "authGoogleAccount": "Google account",
   "authSignOut": "Sign Out"
 }

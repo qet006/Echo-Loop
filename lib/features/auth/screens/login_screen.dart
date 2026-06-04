@@ -1,22 +1,219 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../router/app_router.dart';
 import '../../../theme/app_theme.dart';
 import '../auth_form_utils.dart';
+import '../google_services_availability.dart';
+import '../providers/auth_providers.dart';
 
-class LoginScreen extends ConsumerWidget {
-  const LoginScreen({super.key});
+class LoginScreen extends ConsumerStatefulWidget {
+  const LoginScreen({
+    super.key,
+    this.onAppleSignIn,
+    this.onGoogleSignIn,
+    this.isAppleSignInSupportedOverride,
+    this.isGoogleSignInSupportedOverride,
+  });
 
-  void _showComingSoon(BuildContext context) {
+  final Future<void> Function()? onAppleSignIn;
+  final Future<void> Function()? onGoogleSignIn;
+  final bool? isAppleSignInSupportedOverride;
+  final bool? isGoogleSignInSupportedOverride;
+
+  @override
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends ConsumerState<LoginScreen> {
+  bool _isBusy = false;
+  bool? _isAppleSignInAvailable;
+  bool? _isGoogleSignInAvailable;
+
+  bool get _isApplePlatformSupported {
+    final override = widget.isAppleSignInSupportedOverride;
+    if (override != null) return override;
+    return !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.macOS);
+  }
+
+  bool get _isAppleSignInSupported => _isAppleSignInAvailable ?? false;
+
+  bool get _isGoogleSignInSupported {
+    final override = widget.isGoogleSignInSupportedOverride;
+    if (override != null) return override;
+    return _isGoogleSignInAvailable ?? false;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveAppleSignInAvailability();
+    _resolveGoogleSignInAvailability();
+  }
+
+  @override
+  void didUpdateWidget(LoginScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isAppleSignInSupportedOverride !=
+        widget.isAppleSignInSupportedOverride) {
+      _resolveAppleSignInAvailability();
+    }
+    if (oldWidget.isGoogleSignInSupportedOverride !=
+        widget.isGoogleSignInSupportedOverride) {
+      _resolveGoogleSignInAvailability();
+    }
+  }
+
+  /// 先按平台做快速过滤，再调用插件确认 native Sign in with Apple 实际可用。
+  ///
+  /// 这样不会在缺少系统能力或插件返回不可用时暴露一个只能失败的入口。
+  Future<void> _resolveAppleSignInAvailability() async {
+    final override = widget.isAppleSignInSupportedOverride;
+    if (override != null) {
+      setState(() => _isAppleSignInAvailable = override);
+      return;
+    }
+
+    if (!_isApplePlatformSupported) {
+      setState(() => _isAppleSignInAvailable = false);
+      return;
+    }
+
+    try {
+      final isAvailable = await SignInWithApple.isAvailable();
+      if (!mounted) return;
+      setState(() => _isAppleSignInAvailable = isAvailable);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isAppleSignInAvailable = false);
+    }
+  }
+
+  /// 只有 Android 且 Google Play services 可用时才显示 Google 登录入口。
+  ///
+  /// 中国区 Android / 华为等无 GMS 设备会在这里被过滤，只保留邮箱 OTP
+  /// 兜底，避免用户看到一个必然失败的入口。
+  Future<void> _resolveGoogleSignInAvailability() async {
+    final override = widget.isGoogleSignInSupportedOverride;
+    if (override != null) {
+      setState(() => _isGoogleSignInAvailable = override);
+      return;
+    }
+
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      setState(() => _isGoogleSignInAvailable = false);
+      return;
+    }
+
+    final isAvailable = await const MethodChannelGoogleServicesAvailability()
+        .isAvailable();
+    if (!mounted) return;
+    setState(() => _isGoogleSignInAvailable = isAvailable);
+  }
+
+  String _authErrorMessage(BuildContext context, Object error) {
     final l10n = AppLocalizations.of(context)!;
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(l10n.authProviderComingSoon)));
+    if (error is AuthException &&
+        error.message == 'Supabase auth is not configured.') {
+      return l10n.authUnavailable;
+    }
+    if (_isGoogleSignInUnavailable(error)) {
+      return l10n.authGoogleUnavailable;
+    }
+    return l10n.authUnknownError;
+  }
+
+  bool _isCanceledAppleSignIn(Object error) {
+    return error is SignInWithAppleAuthorizationException &&
+        error.code == AuthorizationErrorCode.canceled;
+  }
+
+  bool _isCanceledGoogleSignIn(Object error) {
+    return error is GoogleSignInException &&
+        error.code == GoogleSignInExceptionCode.canceled;
+  }
+
+  bool _isGoogleSignInUnavailable(Object error) {
+    if (error is AuthException) {
+      return error.message == 'Google OAuth client is not configured.' ||
+          error.message == 'Google identity token is missing.' ||
+          error.message == 'Google access token is missing.';
+    }
+    if (error is GoogleSignInException) {
+      return error.code ==
+              GoogleSignInExceptionCode.providerConfigurationError ||
+          error.code == GoogleSignInExceptionCode.clientConfigurationError ||
+          error.code == GoogleSignInExceptionCode.uiUnavailable;
+    }
+    return false;
+  }
+
+  Future<void> _signInWithApple() async {
+    if (_isBusy) return;
+
+    setState(() => _isBusy = true);
+    try {
+      final action = widget.onAppleSignIn;
+      if (action != null) {
+        await action();
+      } else {
+        await ref.read(authControllerProvider).signInWithApple();
+      }
+
+      if (!mounted) return;
+      context.go(AppRoutes.settings);
+    } catch (error) {
+      if (!mounted) return;
+      if (_isCanceledAppleSignIn(error)) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(content: Text(_authErrorMessage(context, error))),
+        );
+    } finally {
+      if (mounted) {
+        setState(() => _isBusy = false);
+      }
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    if (_isBusy) return;
+
+    setState(() => _isBusy = true);
+    try {
+      final action = widget.onGoogleSignIn;
+      if (action != null) {
+        await action();
+      } else {
+        await ref.read(authControllerProvider).signInWithGoogle();
+      }
+
+      if (!mounted) return;
+      context.go(AppRoutes.settings);
+    } catch (error) {
+      if (!mounted) return;
+      if (_isCanceledGoogleSignIn(error)) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(content: Text(_authErrorMessage(context, error))),
+        );
+    } finally {
+      if (mounted) {
+        setState(() => _isBusy = false);
+      }
+    }
   }
 
   Future<void> _openPolicy(String path) async {
@@ -32,7 +229,7 @@ class LoginScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -47,22 +244,44 @@ class LoginScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _AuthMethodButton(
-            icon: Icon(Icons.apple, size: 22, color: colorScheme.onSurface),
-            label: l10n.authContinueWithApple,
-            onPressed: () => _showComingSoon(context),
-          ),
-          const SizedBox(height: AppSpacing.m),
-          _AuthMethodButton(
-            icon: FaIcon(
-              FontAwesomeIcons.google,
-              size: 22,
-              color: colorScheme.onSurface,
+          if (_isAppleSignInSupported) ...[
+            _AuthMethodButton(
+              icon: _isBusy
+                  ? SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: colorScheme.onSurface,
+                      ),
+                    )
+                  : Icon(Icons.apple, size: 22, color: colorScheme.onSurface),
+              label: l10n.authContinueWithApple,
+              onPressed: _isBusy ? null : _signInWithApple,
             ),
-            label: l10n.authContinueWithGoogle,
-            onPressed: () => _showComingSoon(context),
-          ),
-          const SizedBox(height: AppSpacing.m),
+            const SizedBox(height: AppSpacing.m),
+          ],
+          if (_isGoogleSignInSupported) ...[
+            _AuthMethodButton(
+              icon: _isBusy
+                  ? SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: colorScheme.onSurface,
+                      ),
+                    )
+                  : FaIcon(
+                      FontAwesomeIcons.google,
+                      size: 22,
+                      color: colorScheme.onSurface,
+                    ),
+              label: l10n.authContinueWithGoogle,
+              onPressed: _isBusy ? null : _signInWithGoogle,
+            ),
+            const SizedBox(height: AppSpacing.m),
+          ],
           _AuthMethodButton(
             icon: Icon(
               Icons.mail_outline_rounded,
@@ -70,7 +289,9 @@ class LoginScreen extends ConsumerWidget {
               color: colorScheme.onSurface,
             ),
             label: l10n.authContinueWithEmail,
-            onPressed: () => context.push(AppRoutes.emailSignIn),
+            onPressed: _isBusy
+                ? null
+                : () => context.push(AppRoutes.emailSignIn),
           ),
         ],
       ),

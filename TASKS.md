@@ -1,7 +1,78 @@
 # Echo Loop 任务清单
 
 > 最后更新：2026-06-04
-> 当前焦点：Android 复习提醒改为非精确本地通知（已完成）
+> 当前焦点：Apple 登录审查修复（已完成）
+
+## 已完成：Apple 登录审查修复
+
+修复 Apple 登录代码审查发现的两个问题：登录入口不再只按平台判断，而是额外检查 native Sign in with Apple 实际可用性；iOS Xcode 配置不再把 Release/Profile/Release-prod target 固定为 Apple Development 签名，避免污染发布签名链路。同时补足 Apple native ID token flow 的仓库层测试。
+
+### 实现
+- [x] 登录页 iOS/macOS Apple 入口新增 `SignInWithApple.isAvailable()` 可用性检查，插件不可用或检查失败时不展示入口
+- [x] iOS `Runner` target 移除误加的 `CODE_SIGN_IDENTITY = "Apple Development"` 和空 `PROVISIONING_PROFILE_SPECIFIER`，保留 Apple 登录 entitlement
+- [x] `SupabaseAuthRepository.signInWithApple` 补充仓库层测试，覆盖 hashed nonce → Apple、raw nonce → Supabase、identity token 缺失、首次姓名 metadata 写入、metadata 更新失败不撤销 session
+- [x] Auth 测试替身补齐 Apple credential provider / GoTrueClient / analytics 默认 stub，避免 mocktail 漏洞掩盖真实分支
+
+### 验证
+- [x] `flutter test test/features/auth/auth_providers_test.dart`：17 tests passed
+- [x] `flutter analyze lib/features/auth/providers/auth_providers.dart lib/features/auth/screens/login_screen.dart lib/features/auth/screens/account_screen.dart lib/screens/settings_screen.dart test/features/auth/auth_providers_test.dart test/features/auth/auth_flow_screens_test.dart test/screens/settings_screen_test.dart`：No issues found
+- [x] `flutter test test/features/auth/auth_flow_screens_test.dart test/screens/settings_screen_test.dart`：40 tests passed
+- [x] `scripts/check.sh`：全量 `flutter analyze` 通过（仅仓库既有 warning/info）；全量 `flutter test` 2418 tests passed，11 skip；macOS integration 阶段失败在本地 App debug connection 启动失败（`The log reader stopped unexpectedly, or never started`），与本次认证修复无关
+
+**完成时间**: 2026-06-04 16:41 +0800
+
+## 已完成：登录入口平台收敛与账号邮箱展示优化
+
+在 Apple 登录完成后，收敛登录页入口：Apple 平台仅显示 Apple 登录和邮箱 OTP，Android 平台仅显示 Google 登录和邮箱 OTP。同时优化已登录账号展示：设置页按 Supabase provider 显示 Apple/Google 登录方式，邮箱 OTP 登录显示邮箱标识；账号页显示登录方式和完整邮箱。
+
+### 实现
+- [x] 登录页新增 Google 登录平台支持判断，iOS/macOS 隐藏 Google 入口，Android 隐藏 Apple 入口
+- [x] 账号页按真实 provider 显示 `Apple account/Apple 账号`、`Google account/Google 账号` 或普通 `Account/账户`
+- [x] 账号页始终显示完整邮箱，不提示 Apple 私密邮箱，不用邮箱域名推断登录方式
+- [x] 设置页账号入口对 Apple/Google 登录显示 `Signed in with Apple/Google`，普通邮箱登录显示邮箱标识
+- [x] 登录方式识别改为读取 Supabase `appMetadata.provider` / `appMetadata.providers` / `identities.provider`
+- [x] 账号页等待 session 加载时不误判为已登出，避免测试和首帧跳转竞态
+- [x] 设置页账号入口复用同一邮箱压缩展示规则
+
+### 验证
+- [x] `flutter analyze lib/features/auth/screens/login_screen.dart lib/features/auth/screens/account_screen.dart lib/screens/settings_screen.dart test/features/auth/auth_flow_screens_test.dart`：No issues found
+- [x] `flutter test test/features/auth/auth_flow_screens_test.dart`：22 tests passed
+- [x] `flutter analyze lib/screens/settings_screen.dart test/screens/settings_screen_test.dart`：No issues found
+- [x] `flutter test test/screens/settings_screen_test.dart`：15 tests passed
+- [x] `flutter analyze lib/features/auth/screens/account_screen.dart lib/screens/settings_screen.dart lib/l10n/app_localizations.dart lib/l10n/app_localizations_en.dart lib/l10n/app_localizations_zh.dart test/features/auth/auth_flow_screens_test.dart test/screens/settings_screen_test.dart`：No issues found
+- [x] `flutter test test/features/auth/auth_flow_screens_test.dart test/screens/settings_screen_test.dart`：40 tests passed
+- [x] `flutter gen-l10n`
+
+**完成时间**: 2026-06-04 16:18 +0800
+
+## 已完成：iOS/macOS Apple 账号登录
+
+在邮箱 OTP 登录基础上接入 Apple 账号登录。首版覆盖 iOS 和 macOS，采用 native ID token flow：App 通过系统 Sign in with Apple 获取 identity token，使用 nonce 防重放，再交给 Supabase `signInWithIdToken(provider: apple)` 建立长期 Supabase session；不新增自建后端 API。
+
+### 实现
+- [x] 新增 `sign_in_with_apple` 依赖，并更新 Flutter/macOS 插件注册与 lockfile
+- [x] 新增 Apple 登录凭证获取接口，生产环境走系统 Apple 面板，测试可注入替身
+- [x] `AuthRepository` / `AuthController` 新增 `signInWithApple`
+- [x] Apple 登录使用 raw nonce + SHA-256 nonce，避免 ID token 重放
+- [x] 登录成功后复用现有 PostHog/Supabase 身份同步链路
+- [x] 首次 Apple 返回姓名时写入 user metadata，metadata 更新失败只记录日志，不撤销已建立 session
+- [x] 用户取消 Apple 授权时不显示错误提示
+- [x] 登录页 iOS/macOS 显示 Apple 入口，非 Apple 平台隐藏入口；登录中禁用其他认证入口
+- [x] iOS/macOS entitlements 增加 `com.apple.developer.applesignin`
+
+### 验证
+- [x] `flutter pub get`
+- [x] `flutter analyze lib/features/auth test/features/auth`：No issues found
+- [x] `flutter test test/features/auth/auth_providers_test.dart test/features/auth/auth_flow_screens_test.dart`：32 tests passed
+- [x] `scripts/check.sh`：全量 `flutter analyze` 通过（仅仓库既有 warning/info）；全量 `flutter test` 2407 tests passed，11 skip
+- [x] macOS provisioning profile 已刷新并通过签名能力校验；`flutter build macos --debug` 成功生成 `build/macos/Build/Products/Debug/Echo Loop.app`
+
+### 后台配置待办
+- [x] Apple Developer：为 `top.echo-loop` 和 `top.echo-loop.dev` 对应 App ID 开启 Sign in with Apple
+- [x] Supabase Auth：开启 Apple provider，并配置对应 bundle IDs / client IDs
+- [x] 刷新 iOS/macOS provisioning profiles，并用 macOS debug build 确认 Apple 登录 entitlement 已生效
+
+**完成时间**: 2026-06-04 14:55 +0800
 
 ## 已完成：修复 GitHub Actions analyze 中 AnalyticsChannel 测试替身缺口
 

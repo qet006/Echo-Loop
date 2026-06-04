@@ -3094,6 +3094,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get authProviderComingSoon => '即将支持';
 
   @override
+  String get authGoogleUnavailable => '当前设备无法使用 Google 登录，请改用邮箱验证码登录。';
+
+  @override
   String get authPasswordlessHint => '无需密码，我们会向你的邮箱发送一次性验证码。';
 
   @override
@@ -3273,6 +3276,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get authSignedOutStatus => '未登录';
+
+  @override
+  String get authSignedInWithApple => '已通过 Apple 登录';
+
+  @override
+  String get authSignedInWithGoogle => '已通过 Google 登录';
+
+  @override
+  String get authAppleAccount => 'Apple 账号';
+
+  @override
+  String get authGoogleAccount => 'Google 账号';
 
   @override
   String get authSignOut => '退出登录';

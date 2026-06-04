@@ -30,6 +30,7 @@ import '../providers/tag_provider.dart';
 import '../analytics/analytics_providers.dart';
 import '../analytics/models/event_names.dart';
 import '../features/auth/providers/auth_providers.dart';
+import '../features/auth/screens/account_screen.dart';
 import '../router/app_router.dart';
 import '../features/onboarding_survey/providers/onboarding_survey_provider.dart';
 import '../services/backup/backup_manifest.dart';
@@ -127,9 +128,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final session = ref.watch(supabaseSessionProvider).valueOrNull;
     final isSignedIn = session != null;
     final user = session?.user;
-    final accountSubtitle = isSignedIn
-        ? (user!.email ?? user.id)
-        : null;
+    final accountIdentifier = isSignedIn ? (user!.email ?? user.id) : null;
+    final accountSubtitle = accountIdentifier == null
+        ? null
+        : switch (authDisplayProviderForUser(user!)) {
+            AuthDisplayProvider.apple => l10n.authSignedInWithApple,
+            AuthDisplayProvider.google => l10n.authSignedInWithGoogle,
+            AuthDisplayProvider.email || AuthDisplayProvider.unknown =>
+              compactAccountListIdentifier(accountIdentifier),
+          };
 
     return _buildSection(
       context,
@@ -138,7 +145,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ListTile(
           leading: _emojiIcon('👤'),
           title: Text(l10n.account),
-          subtitle: accountSubtitle == null ? null : Text(accountSubtitle),
+          subtitle: accountSubtitle == null
+              ? null
+              : Text(
+                  accountSubtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

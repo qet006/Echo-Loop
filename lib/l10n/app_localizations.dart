@@ -5720,6 +5720,12 @@ abstract class AppLocalizations {
   /// **'Coming soon'**
   String get authProviderComingSoon;
 
+  /// No description provided for @authGoogleUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Google sign-in is unavailable on this device. Use an email code instead.'**
+  String get authGoogleUnavailable;
+
   /// No description provided for @authPasswordlessHint.
   ///
   /// In en, this message translates to:
@@ -6073,6 +6079,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Signed out'**
   String get authSignedOutStatus;
+
+  /// No description provided for @authSignedInWithApple.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in with Apple'**
+  String get authSignedInWithApple;
+
+  /// No description provided for @authSignedInWithGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in with Google'**
+  String get authSignedInWithGoogle;
+
+  /// No description provided for @authAppleAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple account'**
+  String get authAppleAccount;
+
+  /// No description provided for @authGoogleAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Google account'**
+  String get authGoogleAccount;
 
   /// No description provided for @authSignOut.
   ///

@@ -1,13 +1,20 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../analytics/analytics_providers.dart';
 import '../../../config/auth_config.dart' as auth_config;
+import '../../../services/app_logger.dart';
 import '../../../services/user_id_service.dart';
+import '../apple_sign_in_credentials.dart';
+import '../google_sign_in_credentials.dart';
 
 /// 认证仓库接口。
 ///
@@ -21,13 +28,26 @@ abstract class AuthRepository {
     required String token,
   });
 
+  Future<AuthResponse> signInWithApple();
+
+  Future<AuthResponse> signInWithGoogle();
+
   Future<void> signOut();
 }
 
 class SupabaseAuthRepository implements AuthRepository {
-  SupabaseAuthRepository(this._auth);
+  SupabaseAuthRepository(
+    this._auth, {
+    AppleSignInCredentialsProvider appleCredentialsProvider =
+        const NativeAppleSignInCredentialsProvider(),
+    GoogleSignInCredentialsProvider? googleCredentialsProvider,
+  }) : _appleCredentialsProvider = appleCredentialsProvider,
+       _googleCredentialsProvider =
+           googleCredentialsProvider ?? NativeGoogleSignInCredentialsProvider();
 
   final GoTrueClient _auth;
+  final AppleSignInCredentialsProvider _appleCredentialsProvider;
+  final GoogleSignInCredentialsProvider _googleCredentialsProvider;
 
   @override
   Future<void> sendEmailOtp(String email) {
@@ -43,9 +63,84 @@ class SupabaseAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthResponse> signInWithApple() async {
+    final rawNonce = _generateRawNonce();
+    final credential = await _appleCredentialsProvider.getCredential(
+      nonce: _sha256Hex(rawNonce),
+    );
+    final idToken = credential.identityToken;
+    if (idToken == null || idToken.isEmpty) {
+      throw const AuthException('Apple identity token is missing.');
+    }
+
+    final response = await _auth.signInWithIdToken(
+      provider: OAuthProvider.apple,
+      idToken: idToken,
+      nonce: rawNonce,
+    );
+
+    final userMetadata = _appleUserMetadata(credential);
+    if (userMetadata.isNotEmpty) {
+      try {
+        await _auth.updateUser(UserAttributes(data: userMetadata));
+      } catch (error, stackTrace) {
+        AppLogger.log(
+          'Auth',
+          'Apple user metadata update failed: $error\n$stackTrace',
+        );
+      }
+    }
+
+    return response;
+  }
+
+  @override
+  Future<AuthResponse> signInWithGoogle() async {
+    final credential = await _googleCredentialsProvider.getCredentials();
+    return _auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: credential.idToken,
+      accessToken: credential.accessToken,
+    );
+  }
+
+  @override
   Future<void> signOut() {
     return _auth.signOut();
   }
+}
+
+const _nonceCharacters =
+    '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+
+String _generateRawNonce({int length = 32, Random? random}) {
+  final generator = random ?? Random.secure();
+  return List.generate(
+    length,
+    (_) => _nonceCharacters[generator.nextInt(_nonceCharacters.length)],
+  ).join();
+}
+
+String _sha256Hex(String input) {
+  return sha256.convert(utf8.encode(input)).toString();
+}
+
+Map<String, String> _appleUserMetadata(
+  AuthorizationCredentialAppleID credential,
+) {
+  final givenName = credential.givenName?.trim();
+  final familyName = credential.familyName?.trim();
+  final parts = [
+    if (givenName != null && givenName.isNotEmpty) givenName,
+    if (familyName != null && familyName.isNotEmpty) familyName,
+  ];
+  final fullName = parts.join(' ').trim();
+
+  return {
+    if (fullName.isNotEmpty) 'full_name': fullName,
+    if (givenName != null && givenName.isNotEmpty) 'given_name': givenName,
+    if (familyName != null && familyName.isNotEmpty) 'family_name': familyName,
+  };
 }
 
 /// 默认认证仓库。
@@ -131,6 +226,22 @@ class AuthController {
       email: email,
       token: token,
     );
+    final user = response.user;
+    if (user != null) {
+      await _ref.read(authAnalyticsSyncProvider).syncSignedInUser(user);
+    }
+  }
+
+  Future<void> signInWithApple() async {
+    final response = await _repository.signInWithApple();
+    final user = response.user;
+    if (user != null) {
+      await _ref.read(authAnalyticsSyncProvider).syncSignedInUser(user);
+    }
+  }
+
+  Future<void> signInWithGoogle() async {
+    final response = await _repository.signInWithGoogle();
     final user = response.user;
     if (user != null) {
       await _ref.read(authAnalyticsSyncProvider).syncSignedInUser(user);
