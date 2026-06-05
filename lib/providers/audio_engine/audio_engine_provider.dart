@@ -147,10 +147,8 @@ class AudioEngine extends _$AudioEngine {
   }
 
   Future<void> clearClip() async {
-    if (state.clipStart != Duration.zero) {
-      state = state.copyWith(clipStart: Duration.zero);
-      await _audioPlayer.setClip(start: null, end: null);
-    }
+    state = state.copyWith(clipStart: Duration.zero);
+    await _audioPlayer.setClip(start: null, end: null);
   }
 
   // --- 句子级播放基元（所有业务模式共享） ---
@@ -168,7 +166,38 @@ class AudioEngine extends _$AudioEngine {
       end: sentence.endTime,
     );
 
+    if (!isActiveSession(sessionId)) {
+      AppLogger.log(
+        'AudioEngine',
+        '⚠ playClipOnce SKIPPED after setClip: session $sessionId 已过期 '
+            '(current=${state.sessionId})',
+      );
+      return;
+    }
+
+    // 标准 clip 播放流程：每次设置片段后显式回到 clip 相对起点。
+    // just_audio 在连续切 clip 时可能保留旧相对 position；不 seek(0)
+    // 会导致“点击句子却从句中间播放”的交互错误。
+    await _audioPlayer.seek(Duration.zero);
+
+    if (!isActiveSession(sessionId)) {
+      AppLogger.log(
+        'AudioEngine',
+        '⚠ playClipOnce SKIPPED after seek: session $sessionId 已过期 '
+            '(current=${state.sessionId})',
+      );
+      return;
+    }
+
     await _audioPlayer.play();
+    if (!isActiveSession(sessionId)) {
+      AppLogger.log(
+        'AudioEngine',
+        '⚠ playClipOnce: session $sessionId 在 play() 后已过期，主动 pause',
+      );
+      await _audioPlayer.pause();
+      return;
+    }
 
     await _audioPlayer.playerStateStream.firstWhere(
       (s) =>

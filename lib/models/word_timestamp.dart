@@ -43,6 +43,21 @@ class WordTimestamp {
     );
   }
 
+  /// 复制并替换部分字段。
+  WordTimestamp copyWith({
+    String? word,
+    Duration? startTime,
+    Duration? endTime,
+    double? confidence,
+  }) {
+    return WordTimestamp(
+      word: word ?? this.word,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      confidence: confidence ?? this.confidence,
+    );
+  }
+
   /// 序列化为 JSON
   Map<String, dynamic> toJson() => {
     'word': word,

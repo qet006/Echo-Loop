@@ -3311,4 +3311,40 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get authSignOut => '退出登录';
+
+  @override
+  String get editSubtitles => '编辑字幕';
+
+  @override
+  String get mergeWithNextSentence => '合并下一句';
+
+  @override
+  String get deleteSentence => '删除句子';
+
+  @override
+  String get sentenceDeleted => '已删除句子';
+
+  @override
+  String get playSentence => '播放句子';
+
+  @override
+  String get stopPlayback => '停止播放';
+
+  @override
+  String get saveSubtitleEdits => '保存字幕修改';
+
+  @override
+  String get subtitleStructureChangedWarning => '这会清除该音频的学习进度和收藏句子。';
+
+  @override
+  String get subtitleEditsSaved => '字幕修改已保存。';
+
+  @override
+  String get discardSubtitleEditsTitle => '放弃修改？';
+
+  @override
+  String get discardSubtitleEditsMessage => '当前字幕修改尚未保存。';
+
+  @override
+  String get discard => '放弃';
 }

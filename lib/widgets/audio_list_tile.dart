@@ -472,6 +472,14 @@ class AudioListTile extends ConsumerWidget {
                 l10n.manageSubtitles,
               ),
             ),
+          if (!isOfficial && audioItem.hasTranscript)
+            PopupMenuItem(
+              value: 'editSubtitles',
+              child: _buildMenuItemRow(
+                const Icon(Icons.edit_note, size: 20),
+                l10n.editSubtitles,
+              ),
+            ),
           if (isOfficial)
             PopupMenuItem(
               value: 'updateOfficialSubtitle',
@@ -546,6 +554,11 @@ class AudioListTile extends ConsumerWidget {
             _showRenameDialog(context, ref);
           } else if (value == 'manageSubtitles') {
             _showManageSubtitlesSheet(context);
+          } else if (value == 'editSubtitles') {
+            context.push(
+              AppRoutes.subtitleEditor(audioItem.id),
+              extra: audioItem,
+            );
           } else if (value == 'updateOfficialSubtitle') {
             unawaited(_handleUpdateOfficialSubtitle(context, ref, l10n));
           } else if (value == 'manage') {

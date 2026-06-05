@@ -20,6 +20,8 @@ import '../features/official_collections/screens/discover_collections_screen.dar
 import '../features/official_collections/screens/official_collection_detail_screen.dart';
 import '../features/onboarding_survey/providers/onboarding_survey_provider.dart';
 import '../features/onboarding_survey/screens/onboarding_survey_screen.dart';
+import '../features/subtitle_editor/subtitle_simple_editor_screen.dart';
+import '../models/audio_item.dart';
 import '../screens/library_screen.dart';
 import '../screens/collection_detail_screen.dart';
 import '../screens/study_screen.dart';
@@ -103,6 +105,10 @@ abstract class AppRoutes {
 
   /// 独立音频播放器页路径（不依赖合集）
   static String audioPlayer(String audioId) => '/audio/$audioId/player';
+
+  /// 简版字幕编辑页路径
+  static String subtitleEditor(String audioId) =>
+      '/audio/$audioId/subtitles/edit';
 
   /// 收藏句子复习页路径
   static const bookmarkReview = '/bookmark-review';
@@ -299,6 +305,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/audio/:audioId/player',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const PlayerScreen(),
+      ),
+      GoRoute(
+        path: '/audio/:audioId/subtitles/edit',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is! AudioItem) {
+            throw StateError('Subtitle editor requires AudioItem extra');
+          }
+          return SubtitleSimpleEditorScreen(audioItem: extra);
+        },
       ),
       GoRoute(
         path: '/audio/:audioId/blind-listen',

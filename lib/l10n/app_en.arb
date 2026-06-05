@@ -1712,5 +1712,17 @@
   "authSignedInWithGoogle": "Signed in with Google",
   "authAppleAccount": "Apple account",
   "authGoogleAccount": "Google account",
-  "authSignOut": "Sign Out"
+  "authSignOut": "Sign Out",
+  "editSubtitles": "Edit subtitles",
+  "mergeWithNextSentence": "Merge with next",
+  "deleteSentence": "Delete sentence",
+  "sentenceDeleted": "Sentence deleted",
+  "playSentence": "Play sentence",
+  "stopPlayback": "Stop playback",
+  "saveSubtitleEdits": "Save subtitle changes",
+  "subtitleStructureChangedWarning": "This will clear learning progress and bookmarked sentences for this audio.",
+  "subtitleEditsSaved": "Subtitle changes saved.",
+  "discardSubtitleEditsTitle": "Discard changes?",
+  "discardSubtitleEditsMessage": "Your subtitle changes have not been saved.",
+  "discard": "Discard"
 }

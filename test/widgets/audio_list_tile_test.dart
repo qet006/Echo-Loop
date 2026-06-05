@@ -153,6 +153,35 @@ void main() {
 
       expect(find.text('Update Subtitle'), findsOneWidget);
       expect(find.text('Manage Subtitles'), findsNothing);
+      expect(find.text('Edit subtitles'), findsNothing);
+    });
+
+    testWidgets('用户音频有字幕时显示编辑字幕菜单', (tester) async {
+      final item = baseItem.copyWith(transcriptPath: 'transcripts/user.srt');
+      await tester.pumpWidget(
+        buildCompactTile(AudioLibraryState(audioItems: [item])),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('audio_list_tile_menu_hit_area')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Manage Subtitles'), findsOneWidget);
+      expect(find.text('Edit subtitles'), findsOneWidget);
+    });
+
+    testWidgets('用户音频无字幕时不显示编辑字幕菜单', (tester) async {
+      final item = baseItem.copyWith(transcriptPath: null);
+      await tester.pumpWidget(
+        buildCompactTile(AudioLibraryState(audioItems: [item])),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('audio_list_tile_menu_hit_area')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Manage Subtitles'), findsOneWidget);
+      expect(find.text('Edit subtitles'), findsNothing);
     });
 
     testWidgets('点击官方更新字幕先弹出清空进度确认框', (tester) async {

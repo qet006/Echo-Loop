@@ -6145,6 +6145,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sign Out'**
   String get authSignOut;
+
+  /// No description provided for @editSubtitles.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit subtitles'**
+  String get editSubtitles;
+
+  /// No description provided for @mergeWithNextSentence.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge with next'**
+  String get mergeWithNextSentence;
+
+  /// No description provided for @deleteSentence.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete sentence'**
+  String get deleteSentence;
+
+  /// No description provided for @sentenceDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Sentence deleted'**
+  String get sentenceDeleted;
+
+  /// No description provided for @playSentence.
+  ///
+  /// In en, this message translates to:
+  /// **'Play sentence'**
+  String get playSentence;
+
+  /// No description provided for @stopPlayback.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop playback'**
+  String get stopPlayback;
+
+  /// No description provided for @saveSubtitleEdits.
+  ///
+  /// In en, this message translates to:
+  /// **'Save subtitle changes'**
+  String get saveSubtitleEdits;
+
+  /// No description provided for @subtitleStructureChangedWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This will clear learning progress and bookmarked sentences for this audio.'**
+  String get subtitleStructureChangedWarning;
+
+  /// No description provided for @subtitleEditsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle changes saved.'**
+  String get subtitleEditsSaved;
+
+  /// No description provided for @discardSubtitleEditsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get discardSubtitleEditsTitle;
+
+  /// No description provided for @discardSubtitleEditsMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your subtitle changes have not been saved.'**
+  String get discardSubtitleEditsMessage;
+
+  /// No description provided for @discard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get discard;
 }
 
 class _AppLocalizationsDelegate

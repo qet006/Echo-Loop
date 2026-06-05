@@ -118,6 +118,113 @@
 
 **完成时间**: 2026-06-04 22:05 +0800
 
+## 已完成：字幕编辑器可拖动句子边界 + 词级时间戳同步
+
+在字幕编辑页支持手动微调句子起止时间：波形上当前句的起止边界做成可拖动把手，并把前后相邻句的起止边界画成参照线；拖动不能跨越相邻句最近边界（句子永不重叠、顺序不变）。保存时同时更新句子级 SRT 和词级时间戳（`audio_items.word_timestamps_json`）——词级同步策略为「只对齐边界词」：每句首词 start 跟随句 start、末词 end 跟随句 end，中间词真实时间戳不动；被删除区间的词丢弃。词级同步在保存时按时间重建，不在编辑期维护词索引，merge/delete 逻辑不受影响。仅 AI 转录音频有词级数据；本地字幕只更新 SRT。
+
+### 实现
+- [x] `WordTimestamp` 新增 `copyWith`
+- [x] 新增 `lib/utils/word_timestamp_sync.dart`：`syncWordTimestampsToSentenceBounds` 纯函数（按句子边界对齐边界词、丢弃句外词）
+- [x] `SubtitleEditEngine` 新增 `BoundaryEdge` 枚举、`kMinSentenceDuration` 常量和 `adjustBoundary`（按相邻句最近边界 + 最小句长钳制）
+- [x] `SubtitleEditorController` 新增 `adjustSelectedSentenceBoundary`；`save()` 增加词级时间戳同步块（AI 转录音频才执行）
+- [x] `SubtitleWaveformView` 新增边界把手 hit-test + 拖动手势（命中边界拖边界、否则拖播放头）、前后句参照线、可抓取把手绘制；新增 `selectedIndex` / `onAdjustBoundary` / `onAdjustEnd` 入参
+- [x] `SubtitleSimpleEditorScreen` 传入 `selectedIndex` 并接入拖动回调
+
+### 验证
+- [x] `flutter analyze`：本次改动文件 No issues（仅余仓库既有 info 级 lint）
+- [x] `flutter test`：全量 2472 passed，11 skip
+- [x] 新增/补充单测：`word_timestamp_sync_test.dart`（8 例）、`subtitle_edit_engine_test.dart` 补 `adjustBoundary`（8 例）、`subtitle_editor_controller_test.dart` 补边界调整（3 例）、`subtitle_waveform_view_test.dart` 补边界拖动（1 例）
+
+**完成时间**: 2026-06-05
+
+### 后续修复与增强（同日）
+- [x] **Bug 1**：单句播放到句尾时焦点不再跳到下一句。`_handlePosition`/`_tickPlayhead` 仅在 range 模式跟随播放头切句，sentence 模式保持焦点（修复首尾相接句的跳焦）
+- [x] **Bug 2**：缩放时保持「当前位置」（播放头）在屏幕上不动而非左侧不动。`SubtitleWaveformView._preserveFocalOnZoom` 在缩放后调整滚动偏移锚定焦点
+- [x] **Bug 3**：前后相邻句的边界也可拖动。hit-test 扩展到当前句 + 前后句的起止边界；重合边界按拖动方向定夺（左拖选「结束」边界、右拖选「开始」边界）；`adjustSentenceBoundary(index, edge, target)` 支持任意句索引且不改变当前选中句
+- [x] **Bug 4**：起止边界配色区分——起始蓝（`0xFF2196F3`）、结束绿（`0xFF43A047`）；相邻句边界用淡色 + 小把手
+- [x] **增强**：支持双指捏合缩放波形，两条路径——① 触摸屏原始指针按指距比例缩放（双指期间禁用滚动）；② 触控板 `PointerPanZoom*` 按 `event.scale` 缩放（纯滚动 scale≈1 为 no-op，不影响横向滚动）；越界统一由 `setWaveformZoomScale` 钳制；新增 `onZoomChanged` 入参
+- [x] 补充单测：缩放焦点保持、单句播放不跳焦、相邻句边界调整、触摸双指捏合、触控板 pan-zoom 捏合；字幕编辑波形 8 例全过
+- [x] `flutter test` 全量：2476 passed，11 skip
+
+### 重构：波形改为「单一坐标系」根治停止跳变/闪烁（同日）
+反复出现的「播放停止时波形/红线跳变、闪烁」是架构问题：波形在 `SingleChildScrollView` 里、红线是独立视口 overlay，两套坐标系按不同周期更新（红线分状态用「理想居中」与「实际偏移」两套公式 + post-frame `jumpTo` 滞后一帧）。采用行业标准做法重构为单一真相源：
+- [x] 新增纯类 `WaveformMetrics`（viewport/zoom/duration/padding → `timeToContentX`/`screenX`/`timeAt`/`offsetToCenter`），波形/边界/红线/命中/轴全部经此唯一映射
+- [x] 删除 `ScrollView`/`ScrollController`/`_restPinned`/`_scheduleFollow`/`_centerPlayheadOnStop`/双公式 `_buildPlayhead`/`_contentKey`/物理切换；改为单 `CustomPaint` 填满视口，波形层只绘**可见时间窗**（顺带修复高缩放下整条 contentWidth 全量重绘的性能陷阱）
+- [x] `viewOffset` 每帧在 build 内同步派生（播放跟随→选句居中→缩放焦点→保持），播放停止仅翻 `isPlaying`、偏移与红线像素级不变 ⇒ **结构性零跳变/零闪烁**
+- [x] 手势改用 `event.localPosition` + `metrics.timeAt`（去 `globalToLocal`）；捏合/触控板/选句居中(selectionEpoch)/缩放焦点保持均迁移到同步模型
+- [x] 测试：新增核心不变量「红线 x 跨 play→stop 像素级不变」「viewOffset 派生正确」；波形视图测试断言改读 painter
+
+#### 真正根因（状态机/引擎层）—— 「播放完跳回句首」一直没好的原因
+之前所有改动都在视图层，但「跳回句首」其实是 **controller 完成回调的停止顺序 bug**，与视图无关：
+- 根因：`playSentence`/`togglePlaybackFromPlayhead` 的 finally「先停底层播放器再冻结状态」。`_audioPlayer.stop()` 会吐出 position=0，经 `absolutePositionStream = clipStart + rel` 映射成 clip 起点（句首），被 `_handlePosition` 采纳（此刻 `isPlaying` 仍为 true），把 `playbackPosition` 拉回句首 → 视图忠实跟随 → 跳回句首。
+- [x] 修复：两个 finally 改为「先冻结 `isPlaying=false` + 锁定句尾位置，再 `_stopActivePlayback`」（与 `stopPlayback()` 一致）；`_handlePosition` 增加「丢弃 >400ms 大幅后退残留事件」防御。
+- [x] 回归测试 `subtitle_editor_stop_position_test.dart`：模拟 stop 残留事件，断言句尾停住且中间帧不回退；已验证「无修复必失败、有修复通过」。
+
+#### 视图侧补回两项回归（单坐标重写一度引入）
+- [x] 抖动/闪烁：重新加入播放头 80ms 双向小步补间（TweenAnimationBuilder，同一 painted 同时驱动红线与跟随偏移），平滑 50ms tick 台阶与 position 流微校准。
+- [x] 无法平移：单指拖动空白处 = 平移波形（1:1 跟手）；轻点 = 定位播放头；边界把手拖动 = 调边界；双指/触控板 = 缩放。
+- [x] `flutter analyze` 改动文件 No issues；`flutter test` 全量通过。
+
+#### Bug：合并/编辑句子后自由练习与盲听仍显示旧拆分句子
+- 根因：`ListeningPractice` 为 `keepAlive`，其 `loadAudio` 去重守卫只比较 `id` + `transcriptPath`；字幕保存是**原地改写同名 SRT**（`transcripts/{id}_ai.srt`），两者都不变。编辑器 `save()` 保存后调 `loadAudio(updatedItem)` 未带 `forceTranscriptReload` → 命中守卫直接 return → 内存保留旧句子，自由练习/盲听（均派生自 LP.sentences）显示陈旧拆分版本（截图 `0:18` 中间边界即合并前 SRT 残留）。同理仅调时间戳也会读到旧值。
+- [x] 修复：`subtitle_editor_controller.dart` `save()` 中对 LP 的 `loadAudio` 传 `forceTranscriptReload: true` 并补注释。
+- [x] 测试 `subtitle_editor_controller_test.dart` 新增：LP 持有该音频时保存后必须以 `forceTranscriptReload: true` 重载。
+- [x] `flutter analyze` 改动文件 No issues；`flutter test` 全量 2485 passed，11 skip。
+
+**完成时间**: 2026-06-05
+
+## 已完成：字幕编辑页 UI/UX 打磨
+
+在不改变整体布局的前提下打磨字幕编辑页的视觉与交互，复用既有设计系统（`AppSpacing` / colorScheme），提升可读性、可发现性和破坏性操作的安全网。
+
+### 实现
+- [x] 句子列表时间戳去掉 `fontSize: 9` 硬编码，改用 `labelSmall`(11px) + `onSurfaceVariant`；精度降为 `MM:ss` 并加 `tabularFigures` 防数字抖动
+- [x] 控制条间距统一到 `AppSpacing` 常量；倍速按钮从裸文本改为带 `outlineVariant` 边框、圆角 12 的紧凑 chip（含 `arrow_drop_down`），明确其可点性
+- [x] 移除常驻 `_DirtyBanner`（警告语义已由保存确认对话框承载），释放列表垂直空间
+- [x] AppBar 保存按钮从裸 `TextButton` 升级为紧凑 `FilledButton.tonal`，强化主操作存在感
+- [x] 删除菜单项用 `colorScheme.error` 着色；删除后弹 SnackBar 并提供撤销，`SubtitleEditorController` 新增 `restoreSentences` 还原快照
+- [x] 播放中行 leading 图标用 `colorScheme.primary` 实色，区别于「仅选中定位」的行底高亮
+- [x] 波形绘制去掉顶部 `topPadding`、波形与时间轴间隙收到 2px，消除上方多余空白
+- [x] 重定义波形缩放语义：`_contentWidth` 改为「视口宽度 × 缩放」，`zoomScale == 1` 时时间轴恰好铺满屏宽（不缩放）；上限 `maxWaveformZoomScale` 按音频长度计算（约 `时长 / 4s`，clamp 1~150），长音频也能放大到看清一句话
+- [x] 控制条缩放滑块改为左 `zoom_out`、右 `zoom_in` 图标，去掉放大倍数文本；短音频（上限=1）禁用滑块
+
+### 验证
+- [x] `flutter gen-l10n`（新增 `sentenceDeleted` 文案，`undo` / `save` 复用既有 key）
+- [x] `dart format lib/features/subtitle_editor/ test/features/subtitle_editor/`
+- [x] `flutter analyze lib/features/subtitle_editor`：No issues found（全量 analyze 仅余仓库既有 warning/info）
+- [x] `flutter test test/features/subtitle_editor/`：19 tests passed（含 `restoreSentences` 撤销、缩放范围按音频长度限制用例）
+
+**完成时间**: 2026-06-05
+
+## 已完成：简版字幕编辑页
+
+为用户上传且已有字幕的音频新增简版字幕编辑入口和编辑页面。首版聚焦结构操作：顶部展示音频波形，下方展示句子列表；每句支持单句播放、合并下一句和删除句子。保存时重新生成 SRT，更新音频句子数/词数，并清除该音频学习进度和收藏句子，避免结构变化后 sentenceIndex 错位。
+
+### 实现
+- [x] 新增 `just_waveform` 依赖，用于提取波形数据；波形组件自绘当前句起止范围和播放进度，并为后续拖动边界预留绘制层
+- [x] 新增 `SubtitleSimpleEditorScreen`，页面包含固定波形区、句子列表、保存按钮和未保存退出确认
+- [x] 新增 `SubtitleEditorController`，负责加载音频/字幕、播放单句、合并下一句、删除句子、保存 SRT 和刷新当前练习缓存
+- [x] 新增 `SubtitleEditEngine` 纯 Dart 逻辑，保证合并/删除后句子 index 连续
+- [x] 音频菜单对用户上传且已有字幕的音频显示“编辑字幕”，官方音频和无字幕音频不显示
+- [x] “管理字幕”弹窗在已有字幕时增加“编辑字幕”次级入口
+- [x] 新增中英文文案并生成本地化代码
+- [x] 修复字幕编辑交互稳定性：`AudioEngine.playClipOnce` 按标准 clip 流程显式 `seek(0)`，字幕编辑页统一播放 session / stop / clearClip，播放头使用本地时钟平滑推进并用 position stream 校准
+- [x] 波形区新增播放、缩放和倍速控制；拖动播放头时停止当前播放，结束拖动后按绝对时间 seek
+- [x] 合并/删除句子时停止播放并让红线回到新选中句起点；保存失败不再误提示成功
+
+### 验证
+- [x] `flutter gen-l10n`
+- [x] `dart format lib/features/subtitle_editor lib/router/app_router.dart lib/widgets/audio_list_tile.dart lib/widgets/manage_subtitles_sheet.dart test/features/subtitle_editor/subtitle_edit_engine_test.dart test/widgets/audio_list_tile_test.dart`
+- [x] `flutter analyze lib/features/subtitle_editor lib/router/app_router.dart lib/widgets/audio_list_tile.dart lib/widgets/manage_subtitles_sheet.dart test/features/subtitle_editor/subtitle_edit_engine_test.dart test/widgets/audio_list_tile_test.dart`：No issues found
+- [x] `flutter test test/features/subtitle_editor/subtitle_edit_engine_test.dart test/widgets/audio_list_tile_test.dart`：18 tests passed
+- [x] `dart format lib/features/subtitle_editor/subtitle_editor_controller.dart lib/features/subtitle_editor/subtitle_simple_editor_screen.dart lib/features/subtitle_editor/subtitle_waveform_view.dart lib/providers/audio_engine/audio_engine_provider.dart test/features/subtitle_editor/subtitle_editor_controller_test.dart test/features/subtitle_editor/subtitle_waveform_view_test.dart`
+- [x] `flutter analyze lib/features/subtitle_editor lib/providers/audio_engine/audio_engine_provider.dart test/features/subtitle_editor`：No issues found
+- [x] `flutter test test/features/subtitle_editor/subtitle_editor_controller_test.dart test/features/subtitle_editor/subtitle_waveform_view_test.dart test/features/subtitle_editor/subtitle_edit_engine_test.dart`：17 tests passed
+- [x] `scripts/check.sh`：全量 `flutter analyze` 通过（仅仓库既有 warning/info）；全量 `flutter test` 2447 tests passed，11 skip；macOS integration 中 `native_audio_decoder_integration_test` 通过，后续 `asr_engine_test` / `app_test` 在本地 App debug connection 启动失败（`The log reader stopped unexpectedly, or never started`），与本次字幕编辑改动无关
+
+**完成时间**: 2026-06-04 22:03 +0800
+**交互稳定性修复完成时间**: 2026-06-05 00:22 +0800
+
 ## 已完成：Android Google 账号登录与 GMS 门控
 
 在邮箱 OTP 和 Apple 登录基础上补齐 Android Google 账号登录。实现采用 Google native ID token flow：App 通过 `google_sign_in` 获取 Google ID token / access token，再交给 Supabase `signInWithIdToken(provider: google)` 建立 Supabase session；不新增自建后端 API，不使用 redirect OAuth deep link 流。同时在 Android 登录页前置检测 Google Play services，可用才展示 Google 登录入口，不可用时只保留邮箱验证码兜底。

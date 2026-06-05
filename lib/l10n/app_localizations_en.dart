@@ -3443,4 +3443,42 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authSignOut => 'Sign Out';
+
+  @override
+  String get editSubtitles => 'Edit subtitles';
+
+  @override
+  String get mergeWithNextSentence => 'Merge with next';
+
+  @override
+  String get deleteSentence => 'Delete sentence';
+
+  @override
+  String get sentenceDeleted => 'Sentence deleted';
+
+  @override
+  String get playSentence => 'Play sentence';
+
+  @override
+  String get stopPlayback => 'Stop playback';
+
+  @override
+  String get saveSubtitleEdits => 'Save subtitle changes';
+
+  @override
+  String get subtitleStructureChangedWarning =>
+      'This will clear learning progress and bookmarked sentences for this audio.';
+
+  @override
+  String get subtitleEditsSaved => 'Subtitle changes saved.';
+
+  @override
+  String get discardSubtitleEditsTitle => 'Discard changes?';
+
+  @override
+  String get discardSubtitleEditsMessage =>
+      'Your subtitle changes have not been saved.';
+
+  @override
+  String get discard => 'Discard';
 }
