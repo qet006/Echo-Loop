@@ -411,6 +411,9 @@ class _SentenceList extends StatefulWidget {
 }
 
 class _SentenceListState extends State<_SentenceList> {
+  static const double _kPlayActionWidth = 52;
+  static const double _kMenuActionWidth = 44;
+
   final List<GlobalKey> _rowKeys = [];
 
   @override
@@ -471,63 +474,109 @@ class _SentenceListState extends State<_SentenceList> {
         final sentence = widget.sentences[index];
         final isSelected = widget.selectedIndex == index;
         final isPlaying = widget.playingIndex == index;
+        final rowColor = isSelected || isPlaying
+            ? theme.colorScheme.primaryContainer.withValues(alpha: .35)
+            : Colors.transparent;
         return KeyedSubtree(
           key: _rowKeys[index],
-          child: ListTile(
-            onTap: () => widget.onSelect(index),
-            selected: isSelected || isPlaying,
-            selectedTileColor: theme.colorScheme.primaryContainer.withValues(
-              alpha: .35,
-            ),
-            leading: IconButton(
-              key: ValueKey('subtitle-sentence-play-$index'),
-              tooltip: isPlaying ? l10n.stopPlayback : l10n.playSentence,
-              icon: Icon(
-                isPlaying
-                    ? Icons.stop_circle_outlined
-                    : Icons.play_circle_outline,
-                // 播放中用 primary 实色单点强调，区别于「仅选中定位」的行底高亮
-                color: isPlaying ? theme.colorScheme.primary : null,
-              ),
-              onPressed: isPlaying ? widget.onStop : () => widget.onPlay(index),
-            ),
-            title: Text(sentence.text),
-            subtitle: Text(
-              '${_formatTime(sentence.startTime)} - ${_formatTime(sentence.endTime)}',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-            trailing: PopupMenuButton<_SentenceAction>(
-              tooltip: MaterialLocalizations.of(context).showMenuTooltip,
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: _SentenceAction.mergeNext,
-                  enabled: index < widget.sentences.length - 1,
-                  child: _MenuRow(
-                    icon: Icons.call_merge,
-                    label: l10n.mergeWithNextSentence,
+          child: Material(
+            color: rowColor,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    width: _kPlayActionWidth,
+                    child: Tooltip(
+                      message: isPlaying
+                          ? l10n.stopPlayback
+                          : l10n.playSentence,
+                      child: InkWell(
+                        key: ValueKey('subtitle-sentence-play-$index'),
+                        onTap: isPlaying
+                            ? widget.onStop
+                            : () => widget.onPlay(index),
+                        child: Center(
+                          child: Icon(
+                            isPlaying
+                                ? Icons.stop_circle_outlined
+                                : Icons.play_circle_outline,
+                            // 播放中用 primary 实色单点强调，区别于「仅选中定位」的行底高亮
+                            color: isPlaying ? theme.colorScheme.primary : null,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                PopupMenuItem(
-                  value: _SentenceAction.delete,
-                  enabled: widget.sentences.length > 1,
-                  child: _MenuRow(
-                    icon: Icons.delete_outline,
-                    label: l10n.deleteSentence,
-                    color: theme.colorScheme.error,
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => widget.onSelect(index),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(sentence.text),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${_formatTime(sentence.startTime)} - ${_formatTime(sentence.endTime)}',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ],
-              onSelected: (action) {
-                switch (action) {
-                  case _SentenceAction.mergeNext:
-                    widget.onMergeNext(index);
-                  case _SentenceAction.delete:
-                    widget.onDelete(index);
-                }
-              },
+                  SizedBox(
+                    width: _kMenuActionWidth,
+                    child: PopupMenuButton<_SentenceAction>(
+                      padding: EdgeInsets.zero,
+                      tooltip: MaterialLocalizations.of(
+                        context,
+                      ).showMenuTooltip,
+                      child: Center(
+                        child: Icon(
+                          Icons.more_horiz,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: _SentenceAction.mergeNext,
+                          enabled: index < widget.sentences.length - 1,
+                          child: _MenuRow(
+                            icon: Icons.call_merge,
+                            label: l10n.mergeWithNextSentence,
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: _SentenceAction.delete,
+                          enabled: widget.sentences.length > 1,
+                          child: _MenuRow(
+                            icon: Icons.delete_outline,
+                            label: l10n.deleteSentence,
+                            color: theme.colorScheme.error,
+                          ),
+                        ),
+                      ],
+                      onSelected: (action) {
+                        switch (action) {
+                          case _SentenceAction.mergeNext:
+                            widget.onMergeNext(index);
+                          case _SentenceAction.delete:
+                            widget.onDelete(index);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );

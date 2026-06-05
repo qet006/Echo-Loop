@@ -1,7 +1,24 @@
 # Echo Loop 任务清单
 
 > 最后更新：2026-06-05
-> 当前焦点：AI 转录 v2 认证与登录弹窗（已完成）
+> 当前焦点：字幕编辑器句子 item 三栏布局（已完成）
+
+## 已完成：字幕编辑器句子 item 三栏布局
+
+将字幕编辑页句子列表从 `ListTile` 默认 leading/trailing 布局改为与合集列表一致的三栏结构：左侧播放按钮、中间文本、右侧菜单按钮。左右按钮区固定较窄宽度并占满 item 高度，减少对字幕文本区的挤压，同时保留播放、选中、合并下一句和删除菜单行为。
+
+### 实现
+- [x] 句子 item 改为 `Material + IntrinsicHeight + Row`，左/中/右三栏清晰分区
+- [x] 左侧播放区固定 52px、右侧菜单区固定 44px，整高可点击
+- [x] 中间文字区使用 `Expanded` 占满剩余宽度，点击仍用于选中句子
+- [x] 保留选中/播放中的行底高亮与播放中 primary 图标强调
+
+### 验证
+- [x] `dart format lib/features/subtitle_editor/subtitle_simple_editor_screen.dart`
+- [x] `flutter analyze lib/features/subtitle_editor/subtitle_simple_editor_screen.dart`：No issues found
+- [x] `flutter test test/features/subtitle_editor/`：49 tests passed
+
+**完成时间**: 2026-06-05 22:09 +0800
 
 ## 已完成：AI 转录 v2 认证与登录弹窗
 
