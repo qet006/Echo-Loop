@@ -180,7 +180,7 @@ class _IsWordSavedProviderElement extends AutoDisposeStreamProviderElement<bool>
   String get word => (origin as IsWordSavedProvider).word;
 }
 
-String _$savedWordListHash() => r'42ca8a16e402ab4fbce5e616f0e76e5b37750d3e';
+String _$savedWordListHash() => r'7857abfa0ee3936c02aff8d409da43a32d874f20';
 
 /// 收藏单词列表 Provider（流式）
 ///
