@@ -198,14 +198,19 @@ flutter test integration_test -d macos
 - **相关代码**：`scripts/lib/build_number.sh`、`scripts/release_*.sh`、`.github/workflows/release.yml`、`lib/screens/settings_screen.dart`
 - **修复时间**：2026-05-20
 
-### 7.4 离线 ASR：Android NNAPI provider 在部分机型触发 native abort
+### 7.4 离线 ASR：sherpa-onnx Silero VAD native 推理在部分机型 abort（**未解决**）
 
-- **现象**：OnePlus Ace 6T / Android 16 (ColorOS) 跟读/复述点"结束录音"后闪退。先按 AudioRecord 并发改（见 commit `bbbf1c37`）**未解决**——根因不在录音
-- **根因**：Android 固定走离线 sherpa-onnx，`_platformProvider()` 默认返回 `nnapi`。onnxruntime 经厂商 NNAPI 驱动跑 int8 量化模型，ColorOS/Android 16 的 NNAPI 驱动在 `recognizer.decode()` 期触发 native abort（**SIGABRT，Dart/Java try-catch 无法捕获，进程直接被杀**）。`_createRecognizer` 的 try/catch 只能兜住构造期 Dart 异常，挡不住 decode 期的 native abort
-- **解法**：`_platformProvider()` 统一返回 `cpu`，把厂商 NNAPI 驱动整条移出 native 路径（保留 `AsrModelConfig.provider` 覆盖能力）
+- **现象**：OnePlus Ace 6T / Android 16 (ColorOS) 跟读/复述点"结束录音"后闪退
+- **排查过程（重要方法论）**：拿不到 logcat/tombstone，靠**落盘日志 + 崩溃面包屑**定位。先按"最可能是 NNAPI"把 `_platformProvider()` 由 `nnapi` 改 `cpu`（兜底，保留）；但真机日志显示 `provider=cpu` 后**仍崩**，且 worker 日志里 `VAD input` 打出、紧随的 `VAD: segments` 未打出——锁定崩在 `_extractSpeechWithVad`，即 **Silero VAD 的 native 推理**，与 NNAPI/whisper 无关
+- **真因**：sherpa-onnx 的 Silero VAD 在该机型 native abort（进程被杀）。在 sherpa-onnx native 层，本地无法复现、改不动
+- **失败的修复尝试（均未解决）**：
+  - ① AudioRecord 并发串行（commit `bbbf1c37`）——误判，真因不在录音
+  - ② NNAPI → cpu provider（commit `0174ee80`）——误判，cpu 后仍崩
+  - ③ 自适应跳过 VAD（崩一次后置位 `offline_asr_skip_vad`、整段直送 whisper）——真机**连续崩多次**，标记未触发自愈或绕开 VAD 后 whisper decode 同样崩，已**撤销**
+- **现状**：崩溃**未解决**。保留诊断设施（落盘日志 / `_workerLog` / 崩溃面包屑 / `asr_inference_crash_suspected` 上报）与两个独立合理的防御改动（cpu provider、AudioRecord 串行）继续排查；确诊需真机 **logcat + `/data/tombstones`**
 - **规则**：
-  - native SIGABRT 是**不可 catch** 的——"兜底不崩"只能靠避开崩溃路径，不能靠包 try-catch
-  - 排查 native 崩溃必须**落盘日志 + 调用前同步 flush**：内存日志（`AppLogger` 环形缓冲）崩溃即丢；Worker isolate 的日志写的是该 isolate 自己的单例，到不了主 isolate 日志页，需在 isolate 内自行写文件（`_workerLog`）
-  - 无 logcat 时用"崩溃面包屑"自证落点：native 调用前同步写 marker 文件、成功后 `finally` 清除；进程被杀则 finally 不执行、marker 残留，下次启动检测并上报 `asr_inference_crash_suspected`
-- **相关代码**：`lib/services/asr/sherpa_onnx_engine.dart`、`lib/services/app_logger.dart`、`lib/providers/offline_asr_settings_provider.dart`、`lib/utils/app_data_dir.dart`
-- **修复时间**：2026-06-10
+  - native SIGABRT/SIGSEGV/被杀**不可 catch**——"兜底不崩"只能靠避开崩溃路径（跳过该 native 调用），不能靠包 try-catch；但避开 VAD 后本例仍崩，说明绕开单点不一定够
+  - 面包屑只能证明"进程在某 native 段被终止"，**证明不了信号类型**（SIGABRT/SIGSEGV/OOM-SIGKILL 都会残留 marker），也证明不了"绕开该段就不崩"；要确诊信号/栈仍需 logcat + `/data/tombstones`
+  - 排查 native 崩溃必须**落盘日志 + 调用前同步 flush**：内存日志（`AppLogger` 环形缓冲）崩溃即丢；Worker isolate 的日志写各自 isolate 单例、到不了主 isolate 日志页，需在 isolate 内自行写文件（`_workerLog`）
+- **相关代码**：`lib/services/asr/sherpa_onnx_engine.dart`（崩溃面包屑 / `_workerLog` / cpu provider）、`lib/providers/offline_asr_settings_provider.dart`（`_reportPreviousAsrCrashIfAny`）、`lib/services/app_logger.dart`、`lib/utils/app_data_dir.dart`
+- **更新时间**：2026-06-10（暂记，待真机定位）

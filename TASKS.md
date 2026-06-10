@@ -1,7 +1,11 @@
 # Echo Loop 任务清单
 
 > 最后更新：2026-06-10
-> 当前焦点：修复 Android 结束录音闪退（ASR/NNAPI）
+> 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 待办：Android 离线 ASR 结束录音仍闪退
+
+- [ ] 崩在 sherpa-onnx 的 Silero VAD native 推理（`_extractSpeechWithVad`）；cpu provider、AudioRecord 串行、自适应跳过 VAD 三种尝试均未解决（skip-VAD 真机连续崩多次已撤销）。诊断设施已保留，待真机 **logcat + `/data/tombstones`** 确诊信号/栈后再定方案。详见 CLAUDE.md §7.4。
 
 ## 已完成：移除独立网盘导入入口
 
