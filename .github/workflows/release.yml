@@ -202,6 +202,46 @@ jobs:
           path: build/release/Echo-Loop-*-arm64.apk
           retention-days: 30
 
+      # Google Play 只接受 AAB 作为上架包（APK 仅用于 R2/GitHub 直装分发）。
+      # 单独构建一份 prod release AAB，签名沿用 gradle 中 prod 的 release 配置。
+      - name: Build Android App Bundle (AAB)
+        if: matrix.platform == 'android'
+        env:
+          BUILD_NAME: ${{ steps.ver.outputs.name }}
+          BUILD_NUMBER: ${{ steps.ver.outputs.number }}
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
+          POSTHOG_API_KEY: ${{ vars.POSTHOG_API_KEY }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          DART_DEFINES=(
+            "--dart-define=API_BASE_URL=${API_BASE_URL}"
+            "--dart-define=POSTHOG_HOST=${POSTHOG_HOST}"
+            "--dart-define=SUPABASE_URL=${SUPABASE_URL}"
+            "--dart-define=SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}"
+            "--dart-define=GOOGLE_WEB_CLIENT_ID=${GOOGLE_WEB_CLIENT_ID}"
+          )
+          if [[ -n "$POSTHOG_API_KEY" ]]; then
+            DART_DEFINES+=("--dart-define=POSTHOG_API_KEY=${POSTHOG_API_KEY}")
+          fi
+          # abiFilters 已在 gradle 限定 arm64，AAB 同样只含 arm64
+          flutter build appbundle --release --flavor=prod \
+            --build-name="$BUILD_NAME" \
+            --build-number="$BUILD_NUMBER" \
+            "${DART_DEFINES[@]}"
+
+      - name: Upload AAB to Google Play (internal track)
+        if: matrix.platform == 'android'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: app.echoloop
+          releaseFiles: build/app/outputs/bundle/prodRelease/app-prod-release.aab
+          track: internal
+          status: completed
+
       # ---------- iOS ----------
 
       - name: Import distribution certificate to keychain
