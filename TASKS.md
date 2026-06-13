@@ -3,6 +3,16 @@
 > 最后更新：2026-06-13
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
 
+## 已完成：禁止删除播客单集（修复删了又回来）
+
+**完成时间**: 2026-06-13
+
+播客单集是 RSS feed 的占位行，删除走 hardDelete，但刷新去重只比对活跃音频的 guid，
+查不到已删行 → 同一单集被重新插回。与官方合集一致隐藏单集删除项，移除请退订整个合集。
+
+- [x] `widgets/audio_list_tile.dart`：删除菜单守卫改为 `!isOfficial && !isPodcastEpisode`
+- [x] `test/widgets/audio_list_tile_test.dart`：单集无删除项 + 用户音频仍有删除项
+
 ## 已完成：空/静音音频检测与标记
 
 **完成时间**: 2026-06-13

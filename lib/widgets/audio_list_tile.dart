@@ -629,6 +629,10 @@ class AudioListTile extends ConsumerWidget {
     // manageTags 也一并隐藏（官方内容场景下打 tag 诉求极低）。
     // 仅保留 pin（纯本地 UI 偏好）+ resetProgress（学习进度重置）。
     final isOfficial = audioItem.remoteAudioId != null;
+    // 播客单集由 RSS feed 统一管理：单集是 feed 的占位行，删除后下次刷新会按
+    // guid 去重重新插回（_importEpisodes 只比对活跃音频的 guid，查不到已删行），
+    // 造成「删了又回来」。故与官方合集一致隐藏删除项，移除请退订整个播客合集。
+    final isPodcastEpisode = audioItem.podcastEpisodeGuid != null;
     return SizedBox.expand(
       child: PopupMenuButton<String>(
         key: _kMenuHitAreaKey,
@@ -725,7 +729,7 @@ class AudioListTile extends ConsumerWidget {
                 l10n.resetLearningProgress,
               ),
             ),
-          if (!isOfficial)
+          if (!isOfficial && !isPodcastEpisode)
             PopupMenuItem(
               value: 'delete',
               child: _buildMenuItemRow(

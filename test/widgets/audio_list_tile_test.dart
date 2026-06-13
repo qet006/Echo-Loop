@@ -915,6 +915,44 @@ void main() {
       expect(find.text('Edit subtitles'), findsNothing);
     });
 
+    testWidgets('播客单集菜单不显示删除项，仍保留单集信息项', (tester) async {
+      final episode = baseItem.copyWith(
+        podcastEpisodeGuid: 'episode-guid-1',
+        podcastEnclosureUrl: 'https://example.com/episode.mp3',
+        transcriptPath: null,
+        transcriptSource: null,
+      );
+      await tester.pumpWidget(
+        buildCompactTile(AudioLibraryState(audioItems: [episode])),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('audio_list_tile_menu_hit_area')));
+      await tester.pumpAndSettle();
+
+      // 单集由 feed 统一管理，删除后刷新会重新插回，故隐藏删除项。
+      expect(find.text('Delete'), findsNothing);
+      // 播客专属能力（单集信息）未被误伤。
+      expect(find.text('Episode Info'), findsOneWidget);
+    });
+
+    testWidgets('用户音频菜单仍显示删除项', (tester) async {
+      final item = baseItem.copyWith(
+        transcriptPath: null,
+        transcriptSource: null,
+      );
+      await tester.pumpWidget(
+        buildCompactTile(AudioLibraryState(audioItems: [item])),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('audio_list_tile_menu_hit_area')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete'), findsOneWidget);
+      expect(find.text('Episode Info'), findsNothing);
+    });
+
     testWidgets('点击官方更新字幕先弹出清空进度确认框', (tester) async {
       final officialItem = baseItem.copyWith(
         remoteAudioId: 'remote-audio-1',
