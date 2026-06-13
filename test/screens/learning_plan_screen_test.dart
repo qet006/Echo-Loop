@@ -243,6 +243,29 @@ void main() {
       expect(find.text('Not started'), findsOneWidget);
     });
 
+    testWidgets('疑似空音频时进度卡片显示内容警告徽章', (tester) async {
+      final suspectEmptyItem = testAudioItem.copyWith(
+        contentStatus: AudioContentStatus.suspectEmpty,
+      );
+      await tester.pumpWidget(createTestWidget(audioItem: suspectEmptyItem));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('learning_plan_content_warning_badge')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('内容正常时进度卡片不显示内容警告徽章', (tester) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('learning_plan_content_warning_badge')),
+        findsNothing,
+      );
+    });
+
     testWidgets('显示首次学习区域的 4 个步骤', (tester) async {
       await tester.pumpWidget(createTestWidget());
       await tester.pumpAndSettle();

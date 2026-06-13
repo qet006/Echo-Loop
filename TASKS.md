@@ -3,6 +3,16 @@
 > 最后更新：2026-06-13
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
 
+## 已完成：学习计划页展示疑似空音频标记
+
+**完成时间**: 2026-06-13
+
+空/静音音频检测的「疑似空音频」标记此前仅在音频列表项显示。进入学习计划页后用户看不到该提示，现在在进度卡片的音频元信息行（时长/句数/词数同行）首位补充同款红色警告徽章，与列表项风格一致；内容正常时不显示。
+
+- [x] `screens/learning_plan_screen.dart`：`_ProgressCard._buildAudioInfo` 在 `contentStatus==suspectEmpty` 时插入 `_buildContentWarningChip`（红色描边 + warning 图标 + `audioContentEmptyWarning`）
+- [x] `test/screens/learning_plan_screen_test.dart`：疑似空音频显示徽章 / 内容正常不显示 两例
+- [x] `flutter analyze`（变更文件）：No issues found；新增测试通过（既有「AI 转录音频过长」用例失败与本次无关）
+
 ## 已完成：禁止删除播客单集（修复删了又回来）
 
 **完成时间**: 2026-06-13
@@ -20,12 +30,18 @@
 新下载/导入的音频若「解码失败（损坏/空）」或「能播但全程静音」，列表项显示警告徽章、转录前确认拦截，避免反复无意义转录；解码失败不再回退 RSS 假时长。
 
 ### 实现
-- [x] `utils/audio_content_check.dart` —— 纯函数 `isWaveformSilent` + 编排 `evaluateAudioContent`（解码时长<=0 直接判 suspectEmpty，否则 just_waveform 取峰值判静音；阈值 3% 满量程）
+- [x] `utils/audio_content_check.dart` —— 纯函数 `isWaveformSilent` + 编排 `evaluateAudioContent`（解码时长<=0 直接判 suspectEmpty，否则 just_waveform 判静音）
 - [x] `models/audio_item.dart` —— 新增 `AudioContentStatus{ok,suspectEmpty}` 枚举 + `contentStatus` 字段（toJson/fromJson/copyWith）
 - [x] DB：`audio_items` 加 `audio_content_status` 列；`app_database` schemaVersion 38→39 + 迁移；build_runner 重新生成
 - [x] `audio_library_provider.dart` —— row↔model 读写映射 + `checkAudioContent`（防竞态校验后写回）
 - [x] 三处下载完成点 fire-and-forget 调用检测：`audio_import_provider`（podcast 懒下载 + 直链导入）、`official_download_notifier`（官方合集）
 - [x] `audio_import_provider` 去掉 podcast 解码失败的 RSS 时长回退（解不出即 0，列表项时长行自然省略）
+
+### 修复（静音误判 + 历史音频回扫）
+- [x] **根因**：`just_waveform` 16-bit `parse()` 数据视图比真实数据早 10 字节，`Waveform.data` 头部混入头部字段值（如 samplesPerPixel=2205），原「全局峰值」法被污染漏判静音
+- [x] `isWaveformSilent` 改为「响亮样本占比」判定（响亮门限≈-40dBFS，占比 < 0.5% 判静音），对少量离群样本健壮；新增回归测试
+- [x] **懒检测**历史音频：用户点击打开音频 / 进字幕管理时（`_handleTap`、`manageSubtitles` 菜单），对未检测过的已就绪音频后台触发一次，避免启动全库扫描的开销
+- [x] buggy v39 检测结果未发布过，无需新迁移；本地 dev 库手动 `UPDATE audio_items SET audio_content_status=NULL` 一次，靠懒检测重检（schemaVersion 保持 39）
 - [x] `audio_list_tile.dart` —— suspectEmpty 显示红色 `warning_amber` 警告徽章
 - [x] `manage_subtitles_sheet.dart` —— `_handleAiTranscription` suspectEmpty 时弹确认框（用确认非硬拦截，规避误判）
 - [x] i18n：`app_en/zh.arb` 新增 `audioContentEmptyWarning` / `transcriptionSilentConfirm*`

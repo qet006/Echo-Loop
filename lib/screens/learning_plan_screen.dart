@@ -1312,6 +1312,10 @@ class _ProgressCard extends ConsumerWidget {
     final item = audioItem!;
     final chips = <Widget>[];
 
+    // 内容异常警告（疑似空音频：解码失败 / 全程静音）放在首位，最醒目。
+    if (item.contentStatus == AudioContentStatus.suspectEmpty) {
+      chips.add(_buildContentWarningChip(theme));
+    }
     if (item.totalDuration > 0) {
       chips.add(
         _InfoChip(
@@ -1347,7 +1351,38 @@ class _ProgressCard extends ConsumerWidget {
     return Wrap(
       spacing: AppSpacing.s,
       runSpacing: AppSpacing.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: chips,
+    );
+  }
+
+  /// 内容异常警告徽章（疑似空音频），与音频列表项的警告徽章风格一致。
+  Widget _buildContentWarningChip(ThemeData theme) {
+    final color = theme.colorScheme.error;
+    return Container(
+      key: const Key('learning_plan_content_warning_badge'),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        border: Border.all(color: color.withValues(alpha: 0.55)),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.warning_amber_rounded, size: 12, color: color),
+          const SizedBox(width: 3),
+          Text(
+            l10n.audioContentEmptyWarning,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              height: 1.1,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
