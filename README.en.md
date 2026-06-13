@@ -26,7 +26,7 @@
   </p>
 
   <p>
-    <a href="https://apps.apple.com/cn/app/echo-loop-%E9%AB%98%E6%95%88%E8%8B%B1%E8%AF%AD%E5%90%AC%E8%AF%B4%E8%AE%AD%E7%BB%83/id6760324074"><img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store" height="48" /></a>
+    <a href="https://apps.apple.com/app/id6760324074"><img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store" height="48" /></a>
     <a href="https://groups.google.com/u/0/g/echo-loop-testers/c/vzaTF9j4ys8"><img src="assets/badges/google-play-en.png" alt="Get it on Google Play" height="48" /></a>
   </p>
 </div>
@@ -151,7 +151,7 @@ Each piece of material is split into 1 first-pass session + 7 spaced reviews. In
   <tr>
     <td valign="middle">
       <p>
-        <a href="https://apps.apple.com/cn/app/echo-loop-%E9%AB%98%E6%95%88%E8%8B%B1%E8%AF%AD%E5%90%AC%E8%AF%B4%E8%AE%AD%E7%BB%83/id6760324074"><img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="App Store" height="48" /></a>
+        <a href="https://apps.apple.com/app/id6760324074"><img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="App Store" height="48" /></a>
         &nbsp;
         <a href="https://groups.google.com/u/0/g/echo-loop-testers/c/vzaTF9j4ys8"><img src="assets/badges/google-play-en.png" alt="Get it on Google Play" height="48" /></a>
         &nbsp;
