@@ -370,6 +370,53 @@ void main() {
     expect(find.text('First Study Audio'), findsAtLeast(1));
   });
 
+  testWidgets('学习社群入口保持紧凑高度并使用发现入口青蓝色系', (tester) async {
+    final now = DateTime(2026, 2, 25, 12, 0);
+    final audioItems = [
+      AudioItem(
+        id: 'audio-1',
+        name: 'First Study Audio',
+        audioPath: 'audios/test.mp3',
+        addedDate: now,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      createTestWidget(
+        audioItems: audioItems,
+        progressState: const LearningProgressState(),
+        fixedNow: now,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Join Community'), findsOneWidget);
+    expect(
+      find.text('Find study buddies, share resources, request features'),
+      findsOneWidget,
+    );
+
+    final communityDecoration = tester
+        .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+        .map((box) => box.decoration)
+        .whereType<BoxDecoration>()
+        .firstWhere((decoration) {
+          final gradient = decoration.gradient;
+          return gradient is LinearGradient &&
+              gradient.colors.length == 2 &&
+              gradient.colors.first == const Color(0xFFEAF8FA) &&
+              gradient.colors.last == const Color(0xFFDDEFFA);
+        });
+
+    expect(communityDecoration.borderRadius, BorderRadius.circular(12));
+    expect(
+      (communityDecoration.border! as Border).top.color,
+      const Color(0xFFA9D5DF),
+    );
+    expect(tester.widget<Icon>(find.byIcon(Icons.group_rounded)).size, 20);
+    expect(tester.widget<Icon>(find.byIcon(Icons.chevron_right)).size, 20);
+  });
+
   testWidgets('任务卡片中显示 LearningProgressIcon', (tester) async {
     final now = DateTime(2026, 2, 25, 12, 0);
     final audioItems = [

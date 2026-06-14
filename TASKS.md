@@ -3,6 +3,19 @@
 > 最后更新：2026-06-14
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
 
+## 已完成：学习社群入口视觉对齐发现入口
+
+**完成时间**: 2026-06-14 22:09 +0800
+
+学习 Tab 顶部「加入学习社群」入口在保持原单行紧凑高度的基础上，改为类似「发现精选资源」的青蓝色样式：浅青蓝渐变背景、浅青边线、12px 圆角、左侧社群图标、标题/副标题单行排版和右侧箭头，避免原先蓝底条与发现入口视觉不一致。
+
+- [x] `study_screen.dart`：重构 `_CommunityInviteCard` 为渐变描边卡片，使用 `group_rounded` 图标并保留原有 analytics 与 locale 跳转逻辑
+- [x] `study_screen_test.dart`：新增学习社群入口视觉回归测试，覆盖文案、渐变、边框、圆角、图标和箭头尺寸
+- [x] 后续修复（2026-06-14 22:13 +0800）：按反馈恢复原单行紧凑高度，仅保留类似发现入口的青蓝色系、边框与圆角
+- [x] `flutter analyze lib/screens/study_screen.dart test/screens/study_screen_test.dart`：No issues found
+- [x] `flutter test test/screens/study_screen_test.dart`：13 passed
+- [ ] `scripts/check.sh`：未跑；本次为学习页入口局部视觉调整，按规范仅运行直接相关检查
+
 ## 已完成：发现页入口文案与视觉优化
 
 **完成时间**: 2026-06-14 20:13 +0800
