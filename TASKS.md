@@ -68,16 +68,16 @@
 - [x] `flutter test test/services/refresh_coordinator_test.dart test/features/official_collections/official_catalog_service_test.dart test/features/official_collections/podcast_preview_provider_test.dart test/features/podcast/podcast_service_test.dart test/screens/collection_detail_screen_podcast_test.dart test/features/official_collections/discover_collections_screen_test.dart test/features/official_collections/official_collection_detail_screen_test.dart`：51 passed
 - [ ] `scripts/check.sh`：未跑；本次为 Podcast/官方合集刷新策略局部重构，按规范仅运行直接相关检查
 
-## 已完成：Android 使用平台默认字体链
+## 已完成：恢复 Flutter 系统默认字体策略
 
 **完成时间**: 2026-06-14 14:17 +0800
 
-移除 Flutter Material 默认 `TextTheme` 注入的 Roboto 字体族，不打包、不指定应用字体，让界面文本按 iOS/Android 各自平台默认字体链渲染。
+恢复 Flutter/Material 推荐的默认字体策略：不设置 `fontFamily`，不打包自定义字体，让各平台按自身默认字体链渲染文本。
 
-- [x] `app_theme.dart`：主题构建后清理 `textTheme` / `primaryTextTheme` 中的字体族，保留字号、字重、颜色等 Material 排版 token
-- [x] `app_theme_test.dart`：新增回归测试，防止亮色/暗色主题重新带上显式字体族
+- [x] `app_theme.dart`：移除 Android `sans-serif` 和 `TextTheme` 字体族清理逻辑，回到 `ThemeData(useMaterial3: true)` 默认字体路径
+- [x] `app_theme_test.dart`：移除无效的字体族断言，保留既有主题回归测试
 - [x] `flutter analyze lib/theme/app_theme.dart test/theme/app_theme_test.dart`：No issues found
-- [x] `flutter test test/theme/app_theme_test.dart`：12 passed
+- [x] `flutter test test/theme/app_theme_test.dart`：11 passed
 - [ ] `scripts/check.sh`：未跑；本次为主题字体局部调整，按规范仅运行直接相关检查
 
 ## 已完成：全文盲听字幕 focus 跟随
