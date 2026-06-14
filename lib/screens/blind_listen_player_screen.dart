@@ -642,6 +642,7 @@ class _BlindListenPlayerScreenState
                   : RetellDisplayMode.hideAll,
               keywordMap: const {},
               playingSentenceIndex: playerState.playingSentenceIndex,
+              autoFocusEnabled: true,
               bookmarkedSentenceIndices: playerState.bookmarkedSentenceIndices,
               onSentenceTap: _handleSentenceDetail,
               onSentencePlayFrom: _handleSentencePlayFrom,

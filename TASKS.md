@@ -15,6 +15,20 @@
 - [x] `flutter test test/theme/app_theme_test.dart`：12 passed
 - [ ] `scripts/check.sh`：未跑；本次为主题字体局部调整，按规范仅运行直接相关检查
 
+## 已完成：全文盲听字幕 focus 跟随
+
+**完成时间**: 2026-06-14 14:06 +0800
+
+全文盲听页面新增字幕 focus 功能：默认跟随正在播放的句子并滚动到列表中间；用户手动上下滑动时暂停自动跟随，松手空闲 2 秒后自动恢复 focus。去掉额外手动开关，避免用户理解抽象图标。
+
+- [x] `paragraph_sentence_list_card.dart`：句子列表改为 `ScrollablePositionedList`，支持当前播放句居中、用户滚动暂停、滚动停止延迟恢复
+- [x] `blind_listen_player_screen.dart`：全文盲听常开自动跟随，不新增难理解的手动开关
+- [x] 后续修复：目标句已完整可见时不再强制居中滚动，避免顶部/底部边界持续尝试滚动
+- [x] 测试：新增 `paragraph_sentence_list_card_test.dart` 覆盖自动跟随、目标句可见时不强制滚动、关闭 focus、用户滚动后延迟恢复
+- [x] `flutter analyze lib/screens/blind_listen_player_screen.dart lib/widgets/common/paragraph_sentence_list_card.dart test/screens/blind_listen_player_screen_test.dart test/widgets/paragraph_sentence_list_card_test.dart`：No issues found
+- [x] `flutter test test/widgets/paragraph_sentence_list_card_test.dart test/screens/blind_listen_player_screen_test.dart`：13 passed
+- [ ] `scripts/check.sh`：未跑；本次为全文盲听页面局部 UI 行为优化，按规范仅运行直接相关检查
+
 ## 已完成：发现页接入精选播客 catalog
 
 **完成时间**: 2026-06-14 12:39 +0800
