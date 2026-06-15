@@ -62,26 +62,6 @@ class AudioImportService {
     AudioImportProgressCallback? onProgress,
   }) async {
     final resolved = await resolveUrl(url, cancelToken: cancelToken);
-    final existingResult = await _registrationService
-        .registerExistingAudioByName(
-          name: resolved.displayName,
-          audioLibraryState: audioLibraryState,
-          collectionList: collectionList,
-          collectionState: collectionState,
-          collectionId: collectionId,
-        );
-    switch (existingResult) {
-      case AudioRegistrationAdded(:final item):
-        return item;
-      case AudioRegistrationDuplicate(:final name):
-        throw AudioImportException(
-          AudioImportFailureCode.duplicate,
-          'Audio already exists: $name',
-        );
-      case null:
-        break;
-    }
-
     final dataDir = await _resolveDataDir();
     final audioId = _uuid.v4();
     final downloadedPath = await _downloadToTemp(
@@ -91,21 +71,18 @@ class AudioImportService {
       cancelToken: cancelToken,
       onProgress: onProgress,
     );
-    final relativeAudioPath = await _finalizeDownloadedAudio(
+    final finalizedAudio = await _finalizeDownloadedAudio(
       dataDir: dataDir,
       tempRelativePath: downloadedPath,
-      requestedFileName: resolved.fileName,
     );
 
-    final absoluteAudioPath = p.join(dataDir.path, relativeAudioPath);
-    final sha256 = await _tryComputeSha256(absoluteAudioPath);
     final result = await _registrationService.registerSandboxedAudio(
       input: SandboxedAudioRegistrationInput(
         name: resolved.displayName,
-        relativePath: relativeAudioPath,
+        relativePath: finalizedAudio.relativePath,
         importSourceType: AudioImportSourceType.directUrl,
         importSourceUrl: resolved.uri.toString(),
-        audioSha256: sha256,
+        audioSha256: finalizedAudio.sha256,
       ),
       audioLibrary: audioLibrary,
       audioLibraryState: audioLibraryState,
@@ -116,8 +93,19 @@ class AudioImportService {
 
     switch (result) {
       case AudioRegistrationAdded(:final item):
+        if (finalizedAudio.created &&
+            item.audioPath != finalizedAudio.relativePath) {
+          await _deleteIfExists(
+            File(p.join(dataDir.path, finalizedAudio.relativePath)),
+          );
+        }
         return item;
       case AudioRegistrationDuplicate(:final name):
+        if (finalizedAudio.created) {
+          await _deleteIfExists(
+            File(p.join(dataDir.path, finalizedAudio.relativePath)),
+          );
+        }
         throw AudioImportException(
           AudioImportFailureCode.duplicate,
           'Audio already exists: $name',
@@ -172,19 +160,16 @@ class AudioImportService {
       cancelToken: cancelToken,
       onProgress: onProgress,
     );
-    final relativeAudioPath = await _finalizeDownloadedAudio(
+    final finalizedAudio = await _finalizeDownloadedAudio(
       dataDir: dataDir,
       tempRelativePath: downloadedPath,
-      requestedFileName: '$safeBaseName.$extension',
     );
 
-    final absoluteAudioPath = p.join(dataDir.path, relativeAudioPath);
-    final sha256 = await _tryComputeSha256(absoluteAudioPath);
-    final duration = await _tryReadDuration(relativeAudioPath);
+    final duration = await _tryReadDuration(finalizedAudio.relativePath);
     return DownloadedAudio(
-      relativePath: relativeAudioPath,
+      relativePath: finalizedAudio.relativePath,
       durationSeconds: duration,
-      audioSha256: sha256,
+      audioSha256: finalizedAudio.sha256,
     );
   }
 
@@ -327,10 +312,9 @@ class AudioImportService {
     }
   }
 
-  Future<String> _finalizeDownloadedAudio({
+  Future<_FinalizedDownloadedAudio> _finalizeDownloadedAudio({
     required Directory dataDir,
     required String tempRelativePath,
-    required String requestedFileName,
   }) async {
     final audioDir = Directory(p.join(dataDir.path, 'audios', 'imported'));
     await audioDir.create(recursive: true);
@@ -341,16 +325,36 @@ class AudioImportService {
     );
     final sourceRelativePath = transcodeResult.relativePath;
     final sourceFile = File(p.join(dataDir.path, sourceRelativePath));
-    final requestedBaseName = p.basenameWithoutExtension(requestedFileName);
-    final targetName = transcodeResult.transcoded
-        ? '$requestedBaseName.m4a'
-        : requestedFileName;
-    final finalName = await _uniqueFileName(audioDir, targetName);
+    final sha256 = await _computeFinalAudioSha256(sourceFile);
+    final ext = p.extension(sourceFile.path);
+    final finalName = '$sha256$ext';
     final finalFile = File(p.join(audioDir.path, finalName));
 
-    await _moveAudioToFinal(sourceFile: sourceFile, finalFile: finalFile);
+    final created = !await finalFile.exists();
+    if (created) {
+      await _moveAudioToFinal(sourceFile: sourceFile, finalFile: finalFile);
+    } else {
+      await _deleteIfExists(sourceFile);
+    }
     await _deleteTempAudioSibling(dataDir, tempRelativePath);
-    return p.join('audios', 'imported', finalName);
+    return _FinalizedDownloadedAudio(
+      relativePath: p.join('audios', 'imported', finalName),
+      sha256: sha256,
+      created: created,
+    );
+  }
+
+  /// 对转码/回退后的最终候选音频计算指纹，用作程序内部稳定文件名。
+  Future<String> _computeFinalAudioSha256(File sourceFile) async {
+    try {
+      return await _computeSha256(sourceFile.path);
+    } catch (e) {
+      throw AudioImportException(
+        AudioImportFailureCode.storage,
+        'Failed to fingerprint audio',
+        e,
+      );
+    }
   }
 
   /// 将临时音频移动到正式目录；跨卷 rename 失败时回退 copy，并清理半成品。
@@ -374,31 +378,6 @@ class AudioImportService {
           e,
         );
       }
-    }
-  }
-
-  Future<String> _uniqueFileName(Directory dir, String requested) async {
-    final base = p.basenameWithoutExtension(requested);
-    final ext = p.extension(requested);
-    var candidate = requested;
-    var index = 1;
-    while (await File(p.join(dir.path, candidate)).exists()) {
-      final suffix = _uuid.v4().substring(0, 8);
-      candidate = '$base-$suffix$ext';
-      index++;
-      if (index > 20) {
-        candidate = '${_uuid.v4()}$ext';
-        break;
-      }
-    }
-    return candidate;
-  }
-
-  Future<String?> _tryComputeSha256(String absolutePath) async {
-    try {
-      return await _computeSha256(absolutePath);
-    } catch (_) {
-      return null;
     }
   }
 
@@ -460,4 +439,16 @@ class AudioImportService {
       await file.delete();
     } catch (_) {}
   }
+}
+
+class _FinalizedDownloadedAudio {
+  const _FinalizedDownloadedAudio({
+    required this.relativePath,
+    required this.sha256,
+    required this.created,
+  });
+
+  final String relativePath;
+  final String sha256;
+  final bool created;
 }

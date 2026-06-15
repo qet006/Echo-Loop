@@ -27,14 +27,16 @@ class AudioRegistrationService {
     CollectionState? collectionState,
     String? collectionId,
   }) async {
-    final existingResult = await registerExistingAudioByName(
-      name: input.name,
-      audioLibraryState: audioLibraryState,
-      collectionList: collectionList,
-      collectionState: collectionState,
-      collectionId: collectionId,
-    );
-    if (existingResult != null) return existingResult;
+    if (input.audioSha256 == null) {
+      final existingResult = await registerExistingAudioByName(
+        name: input.name,
+        audioLibraryState: audioLibraryState,
+        collectionList: collectionList,
+        collectionState: collectionState,
+        collectionId: collectionId,
+      );
+      if (existingResult != null) return existingResult;
+    }
 
     final duration = await _readDurationSeconds(input.relativePath);
     final audioItem = AudioItem(

@@ -202,6 +202,87 @@ void main() {
       expect(item.importSourceType, AudioImportSourceType.local);
       expect(item.importSourceUrl, isNull);
     });
+
+    test('相同 hash 仍创建独立 AudioItem，但可共享音频文件', () async {
+      final existing = AudioItem(
+        id: 'a1',
+        name: 'existing',
+        audioPath: 'audios/sha.m4a',
+        audioSha256: 'sha',
+        addedDate: DateTime(2026, 1, 1),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          audioLibraryProvider.overrideWith(
+            () => _FakeAudioLibrary(AudioLibraryState(audioItems: [existing])),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final service = AudioRegistrationService(
+        readDurationSeconds: (_) async => 5,
+      );
+
+      final result = await service.registerSandboxedAudio(
+        input: const SandboxedAudioRegistrationInput(
+          name: 'new-name',
+          relativePath: 'audios/sha.m4a',
+          importSourceType: AudioImportSourceType.local,
+          audioSha256: 'sha',
+        ),
+        audioLibrary: container.read(audioLibraryProvider.notifier),
+        audioLibraryState: container.read(audioLibraryProvider),
+      );
+
+      final added = result as AudioRegistrationAdded;
+      expect(added.item.name, 'new-name');
+      expect(added.item.audioPath, 'audios/sha.m4a');
+      expect(added.item.audioSha256, 'sha');
+      expect(container.read(audioLibraryProvider).audioItems, [
+        existing,
+        added.item,
+      ]);
+    });
+
+    test('同名但 hash 不同的音频可以共存', () async {
+      final existing = AudioItem(
+        id: 'a1',
+        name: 'lesson',
+        audioPath: 'audios/old.m4a',
+        audioSha256: 'old-sha',
+        addedDate: DateTime(2026, 1, 1),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          audioLibraryProvider.overrideWith(
+            () => _FakeAudioLibrary(AudioLibraryState(audioItems: [existing])),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final service = AudioRegistrationService(
+        readDurationSeconds: (_) async => 5,
+      );
+
+      final result = await service.registerSandboxedAudio(
+        input: const SandboxedAudioRegistrationInput(
+          name: 'lesson',
+          relativePath: 'audios/new.m4a',
+          importSourceType: AudioImportSourceType.local,
+          audioSha256: 'new-sha',
+        ),
+        audioLibrary: container.read(audioLibraryProvider.notifier),
+        audioLibraryState: container.read(audioLibraryProvider),
+      );
+
+      final added = result as AudioRegistrationAdded;
+      expect(added.item.name, 'lesson');
+      expect(added.item.audioSha256, 'new-sha');
+      expect(container.read(audioLibraryProvider).audioItems, [
+        existing,
+        added.item,
+      ]);
+    });
   });
 
   group('AudioImportService.importFromUrl', () {
@@ -278,8 +359,7 @@ void main() {
       );
 
       expect(item.name, 'lesson');
-      expect(item.audioPath, startsWith('audios/imported/lesson'));
-      expect(item.audioPath, endsWith('.m4a'));
+      expect(item.audioPath, 'audios/imported/sha.m4a');
       expect(item.totalDuration, 42);
       expect(item.audioSha256, 'sha');
       expect(item.importSourceType, AudioImportSourceType.directUrl);
@@ -320,20 +400,24 @@ void main() {
         audioLibraryState: container.read(audioLibraryProvider),
       );
 
-      expect(item.audioPath, endsWith('.mp3'));
+      expect(item.audioPath, 'audios/imported/sha-original.mp3');
       expect(item.totalDuration, 24);
       expect(item.audioSha256, 'sha-original');
       expect(await File('${tmpDir.path}/${item.audioPath}').exists(), isTrue);
       expect(await _tmpAudioImportFiles(tmpDir), isEmpty);
     });
 
-    test('合集入口遇到同名音频时关联已有音频', () async {
+    test('合集入口遇到相同 hash 音频时创建独立条目并复用文件', () async {
       final existing = AudioItem(
         id: 'a1',
-        name: 'lesson',
-        audioPath: 'audios/lesson.mp3',
+        name: 'existing lesson',
+        audioPath: 'audios/imported/sha-existing.m4a',
+        audioSha256: 'sha-existing',
         addedDate: DateTime(2026, 1, 1),
       );
+      final existingFile = File('${tmpDir.path}/${existing.audioPath}');
+      await existingFile.create(recursive: true);
+      await existingFile.writeAsBytes([9, 9, 9]);
       final container = ProviderContainer(
         overrides: [
           audioLibraryProvider.overrideWith(
@@ -346,6 +430,8 @@ void main() {
       final service = AudioImportService(
         dio: dio,
         resolveDataDir: () async => tmpDir,
+        computeSha256: (_) async => 'sha-existing',
+        transcodeService: _FakeTranscodeService(shouldTranscode: true),
       );
 
       final item = await service.importFromUrl(
@@ -356,17 +442,18 @@ void main() {
         collectionId: 'c1',
       );
 
-      expect(item, existing);
-      expect(container.read(collectionListProvider).getAudioIds('c1'), ['a1']);
-      verifyNever(
-        () => dio.download(
-          any(),
-          any(),
-          cancelToken: any(named: 'cancelToken'),
-          options: any(named: 'options'),
-          onReceiveProgress: any(named: 'onReceiveProgress'),
-        ),
+      expect(item.id, isNot(existing.id));
+      expect(item.name, 'lesson');
+      expect(item.audioPath, existing.audioPath);
+      expect(item.audioSha256, existing.audioSha256);
+      expect(container.read(collectionListProvider).getAudioIds('c1'), [
+        item.id,
+      ]);
+      expect(
+        await File('${tmpDir.path}/audios/imported/sha-existing.m4a').exists(),
+        isTrue,
       );
+      expect(await existingFile.readAsBytes(), [9, 9, 9]);
     });
   });
 
@@ -418,9 +505,32 @@ void main() {
         enclosureType: 'audio/mpeg',
       );
 
-      expect(result.relativePath, endsWith('.m4a'));
+      expect(result.relativePath, 'audios/imported/sha-episode.m4a');
       expect(result.durationSeconds, 61);
       expect(result.audioSha256, 'sha-episode');
+      expect(await _tmpAudioImportFiles(tmpDir), isEmpty);
+    });
+
+    test('目标 hash 文件已存在时复用已有文件且不覆盖内容', () async {
+      final importedDir = Directory('${tmpDir.path}/audios/imported');
+      await importedDir.create(recursive: true);
+      final existingFile = File('${importedDir.path}/sha-episode.m4a');
+      await existingFile.writeAsBytes([9, 9, 9]);
+      final service = AudioImportService(
+        dio: dio,
+        resolveDataDir: () async => tmpDir,
+        computeSha256: (_) async => 'sha-episode',
+        readDurationSeconds: (_) async => 61,
+        transcodeService: _FakeTranscodeService(shouldTranscode: true),
+      );
+
+      final result = await service.downloadEpisodeToSandbox(
+        url: 'https://example.com/episode.mp3',
+        enclosureType: 'audio/mpeg',
+      );
+
+      expect(result.relativePath, 'audios/imported/sha-episode.m4a');
+      expect(await existingFile.readAsBytes(), [9, 9, 9]);
       expect(await _tmpAudioImportFiles(tmpDir), isEmpty);
     });
   });

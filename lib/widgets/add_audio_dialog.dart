@@ -14,6 +14,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:universal_io/io.dart';
 import '../utils/app_data_dir.dart';
+import '../utils/audio_fingerprint.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
 import '../features/audio_import/audio_registration_service.dart';
@@ -29,7 +30,16 @@ typedef _PickedAudio = ({
   String path,
   String name,
   String fileName,
+  String audioSha256,
+  bool created,
   int fileSize,
+});
+
+typedef _SavedPickedAudio = ({
+  String path,
+  String fileName,
+  String audioSha256,
+  bool created,
 });
 
 /// 内联错误提示种类
@@ -569,11 +579,19 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
             rejectedExts.add(ext.isNotEmpty ? ext : '?');
             continue;
           }
-          final dest = await _savePickedFileToSandbox(file, 'audios');
+          final saved = await _savePickedFileToSandbox(file, 'audios');
+          final sourcePath = file.path;
+          final sourceName = file.name.isNotEmpty
+              ? file.name
+              : sourcePath == null
+              ? saved.fileName
+              : path.basename(sourcePath);
           picked.add((
-            path: dest,
-            name: path.basenameWithoutExtension(dest),
-            fileName: path.basename(dest),
+            path: saved.path,
+            name: path.basenameWithoutExtension(sourceName),
+            fileName: saved.fileName,
+            audioSha256: saved.audioSha256,
+            created: saved.created,
             fileSize: file.size,
           ));
         }
@@ -617,7 +635,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
   }
 
   /// 保存文件到应用沙盒，返回相对于数据目录的相对路径
-  Future<String> _savePickedFileToSandbox(
+  Future<_SavedPickedAudio> _savePickedFileToSandbox(
     PlatformFile file,
     String subdir,
   ) async {
@@ -627,28 +645,27 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     await finalDir.create(recursive: true);
     await tmpDir.create(recursive: true);
 
+    final sourcePath = file.path;
     final baseName = file.name.isNotEmpty
         ? file.name
-        : (file.path != null ? path.basename(file.path!) : 'file');
-    final finalPath = path.join(finalDir.path, baseName);
-
-    // 如果文件已存在，直接返回相对路径
-    if (await File(finalPath).exists()) {
-      return path.join(subdir, baseName);
-    }
+        : sourcePath == null
+        ? 'file'
+        : path.basename(sourcePath);
 
     final tmpName =
         '${DateTime.now().microsecondsSinceEpoch}-${path.basename(baseName)}';
     final tmpPath = path.join(tmpDir.path, tmpName);
 
     // 先复制到临时目录，转码/回退决策完成后再移动到正式音频目录。
-    if (file.path != null) {
-      await File(file.path!).copy(tmpPath);
-    } else if (file.bytes != null) {
-      await File(tmpPath).writeAsBytes(file.bytes!);
-    } else if (file.readStream != null) {
+    final bytes = file.bytes;
+    final readStream = file.readStream;
+    if (sourcePath != null) {
+      await File(sourcePath).copy(tmpPath);
+    } else if (bytes != null) {
+      await File(tmpPath).writeAsBytes(bytes);
+    } else if (readStream != null) {
       final out = File(tmpPath).openWrite();
-      await file.readStream!.pipe(out);
+      await readStream.pipe(out);
       await out.close();
     } else {
       throw Exception('Unable to access picked file');
@@ -661,17 +678,27 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     );
     final sourceRelativePath = transcodeResult.relativePath;
     final sourceFile = File(path.join(dataDir.path, sourceRelativePath));
-    final requestedBase = path.basenameWithoutExtension(baseName);
-    final targetName = transcodeResult.transcoded
-        ? '$requestedBase.m4a'
-        : baseName;
-    final finalName = await _uniqueSandboxFileName(finalDir, targetName);
+    final sha256 = await computeAudioSha256(sourceFile.path);
+    final finalName = '$sha256${path.extension(sourceFile.path)}';
     final finalFile = File(path.join(finalDir.path, finalName));
 
-    await _movePickedAudioToFinal(sourceFile: sourceFile, finalFile: finalFile);
+    final created = !await finalFile.exists();
+    if (created) {
+      await _movePickedAudioToFinal(
+        sourceFile: sourceFile,
+        finalFile: finalFile,
+      );
+    } else {
+      await _deleteIfExists(sourceFile);
+    }
     await _deleteIfExists(File(tmpPath));
 
-    return path.join(subdir, finalName);
+    return (
+      path: path.join(subdir, finalName),
+      fileName: finalName,
+      audioSha256: sha256,
+      created: created,
+    );
   }
 
   /// 将本地导入的临时音频移动到正式目录；失败时清理可能写出的半文件。
@@ -694,16 +721,6 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     }
   }
 
-  Future<String> _uniqueSandboxFileName(Directory dir, String requested) async {
-    var candidate = requested;
-    final base = path.basenameWithoutExtension(requested);
-    final ext = path.extension(requested);
-    for (var i = 0; await File(path.join(dir.path, candidate)).exists(); i++) {
-      candidate = '$base-${DateTime.now().microsecondsSinceEpoch}-$i$ext';
-    }
-    return candidate;
-  }
-
   Future<void> _deleteIfExists(File file) async {
     if (!await file.exists()) return;
     try {
@@ -718,10 +735,9 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     final l10n = AppLocalizations.of(context)!;
     final collectionId = widget.collectionId ?? _selectedCollectionId;
     final library = ref.read(audioLibraryProvider.notifier);
-    final libraryState = ref.read(audioLibraryProvider);
-    final collectionState = ref.read(collectionListProvider);
     final collectionList = ref.read(collectionListProvider.notifier);
     final registrationService = AudioRegistrationService();
+    final dataDir = await getAppDataDirectory();
 
     setState(() {
       _isLoading = true;
@@ -739,18 +755,25 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
           name: file.name,
           relativePath: file.path,
           importSourceType: widget.importSourceType,
+          audioSha256: file.audioSha256,
         ),
         audioLibrary: library,
-        audioLibraryState: libraryState,
+        audioLibraryState: ref.read(audioLibraryProvider),
         collectionList: collectionList,
-        collectionState: collectionState,
+        collectionState: ref.read(collectionListProvider),
         collectionId: collectionId,
       );
 
       switch (result) {
         case AudioRegistrationAdded(:final item):
+          if (file.created && item.audioPath != file.path) {
+            await _deleteIfExists(File(path.join(dataDir.path, file.path)));
+          }
           results.add(item);
         case AudioRegistrationDuplicate(:final name):
+          if (file.created) {
+            await _deleteIfExists(File(path.join(dataDir.path, file.path)));
+          }
           skippedDuplicates.add(name);
       }
 
