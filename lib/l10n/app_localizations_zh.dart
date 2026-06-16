@@ -3144,10 +3144,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoPlayRetellRecordingSubtitle => '复述结束后自动回听自己的录音，用于对照和纠音';
 
   @override
-  String get retellRatingToggle => '复述时关闭评级';
+  String get retellRatingToggle => '复述时显示评分';
 
   @override
-  String get retellRatingSubtitle => '关闭后只保留录音回听，但不再显示评分';
+  String get retellRatingSubtitle => '关闭后只保留录音回听，不再显示评分';
 
   @override
   String get retellSkip => '跳过';
