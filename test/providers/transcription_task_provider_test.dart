@@ -13,6 +13,8 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:echo_loop/database/app_database.dart' as db;
 import 'package:echo_loop/database/providers.dart';
+import 'package:echo_loop/features/audio_import/audio_finalization_service.dart';
+import 'package:echo_loop/features/audio_import/audio_import_models.dart';
 import 'package:echo_loop/models/audio_item.dart';
 import 'package:echo_loop/models/word_timestamp.dart';
 import 'package:echo_loop/providers/audio_library_provider.dart';
@@ -35,6 +37,25 @@ class MockSubtitleAutoAlignService extends Mock
     implements SubtitleAutoAlignService {}
 
 class FakeAudioItem extends Fake implements AudioItem {}
+
+/// 转录后转码桩：返回预设结果或抛异常，记录调用次数。
+class _FakeFinalizationService extends AudioFinalizationService {
+  _FakeFinalizationService({this.result, this.error});
+
+  final FinalizedAudio? result;
+  final Object? error;
+  int calls = 0;
+
+  @override
+  Future<FinalizedAudio> transcodeExisting({
+    required Directory dataDir,
+    required String relativePath,
+  }) async {
+    calls++;
+    if (error != null) throw error!;
+    return result!;
+  }
+}
 
 /// 测试用 AppSettings：返回默认开启的 subtitleAutoAlignEnabled，不触达 SharedPreferences。
 class _FakeAppSettings extends AppSettings {
@@ -80,6 +101,7 @@ ProviderContainer _createContainer({
   required MockTranscriptionFileOps mockFileOps,
   required db.AppDatabase database,
   MockSubtitleAutoAlignService? mockAutoAlignService,
+  AudioFinalizationService? finalizationService,
   List<AudioItem>? audioItems,
 }) {
   final overrides = <Override>[
@@ -91,6 +113,13 @@ ProviderContainer _createContainer({
     appSettingsProvider.overrideWith(() => _FakeAppSettings()),
     analyticsOverride(),
   ];
+  if (finalizationService != null) {
+    overrides.add(
+      transcriptionFinalizationServiceProvider.overrideWithValue(
+        finalizationService,
+      ),
+    );
+  }
   if (mockAutoAlignService != null) {
     overrides.add(
       subtitleAutoAlignServiceProvider.overrideWithValue(mockAutoAlignService),
@@ -162,6 +191,50 @@ void main() {
   tearDown(() async {
     await database.close();
   });
+
+  /// 桩：音频已存在 + 字幕缓存命中（返回「Hello world」），用于直达保存流程。
+  void stubCachedTranscript() {
+    when(
+      () => mockApi.getUploadUrl(
+        sha256: any(named: 'sha256'),
+        mimeType: any(named: 'mimeType'),
+        fileSize: any(named: 'fileSize'),
+        accessToken: any(named: 'accessToken'),
+      ),
+    ).thenAnswer(
+      (_) async => const UploadUrlResponse(
+        audioExists: true,
+        objectName: 'user-audio/orig-sha.mp3',
+        publicUrl: 'https://example.com/orig-sha.mp3',
+      ),
+    );
+    when(
+      () => mockApi.submitTranscription(
+        sha256: any(named: 'sha256'),
+        fileName: any(named: 'fileName'),
+        objectName: any(named: 'objectName'),
+        publicUrl: any(named: 'publicUrl'),
+        mimeType: any(named: 'mimeType'),
+        fileSize: any(named: 'fileSize'),
+        language: any(named: 'language'),
+        accessToken: any(named: 'accessToken'),
+      ),
+    ).thenAnswer(
+      (_) async => SubmitTranscriptionResponse(
+        cached: true,
+        transcript: TranscriptResult(
+          sentences: [
+            TranscriptSentence(
+              text: 'Hello world',
+              startTime: Duration.zero,
+              endTime: const Duration(seconds: 2),
+            ),
+          ],
+          fullText: 'Hello world',
+        ),
+      ),
+    );
+  }
 
   group('TranscriptionTaskManager', () {
     test('初始状态为空 Map', () {
@@ -1186,6 +1259,140 @@ void main() {
 
       // 不应调用 computeSha256
       verifyNever(() => mockFileOps.computeSha256(any()));
+
+      container.dispose();
+    });
+
+    test('新导入转录成功 — 触发转码、更新 audioPath/sha 并删除原始文件', () async {
+      // 新导入：audioSha256 == originalAudioSha256，存的还是原始文件。
+      final dataDir = await Directory.systemTemp.createTemp('tx_transcode_ok_');
+      addTearDown(() async {
+        if (await dataDir.exists()) await dataDir.delete(recursive: true);
+      });
+      const originalRel = 'audios/imported/orig-sha.mp3';
+      final originalFile = File('${dataDir.path}/$originalRel');
+      await originalFile.create(recursive: true);
+      await originalFile.writeAsBytes([1, 2, 3]);
+
+      final audioItem = _testAudioItem(
+        audioPath: originalRel,
+        audioSha256: 'orig-sha',
+        originalAudioSha256: 'orig-sha',
+      );
+
+      when(() => mockFileOps.getDataDir()).thenAnswer((_) async => dataDir);
+      when(() => mockFileOps.getFileSize(any())).thenAnswer((_) async => 1024);
+      stubCachedTranscript();
+
+      final fakeFinalization = _FakeFinalizationService(
+        result: const FinalizedAudio(
+          relativePath: 'audios/imported/new-sha.m4a',
+          sha256: 'new-sha',
+          originalSha256: 'orig-sha',
+          created: true,
+        ),
+      );
+
+      final container = _createContainer(
+        mockApi: mockApi,
+        mockFileOps: mockFileOps,
+        database: database,
+        finalizationService: fakeFinalization,
+        audioItems: [audioItem],
+      );
+      await _seedAudioRows(database, [audioItem]);
+      final notifier = container.read(
+        transcriptionTaskManagerProvider.notifier,
+      );
+
+      await notifier.startTranscription(audioItem, 'en', accessToken: 'token');
+
+      expect(fakeFinalization.calls, 1);
+      final updated = container
+          .read(audioLibraryProvider)
+          .audioItems
+          .singleWhere((item) => item.id == audioItem.id);
+      expect(updated.audioPath, 'audios/imported/new-sha.m4a');
+      expect(updated.audioSha256, 'new-sha');
+      // originalAudioSha256 保持原始 sha 不变（转录缓存 key 稳定）。
+      expect(updated.originalAudioSha256, 'orig-sha');
+      // 字幕已保存、状态完成。
+      expect(
+        notifier.getTaskState('test-audio-1'),
+        isA<TranscriptionCompleted>(),
+      );
+      final savedSrt = await database.audioItemDao.getTranscriptSrt(
+        'test-audio-1',
+      );
+      expect(savedSrt, contains('Hello world'));
+      // 旧原始文件已删除。
+      expect(await originalFile.exists(), isFalse);
+
+      container.dispose();
+    });
+
+    test('转码失败 — 静默保留原始：仍完成、字幕已存、audioPath 不变、原始未删', () async {
+      final dataDir = await Directory.systemTemp.createTemp(
+        'tx_transcode_err_',
+      );
+      addTearDown(() async {
+        if (await dataDir.exists()) await dataDir.delete(recursive: true);
+      });
+      const originalRel = 'audios/imported/orig-sha.mp3';
+      final originalFile = File('${dataDir.path}/$originalRel');
+      await originalFile.create(recursive: true);
+      await originalFile.writeAsBytes([1, 2, 3]);
+
+      final audioItem = _testAudioItem(
+        audioPath: originalRel,
+        audioSha256: 'orig-sha',
+        originalAudioSha256: 'orig-sha',
+      );
+
+      when(() => mockFileOps.getDataDir()).thenAnswer((_) async => dataDir);
+      when(() => mockFileOps.getFileSize(any())).thenAnswer((_) async => 1024);
+      stubCachedTranscript();
+
+      final fakeFinalization = _FakeFinalizationService(
+        error: const AudioImportException(
+          AudioImportFailureCode.storage,
+          'boom',
+        ),
+      );
+
+      final container = _createContainer(
+        mockApi: mockApi,
+        mockFileOps: mockFileOps,
+        database: database,
+        finalizationService: fakeFinalization,
+        audioItems: [audioItem],
+      );
+      await _seedAudioRows(database, [audioItem]);
+      final notifier = container.read(
+        transcriptionTaskManagerProvider.notifier,
+      );
+
+      await notifier.startTranscription(audioItem, 'en', accessToken: 'token');
+
+      expect(fakeFinalization.calls, 1);
+      // 转录仍视为成功。
+      expect(
+        notifier.getTaskState('test-audio-1'),
+        isA<TranscriptionCompleted>(),
+      );
+      final savedSrt = await database.audioItemDao.getTranscriptSrt(
+        'test-audio-1',
+      );
+      expect(savedSrt, contains('Hello world'));
+      final updated = container
+          .read(audioLibraryProvider)
+          .audioItems
+          .singleWhere((item) => item.id == audioItem.id);
+      // audioPath/sha 保持原始，下次重新转录会再次尝试（sha 仍相等）。
+      expect(updated.audioPath, originalRel);
+      expect(updated.audioSha256, 'orig-sha');
+      // 原始文件未被删除。
+      expect(await originalFile.exists(), isTrue);
 
       container.dispose();
     });

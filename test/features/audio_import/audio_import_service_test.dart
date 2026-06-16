@@ -4,7 +4,6 @@ import 'package:dio/dio.dart';
 import 'package:echo_loop/features/audio_import/audio_import_models.dart';
 import 'package:echo_loop/features/audio_import/audio_registration_service.dart';
 import 'package:echo_loop/features/audio_import/audio_import_service.dart';
-import 'package:echo_loop/features/audio_import/audio_transcode_service.dart';
 import 'package:echo_loop/models/audio_item.dart';
 import 'package:echo_loop/providers/audio_library_provider.dart';
 import 'package:echo_loop/providers/collection_provider.dart';
@@ -13,38 +12,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockDio extends Mock implements Dio {}
-
-class _FakeTranscodeService extends AudioTranscodeService {
-  _FakeTranscodeService({required this.shouldTranscode});
-
-  final bool shouldTranscode;
-
-  @override
-  Future<AudioTranscodeResult> transcodeToM4a({
-    required Directory dataDir,
-    required String relativePath,
-  }) async {
-    if (!shouldTranscode) {
-      return AudioTranscodeResult(
-        relativePath: relativePath,
-        transcoded: false,
-      );
-    }
-    final source = File('${dataDir.path}/$relativePath');
-    final targetRelativePath = relativePath.replaceAll(
-      RegExp(r'\.[^.]+$'),
-      '.m4a',
-    );
-    final target = File('${dataDir.path}/$targetRelativePath');
-    await target.create(recursive: true);
-    await target.writeAsBytes(await source.readAsBytes());
-    await source.delete();
-    return AudioTranscodeResult(
-      relativePath: targetRelativePath,
-      transcoded: true,
-    );
-  }
-}
 
 class _FakeAudioLibrary extends AudioLibrary {
   _FakeAudioLibrary([this.initialState = const AudioLibraryState()]);
@@ -346,22 +313,21 @@ void main() {
       }
     });
 
-    test('成功下载、创建 AudioItem 并写入库状态', () async {
+    test('成功下载、保留原始音频并创建 AudioItem 写入库状态', () async {
       final service = AudioImportService(
         dio: dio,
         resolveDataDir: () async => tmpDir,
+        // 导入不再转码：仅对原始 .mp3 计算指纹。
         computeSha256: (path) async {
-          if (path.endsWith('.mp3')) return 'sha-original';
-          if (path.endsWith('.m4a')) return 'sha';
-          fail('unexpected hash path: $path');
+          expect(path, endsWith('.mp3'));
+          return 'sha-original';
         },
         registrationService: AudioRegistrationService(
           readDurationSeconds: (path) async {
-            expect(path, endsWith('.m4a'));
+            expect(path, endsWith('.mp3'));
             return 42;
           },
         ),
-        transcodeService: _FakeTranscodeService(shouldTranscode: true),
       );
       final container = ProviderContainer(
         overrides: [audioLibraryProvider.overrideWith(_FakeAudioLibrary.new)],
@@ -375,52 +341,14 @@ void main() {
       );
 
       expect(item.name, 'lesson');
-      expect(item.audioPath, 'audios/imported/sha.m4a');
+      // 保留原始格式与扩展名，audioSha256 == originalAudioSha256。
+      expect(item.audioPath, 'audios/imported/sha-original.mp3');
       expect(item.totalDuration, 42);
-      expect(item.audioSha256, 'sha');
+      expect(item.audioSha256, 'sha-original');
       expect(item.originalAudioSha256, 'sha-original');
       expect(item.importSourceType, AudioImportSourceType.directUrl);
       expect(item.importSourceUrl, 'https://example.com/lesson.mp3');
       expect(container.read(audioLibraryProvider).audioItems, [item]);
-      expect(await File('${tmpDir.path}/${item.audioPath}').exists(), isTrue);
-      expect(
-        await File('${tmpDir.path}/audios/imported/lesson.mp3').exists(),
-        isFalse,
-      );
-      expect(await _tmpAudioImportFiles(tmpDir), isEmpty);
-    });
-
-    test('转码失败时回退保存原始下载音频', () async {
-      final service = AudioImportService(
-        dio: dio,
-        resolveDataDir: () async => tmpDir,
-        computeSha256: (path) async {
-          expect(path, endsWith('.mp3'));
-          return 'sha-original';
-        },
-        registrationService: AudioRegistrationService(
-          readDurationSeconds: (path) async {
-            expect(path, endsWith('.mp3'));
-            return 24;
-          },
-        ),
-        transcodeService: _FakeTranscodeService(shouldTranscode: false),
-      );
-      final container = ProviderContainer(
-        overrides: [audioLibraryProvider.overrideWith(_FakeAudioLibrary.new)],
-      );
-      addTearDown(container.dispose);
-
-      final item = await service.importFromUrl(
-        url: 'https://example.com/lesson.mp3',
-        audioLibrary: container.read(audioLibraryProvider.notifier),
-        audioLibraryState: container.read(audioLibraryProvider),
-      );
-
-      expect(item.audioPath, 'audios/imported/sha-original.mp3');
-      expect(item.totalDuration, 24);
-      expect(item.audioSha256, 'sha-original');
-      expect(item.originalAudioSha256, 'sha-original');
       expect(await File('${tmpDir.path}/${item.audioPath}').exists(), isTrue);
       expect(await _tmpAudioImportFiles(tmpDir), isEmpty);
     });
@@ -429,7 +357,7 @@ void main() {
       final existing = AudioItem(
         id: 'a1',
         name: 'existing lesson',
-        audioPath: 'audios/imported/sha-existing.m4a',
+        audioPath: 'audios/imported/sha-existing.mp3',
         audioSha256: 'sha-existing',
         addedDate: DateTime(2026, 1, 1),
       );
@@ -449,7 +377,6 @@ void main() {
         dio: dio,
         resolveDataDir: () async => tmpDir,
         computeSha256: (_) async => 'sha-existing',
-        transcodeService: _FakeTranscodeService(shouldTranscode: true),
       );
 
       final item = await service.importFromUrl(
@@ -468,7 +395,7 @@ void main() {
         item.id,
       ]);
       expect(
-        await File('${tmpDir.path}/audios/imported/sha-existing.m4a').exists(),
+        await File('${tmpDir.path}/audios/imported/sha-existing.mp3').exists(),
         isTrue,
       );
       expect(await existingFile.readAsBytes(), [9, 9, 9]);
@@ -503,20 +430,18 @@ void main() {
       }
     });
 
-    test('Podcast 单集下载成功后优先返回转码后的 m4a', () async {
+    test('Podcast 单集下载成功后保留原始音频', () async {
       final service = AudioImportService(
         dio: dio,
         resolveDataDir: () async => tmpDir,
         computeSha256: (path) async {
-          if (path.endsWith('.mp3')) return 'sha-episode-original';
-          if (path.endsWith('.m4a')) return 'sha-episode';
-          fail('unexpected hash path: $path');
+          expect(path, endsWith('.mp3'));
+          return 'sha-episode';
         },
         readDurationSeconds: (path) async {
-          expect(path, endsWith('.m4a'));
+          expect(path, endsWith('.mp3'));
           return 61;
         },
-        transcodeService: _FakeTranscodeService(shouldTranscode: true),
       );
 
       final result = await service.downloadEpisodeToSandbox(
@@ -524,24 +449,23 @@ void main() {
         enclosureType: 'audio/mpeg',
       );
 
-      expect(result.relativePath, 'audios/imported/sha-episode.m4a');
+      expect(result.relativePath, 'audios/imported/sha-episode.mp3');
       expect(result.durationSeconds, 61);
       expect(result.audioSha256, 'sha-episode');
-      expect(result.originalAudioSha256, 'sha-episode-original');
+      expect(result.originalAudioSha256, 'sha-episode');
       expect(await _tmpAudioImportFiles(tmpDir), isEmpty);
     });
 
     test('目标 hash 文件已存在时复用已有文件且不覆盖内容', () async {
       final importedDir = Directory('${tmpDir.path}/audios/imported');
       await importedDir.create(recursive: true);
-      final existingFile = File('${importedDir.path}/sha-episode.m4a');
+      final existingFile = File('${importedDir.path}/sha-episode.mp3');
       await existingFile.writeAsBytes([9, 9, 9]);
       final service = AudioImportService(
         dio: dio,
         resolveDataDir: () async => tmpDir,
         computeSha256: (_) async => 'sha-episode',
         readDurationSeconds: (_) async => 61,
-        transcodeService: _FakeTranscodeService(shouldTranscode: true),
       );
 
       final result = await service.downloadEpisodeToSandbox(
@@ -549,7 +473,7 @@ void main() {
         enclosureType: 'audio/mpeg',
       );
 
-      expect(result.relativePath, 'audios/imported/sha-episode.m4a');
+      expect(result.relativePath, 'audios/imported/sha-episode.mp3');
       expect(await existingFile.readAsBytes(), [9, 9, 9]);
       expect(await _tmpAudioImportFiles(tmpDir), isEmpty);
     });

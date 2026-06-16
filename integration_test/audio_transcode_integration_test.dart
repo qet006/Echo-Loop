@@ -34,8 +34,7 @@ void main() {
         final service = AudioTranscodeService();
         for (final fixtureName in fixtures) {
           final ext = p.extension(fixtureName).replaceFirst('.', '');
-          final relativePath = p.join('input', fixtureName);
-          final inputFile = File(p.join(tempDir.path, relativePath));
+          final inputFile = File(p.join(tempDir.path, 'input', fixtureName));
           await inputFile.parent.create(recursive: true);
           final fixtureData = await rootBundle.load(
             'test/fixtures/audio_transcode/$fixtureName',
@@ -47,22 +46,17 @@ void main() {
             ),
           );
 
-          final result = await service
-              .transcodeToM4a(dataDir: tempDir, relativePath: relativePath)
+          final outputFile = File(
+            p.join(tempDir.path, 'output', '$fixtureName.m4a'),
+          );
+          final ok = await service
+              .transcodeToFile(source: inputFile, output: outputFile)
               .timeout(const Duration(seconds: 10));
 
-          expect(result.transcoded, isTrue, reason: 'format .$ext');
-          expect(result.relativePath, endsWith('.m4a'), reason: 'format .$ext');
-
-          final outputFile = File(p.join(tempDir.path, result.relativePath));
+          expect(ok, isTrue, reason: 'format .$ext');
           expect(await outputFile.exists(), isTrue, reason: 'format .$ext');
-          if (ext != 'm4a') {
-            expect(
-              await inputFile.exists(),
-              isFalse,
-              reason: 'format .$ext should remove original after transcode',
-            );
-          }
+          // 新 API 不删除源文件，源应保留。
+          expect(await inputFile.exists(), isTrue, reason: 'format .$ext');
           expect(
             await outputFile.length(),
             greaterThan(0),
