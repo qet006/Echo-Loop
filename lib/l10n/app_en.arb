@@ -85,7 +85,7 @@
   "autoPlayNextSentence": "Auto Play Next Sentence",
   "repeatCount": "Repeat Count",
   "infiniteRepeat": "Infinite ∞",
-  "intervalTime": "Interval (seconds)",
+  "intervalTime": "Interval",
   "times": "times",
   "fullText": "Full Text",
   "bookmarked": "Bookmarked",

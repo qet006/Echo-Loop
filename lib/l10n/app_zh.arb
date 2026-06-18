@@ -71,7 +71,7 @@
   "autoPlayNextSentence": "自动播放下一句",
   "repeatCount": "重复次数",
   "infiniteRepeat": "无限 ∞",
-  "intervalTime": "间隔时间（秒）",
+  "intervalTime": "间隔",
   "times": "次",
   "fullText": "全文",
   "bookmarked": "收藏",

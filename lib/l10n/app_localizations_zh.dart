@@ -227,7 +227,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get infiniteRepeat => '无限 ∞';
 
   @override
-  String get intervalTime => '间隔时间（秒）';
+  String get intervalTime => '间隔';
 
   @override
   String get times => '次';

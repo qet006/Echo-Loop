@@ -527,7 +527,7 @@ abstract class AppLocalizations {
   /// No description provided for @intervalTime.
   ///
   /// In en, this message translates to:
-  /// **'Interval (seconds)'**
+  /// **'Interval'**
   String get intervalTime;
 
   /// No description provided for @times.

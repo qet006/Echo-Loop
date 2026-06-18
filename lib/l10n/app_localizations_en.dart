@@ -228,7 +228,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get infiniteRepeat => 'Infinite ∞';
 
   @override
-  String get intervalTime => 'Interval (seconds)';
+  String get intervalTime => 'Interval';
 
   @override
   String get times => 'times';
