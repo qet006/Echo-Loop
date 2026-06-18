@@ -1,7 +1,17 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-18（播放控制栏视觉优化）
+> 最后更新：2026-06-18（Free Player Tab 激活态视觉优化）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：Free Player Tab 激活态视觉优化
+
+自由播放器顶部「全文 / 收藏」两个 tab 原激活态只靠蓝色文字 + 底部下划线，对比弱、用户不易察觉哪个 tab 激活。改为业界通用、与 Material 3 一致的 SegmentedButton 风格浅色药丸激活态。
+
+- [x] `app_theme.dart`（`tabBarTheme`）：激活态改用 `indicator` 浅色药丸（`secondaryContainer` + 圆角 10）+ `indicatorSize: tab` 铺满；`dividerColor: transparent` 去掉底部下划线；`labelColor: onSecondaryContainer`、`unselectedLabelColor: onSurfaceVariant`；`splashBorderRadius` 与药丸圆角对齐。
+- [x] `player_screen.dart`（`TabBar`）：新增 `indicatorPadding`（垂直 8 / 水平 4）让药丸四周留白、不顶满。
+- [x] 验证：`flutter analyze` 改动文件 0 issue；`player_screen_test` 全绿（纯样式属性调整，无需改测试）。
+
+  **完成时间**: 2026-06-18
 
 ## 已完成：播放控制栏视觉优化
 

@@ -214,11 +214,20 @@ class AppTheme {
       // 图标主题
       iconTheme: IconThemeData(size: 24, color: colorScheme.onSurfaceVariant),
 
-      // TabBar 主题
+      // TabBar 主题：SegmentedButton 风格的浅色药丸激活态
       tabBarTheme: TabBarThemeData(
-        indicatorColor: colorScheme.primary,
-        labelColor: colorScheme.primary,
+        // 激活态填充浅色容器底，去掉底部下划线
+        indicator: BoxDecoration(
+          color: colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        labelColor: colorScheme.onSecondaryContainer,
         unselectedLabelColor: colorScheme.onSurfaceVariant,
+        splashBorderRadius: BorderRadius.circular(10),
+        // 去掉 hover/按压时铺满整 tab 的灰色 overlay（会比药丸大一圈、形成「框中框」）
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
       ),
 
       // SnackBar 主题：圆角 12
