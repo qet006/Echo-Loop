@@ -113,7 +113,7 @@ void main() {
                   const ListeningPracticeState(
                     playlistMode: PlaylistMode.bookmarks,
                     fullSettings: PlaybackSettings(
-                      playbackSpeed: 1.25,
+                      playbackSpeed: 1.2,
                       showTranscript: true,
                     ),
                     bookmarkSettings: PlaybackSettings(

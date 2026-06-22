@@ -6,11 +6,13 @@ library;
 
 import 'package:flutter/material.dart';
 import 'app_dropdown.dart';
+import 'setting_labeled_row.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/blind_listen_settings.dart';
 import '../../models/retell_settings.dart';
 import '../../models/sentence.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/playback_speed.dart';
 import '../../utils/paragraph_grouping.dart';
 import '../guide_flow.dart';
 import '../review/review_briefing_sheet.dart' show formatEstimatedDuration;
@@ -258,152 +260,127 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
             const SizedBox(height: AppSpacing.m),
 
             // 段落时长行
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  l10n.blindListenTargetDuration,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+            SettingLabeledRow(
+              label: Text(
+                l10n.blindListenTargetDuration,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
-                SizedBox(
-                  width: 80,
-                  child: AppDropdown<int>(
-                    value: _targetSeconds,
-                    isExpanded: true,
-                    isDense: true,
-                    items: paragraphDurationOptions.map((s) {
-                      final label = switch (s) {
-                        0 => l10n.retellBriefingSentenceLevel,
-                        -1 => l10n.blindListenNoParagraph,
-                        _ => '${s}s',
-                      };
-                      return DropdownMenuItem(value: s, child: Text(label));
-                    }).toList(),
-                    onChanged: (v) {
-                      if (v != null) setState(() => _targetSeconds = v);
-                    },
-                  ),
-                ),
-              ],
+              ),
+              trailing: AppDropdown<int>(
+                value: _targetSeconds,
+                isExpanded: true,
+                isDense: true,
+                items: paragraphDurationOptions.map((s) {
+                  final label = switch (s) {
+                    0 => l10n.retellBriefingSentenceLevel,
+                    -1 => l10n.blindListenNoParagraph,
+                    _ => '${s}s',
+                  };
+                  return DropdownMenuItem(value: s, child: Text(label));
+                }).toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _targetSeconds = v);
+                },
+              ),
             ),
 
             // 段间停顿行（仅盲听显示，且不分段时无段间隔可言，隐藏）
             if (widget.showPauseMultiplier && _targetSeconds != -1) ...[
               const SizedBox(height: AppSpacing.s),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    l10n.blindListenPauseBetween,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+              SettingLabeledRow(
+                label: Text(
+                  l10n.blindListenPauseBetween,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
-                  SizedBox(
-                    width: 80,
-                    child: AppDropdown<double>(
-                      value: _pauseMultiplier,
-                      isExpanded: true,
-                      isDense: true,
-                      items: [
-                        DropdownMenuItem(
-                          value: -1.0,
-                          child: Text(l10n.pauseModeSmart),
-                        ),
-                        ...(widget.pauseMultiplierOptions ??
-                                BlindListenSettings.multiplierOptions)
-                            .map((m) {
-                              final label = m == m.roundToDouble()
-                                  ? '${m.toInt()}x'
-                                  : '${m}x';
-                              return DropdownMenuItem(
-                                value: m,
-                                child: Text(label),
-                              );
-                            }),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) setState(() => _pauseMultiplier = v);
-                      },
+                ),
+                trailing: AppDropdown<double>(
+                  value: _pauseMultiplier,
+                  isExpanded: true,
+                  isDense: true,
+                  items: [
+                    DropdownMenuItem(
+                      value: -1.0,
+                      child: Text(l10n.pauseModeSmart),
                     ),
-                  ),
-                ],
+                    ...(widget.pauseMultiplierOptions ??
+                            BlindListenSettings.multiplierOptions)
+                        .map((m) {
+                          final label = m == m.roundToDouble()
+                              ? '${m.toInt()}x'
+                              : '${m}x';
+                          return DropdownMenuItem(
+                            value: m,
+                            child: Text(label),
+                          );
+                        }),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setState(() => _pauseMultiplier = v);
+                  },
+                ),
               ),
             ],
 
             if (widget.showPlaybackSpeed) ...[
               const SizedBox(height: AppSpacing.s),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    l10n.playbackSpeed,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+              SettingLabeledRow(
+                label: Text(
+                  l10n.playbackSpeed,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
-                  SizedBox(
-                    width: 80,
-                    child: AppDropdown<double>(
-                      value: _playbackSpeed,
-                      isExpanded: true,
-                      isDense: true,
-                      items:
-                          (widget.playbackSpeedOptions ??
-                                  BlindListenSettings
-                                      .briefingPlaybackSpeedOptions)
-                              .map(
-                                (speed) => DropdownMenuItem(
-                                  value: speed,
-                                  child: Text(_formatSpeed(speed)),
-                                ),
-                              )
-                              .toList(),
-                      onChanged: (v) {
-                        if (v != null) {
-                          setState(() => _playbackSpeed = v);
-                        }
-                      },
-                    ),
-                  ),
-                ],
+                ),
+                trailing: AppDropdown<double>(
+                  value: _playbackSpeed,
+                  isExpanded: true,
+                  isDense: true,
+                  items:
+                      (widget.playbackSpeedOptions ??
+                              BlindListenSettings.briefingPlaybackSpeedOptions)
+                          .map(
+                            (speed) => DropdownMenuItem(
+                              value: speed,
+                              child: Text(_formatSpeed(speed)),
+                            ),
+                          )
+                          .toList(),
+                  onChanged: (v) {
+                    if (v != null) {
+                      setState(() => _playbackSpeed = v);
+                    }
+                  },
+                ),
               ),
             ],
 
             // 可见词比例行（仅复述时传入 defaultKeywordRatio 才显示）
             if (_keywordRatio != null) ...[
               const SizedBox(height: AppSpacing.s),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    l10n.retellKeywordRatio,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+              SettingLabeledRow(
+                label: Text(
+                  l10n.retellKeywordRatio,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
-                  SizedBox(
-                    width: 80,
-                    child: AppDropdown<KeywordRatio>(
-                      value: _keywordRatio,
-                      isExpanded: true,
-                      isDense: true,
-                      items: KeywordRatio.values
-                          .map(
-                            (r) => DropdownMenuItem(
-                              value: r,
-                              child: Text('${r.percent}%'),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (v) {
-                        if (v != null) setState(() => _keywordRatio = v);
-                      },
-                    ),
-                  ),
-                ],
+                ),
+                trailing: AppDropdown<KeywordRatio>(
+                  value: _keywordRatio,
+                  isExpanded: true,
+                  isDense: true,
+                  items: KeywordRatio.values
+                      .map(
+                        (r) => DropdownMenuItem(
+                          value: r,
+                          child: Text('${r.percent}%'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) setState(() => _keywordRatio = v);
+                  },
+                ),
               ),
             ],
 
@@ -585,12 +562,6 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
     );
   }
 
-  /// 统一显示速度标签：整数速度显示为 1x，0.05 步进保留必要小数。
-  String _formatSpeed(double speed) {
-    if (speed == speed.roundToDouble()) return '${speed.toInt()}x';
-    if ((speed * 10).roundToDouble() == speed * 10) {
-      return '${speed.toStringAsFixed(1)}x';
-    }
-    return '${speed.toStringAsFixed(2)}x';
-  }
+  /// 统一显示速度标签：始终保留一位小数。
+  String _formatSpeed(double speed) => formatPlaybackSpeedLabel(speed);
 }

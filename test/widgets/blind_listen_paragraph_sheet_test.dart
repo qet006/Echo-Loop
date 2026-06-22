@@ -21,7 +21,7 @@ void main() {
     ),
   ];
 
-  testWidgets('入口面板显示默认 1x 播放速度下拉菜单', (tester) async {
+  testWidgets('入口面板显示默认 1.0x 播放速度下拉菜单', (tester) async {
     await tester.pumpWidget(
       createTestApp(
         Builder(
@@ -43,7 +43,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Playback Speed'), findsOneWidget);
-    expect(find.text('1x'), findsOneWidget);
+    expect(find.text('1.0x'), findsOneWidget);
     expect(
       find.byWidgetPredicate(
         (widget) =>
@@ -79,7 +79,7 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('1x'));
+    await tester.tap(find.text('1.0x'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('1.5x').last);
     await tester.pumpAndSettle();
@@ -88,4 +88,5 @@ void main() {
 
     expect(selectedSpeed, 1.5);
   });
+
 }

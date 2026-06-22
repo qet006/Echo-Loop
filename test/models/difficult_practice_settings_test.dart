@@ -18,23 +18,24 @@ void main() {
 
     test('copyWith 可更新播放速度', () {
       const settings = DifficultPracticeSettings();
-      final updated = settings.copyWith(playbackSpeed: 0.85);
-      expect(updated.playbackSpeed, 0.85);
+      final updated = settings.copyWith(playbackSpeed: 0.9);
+      expect(updated.playbackSpeed, 0.9);
       expect(updated.shadowReadingRepeatCount, 3);
     });
 
-    test('入口播放速度选项符合难句补练要求（含 0.75/0.85/0.95 难度档位）', () {
+    test('入口播放速度选项符合统一 0.1 步进档位', () {
       expect(DifficultPracticeSettings.briefingPlaybackSpeedOptions, const [
+        0.4,
         0.5,
+        0.6,
         0.7,
-        0.75,
         0.8,
-        0.85,
         0.9,
-        0.95,
         1.0,
         1.1,
+        1.2,
         1.3,
+        1.4,
         1.5,
         2.0,
       ]);
@@ -46,7 +47,7 @@ void main() {
       final s2 = DifficultPracticeSettings.fromJson({'playbackSpeed': 0.1});
       expect(s2.playbackSpeed, 1.0);
       final s3 = DifficultPracticeSettings.fromJson({'playbackSpeed': 0.85});
-      expect(s3.playbackSpeed, 0.85);
+      expect(s3.playbackSpeed, 0.9);
     });
 
     test('copyWith — 部分更新', () {

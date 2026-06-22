@@ -47,17 +47,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('默认显示 1x 播放速度滑块', (tester) async {
+  testWidgets('默认显示 1.0x 播放速度滑块', (tester) async {
     await tester.pumpWidget(createTestWidget());
     await openSheet(tester);
 
     expect(find.text('Playback Speed'), findsOneWidget);
-    expect(find.text('1x'), findsAtLeast(1));
-    final slider = tester.widget<Slider>(find.byType(Slider).first);
-    expect(slider.value, 1.0);
-    expect(slider.min, 0.5);
-    expect(slider.max, 2.0);
-    expect(slider.divisions, 30);
+    expect(find.text('1.0x'), findsAtLeast(1));
+    final slider = tester.widget<Slider>(find.byType(Slider).last);
+    expect(slider.value, 6.0);
+    expect(slider.min, 0);
+    expect(slider.max, 12.0);
+    expect(slider.divisions, 12);
   });
 
   testWidgets('播放速度设置显示在重复次数和段间停顿之后', (tester) async {
@@ -88,7 +88,7 @@ void main() {
     await tester.pumpWidget(createTestWidget(audioEngine: audioEngine));
     await openSheet(tester);
 
-    tester.widget<Slider>(find.byType(Slider).first).onChanged!(1.25);
+    tester.widget<Slider>(find.byType(Slider).last).onChanged!(8);
     await tester.pumpAndSettle();
 
     final container = ProviderScope.containerOf(
@@ -96,9 +96,9 @@ void main() {
     );
     expect(
       container.read(blindListenPlayerProvider).settings.playbackSpeed,
-      1.25,
+      1.2,
     );
-    expect(audioEngine.recordedSpeed, 1.25);
-    expect(find.text('1.25x'), findsOneWidget);
+    expect(audioEngine.recordedSpeed, 1.2);
+    expect(find.text('1.2x'), findsOneWidget);
   });
 }

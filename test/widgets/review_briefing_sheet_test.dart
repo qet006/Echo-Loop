@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../helpers/test_app.dart';
 
 void main() {
-  testWidgets('入口面板默认显示 1x 播放速度下拉菜单', (tester) async {
+  testWidgets('入口面板默认显示 1.0x 播放速度下拉菜单', (tester) async {
     await tester.pumpWidget(
       createTestApp(
         Builder(
@@ -29,7 +29,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Playback Speed'), findsOneWidget);
-    expect(find.text('1x'), findsOneWidget);
+    expect(find.text('1.0x'), findsOneWidget);
   });
 
   testWidgets('入口面板按 defaultPlaybackSpeed 初始化下拉值', (tester) async {
@@ -42,7 +42,7 @@ void main() {
                 context: context,
                 stage: LearningStage.firstLearn,
                 subStage: SubStageType.reviewDifficultPractice,
-                defaultPlaybackSpeed: 0.75,
+                defaultPlaybackSpeed: 0.8,
                 onStartPractice: (_, _) {},
               );
             },
@@ -55,7 +55,7 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    expect(find.text('0.75x'), findsOneWidget);
+    expect(find.text('0.8x'), findsOneWidget);
   });
 
   testWidgets('选择速度后随开始练习回调透出', (tester) async {
@@ -83,7 +83,7 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('1x'));
+    await tester.tap(find.text('1.0x'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('0.9x').last);
     await tester.pumpAndSettle();
@@ -92,4 +92,5 @@ void main() {
 
     expect(selectedSpeed, 0.9);
   });
+
 }

@@ -5,6 +5,7 @@
 library;
 
 import 'intensive_listen_settings.dart' show PauseMode, ShadowingControlMode;
+import '../utils/playback_speed.dart';
 
 /// 盲听设置（会话内临时生效）
 class BlindListenSettings {
@@ -31,22 +32,8 @@ class BlindListenSettings {
 
   /// 入口弹窗使用的离散速度选项
   ///
-  /// 包含 0.75 / 0.85 / 0.95 这几个"按难度+轮次回升映射"会落到的档位，
-  /// 保证下拉默认值在选项列表中可被命中。
-  static const List<double> briefingPlaybackSpeedOptions = [
-    0.5,
-    0.7,
-    0.75,
-    0.8,
-    0.85,
-    0.9,
-    0.95,
-    1.0,
-    1.1,
-    1.3,
-    1.5,
-    2.0,
-  ];
+  /// 与其他练习入口共用统一档位，保证默认值都能命中。
+  static const List<double> briefingPlaybackSpeedOptions = kUnifiedPlaybackSpeeds;
 
   /// 固定间隔可选值（秒）
   static const List<int> fixedPauseOptions = [5, 10, 15, 20, 25, 30, 45, 60];
@@ -173,8 +160,6 @@ class BlindListenSettings {
 
   static double _parsePlaybackSpeed(dynamic raw) {
     if (raw is! num) return 1.0;
-    final value = raw.toDouble();
-    if (value < 0.5 || value > 2.0) return 1.0;
-    return value;
+    return normalizePlaybackSpeed(raw.toDouble());
   }
 }

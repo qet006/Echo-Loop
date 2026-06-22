@@ -1,22 +1,10 @@
+import '../utils/playback_speed.dart';
+
 /// Free Player 支持的离散速度档位。
-const List<double> kFreePlayerPlaybackSpeeds = [
-  0.4,
-  0.5,
-  0.6,
-  0.7,
-  0.8,
-  0.9,
-  1.0,
-  1.1,
-  1.2,
-  1.3,
-  1.4,
-  1.5,
-  2.0,
-];
+const List<double> kFreePlayerPlaybackSpeeds = kUnifiedPlaybackSpeeds;
 
 double normalizeFreePlayerPlaybackSpeed(double speed) {
-  return kFreePlayerPlaybackSpeeds.contains(speed) ? speed : 1.0;
+  return normalizePlaybackSpeed(speed);
 }
 
 /// 自由练习播放器设置模型。

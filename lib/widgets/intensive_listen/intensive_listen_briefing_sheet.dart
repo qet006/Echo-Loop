@@ -6,9 +6,11 @@ library;
 
 import 'package:flutter/material.dart';
 import '../common/app_dropdown.dart';
+import '../common/setting_labeled_row.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/intensive_listen_settings.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/playback_speed.dart';
 import '../common/briefing_action_row.dart';
 
 /// 显示精听简报底部弹窗
@@ -42,7 +44,6 @@ Future<void> showIntensiveListenBriefingSheet({
   );
 }
 
-/// 精听简报弹窗内容
 class IntensiveListenBriefingSheet extends StatefulWidget {
   /// 句子总数
   final int sentenceCount;
@@ -91,14 +92,8 @@ class _IntensiveListenBriefingSheetState
     return l10n.estimatedMinutes(minutes);
   }
 
-  /// 统一显示速度标签：整数速度显示为 1x，0.05 步进保留必要小数。
-  String _formatSpeed(double speed) {
-    if (speed == speed.roundToDouble()) return '${speed.toInt()}x';
-    if ((speed * 10).roundToDouble() == speed * 10) {
-      return '${speed.toStringAsFixed(1)}x';
-    }
-    return '${speed.toStringAsFixed(2)}x';
-  }
+  /// 统一显示速度标签：始终保留一位小数。
+  String _formatSpeed(double speed) => formatPlaybackSpeedLabel(speed);
 
   @override
   Widget build(BuildContext context) {
@@ -169,72 +164,60 @@ class _IntensiveListenBriefingSheetState
           const SizedBox(height: AppSpacing.m),
 
           // 句间停顿（自动 / 1x-5x 段长倍数）
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                l10n.intensiveListenPauseLabel,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+          SettingLabeledRow(
+            label: Text(
+              l10n.intensiveListenPauseLabel,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
               ),
-              SizedBox(
-                width: 80,
-                child: AppDropdown<double>(
-                  value: _pauseMultiplier,
-                  isExpanded: true,
-                  isDense: true,
-                  items: _kPauseMultiplierOptions
-                      .map(
-                        (value) => DropdownMenuItem(
-                          value: value,
-                          child: Text(
-                            value < 0
-                                ? l10n.intensiveListenPauseSmart
-                                : '${value.toInt()}x',
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) setState(() => _pauseMultiplier = v);
-                  },
-                ),
-              ),
-            ],
+            ),
+            trailing: AppDropdown<double>(
+              value: _pauseMultiplier,
+              isExpanded: true,
+              isDense: true,
+              items: _kPauseMultiplierOptions
+                  .map(
+                    (value) => DropdownMenuItem(
+                      value: value,
+                      child: Text(
+                        value < 0
+                            ? l10n.intensiveListenPauseSmart
+                            : '${value.toInt()}x',
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _pauseMultiplier = v);
+              },
+            ),
           ),
           const SizedBox(height: AppSpacing.m),
 
           // 播放速度（与盲听/复述/跟读对齐）
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                l10n.playbackSpeed,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+          SettingLabeledRow(
+            label: Text(
+              l10n.playbackSpeed,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
               ),
-              SizedBox(
-                width: 80,
-                child: AppDropdown<double>(
-                  value: _playbackSpeed,
-                  isExpanded: true,
-                  isDense: true,
-                  items: IntensiveListenSettings.briefingPlaybackSpeedOptions
-                      .map(
-                        (speed) => DropdownMenuItem(
-                          value: speed,
-                          child: Text(_formatSpeed(speed)),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) setState(() => _playbackSpeed = v);
-                  },
-                ),
-              ),
-            ],
+            ),
+            trailing: AppDropdown<double>(
+              value: _playbackSpeed,
+              isExpanded: true,
+              isDense: true,
+              items: IntensiveListenSettings.briefingPlaybackSpeedOptions
+                  .map(
+                    (speed) => DropdownMenuItem(
+                      value: speed,
+                      child: Text(_formatSpeed(speed)),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _playbackSpeed = v);
+              },
+            ),
           ),
           const SizedBox(height: AppSpacing.m),
 

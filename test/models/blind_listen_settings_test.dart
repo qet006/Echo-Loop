@@ -77,18 +77,19 @@ void main() {
       expect(restored.repeatCount, 0);
     });
 
-    test('入口播放速度选项符合盲听要求（含 0.75/0.85/0.95 难度档位）', () {
+    test('入口播放速度选项符合统一 0.1 步进档位', () {
       expect(BlindListenSettings.briefingPlaybackSpeedOptions, const [
+        0.4,
         0.5,
+        0.6,
         0.7,
-        0.75,
         0.8,
-        0.85,
         0.9,
-        0.95,
         1.0,
         1.1,
+        1.2,
         1.3,
+        1.4,
         1.5,
         2.0,
       ]);

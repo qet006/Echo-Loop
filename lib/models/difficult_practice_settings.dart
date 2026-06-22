@@ -7,6 +7,7 @@ library;
 import 'dart:math' as math;
 
 import 'intensive_listen_settings.dart';
+import '../utils/playback_speed.dart';
 
 /// 难句补练/收藏复习设置
 ///
@@ -37,20 +38,7 @@ class DifficultPracticeSettings {
   /// 入口弹窗使用的离散速度选项
   ///
   /// 与 [BlindListenSettings.briefingPlaybackSpeedOptions] / [RetellSettings.briefingPlaybackSpeedOptions] 保持一致。
-  static const List<double> briefingPlaybackSpeedOptions = [
-    0.5,
-    0.7,
-    0.75,
-    0.8,
-    0.85,
-    0.9,
-    0.95,
-    1.0,
-    1.1,
-    1.3,
-    1.5,
-    2.0,
-  ];
+  static const List<double> briefingPlaybackSpeedOptions = kUnifiedPlaybackSpeeds;
 
   const DifficultPracticeSettings({
     this.controlMode = ShadowingControlMode.auto,
@@ -134,12 +122,10 @@ class DifficultPracticeSettings {
     );
   }
 
-  /// 解析播放速度：范围 0.5–2.0，否则回退 1.0
+  /// 解析播放速度：归一化到统一支持档位，否则回退 1.0
   static double _parsePlaybackSpeed(dynamic raw) {
     if (raw is! num) return 1.0;
-    final value = raw.toDouble();
-    if (value < 0.5 || value > 2.0) return 1.0;
-    return value;
+    return normalizePlaybackSpeed(raw.toDouble());
   }
 
   static ShadowingControlMode _parseControlMode(dynamic raw) {

@@ -263,7 +263,7 @@ void main() {
     );
 
     await lp.updateSettings(
-      const PlaybackSettings(playbackSpeed: 1.25, showTranscript: false),
+      const PlaybackSettings(playbackSpeed: 1.2, showTranscript: false),
     );
     await lp.setPlaylistMode(PlaylistMode.bookmarks);
     await lp.updateSettings(
@@ -276,13 +276,13 @@ void main() {
     await lp.setPlaylistMode(PlaylistMode.full);
 
     final state = container.read(listeningPracticeProvider);
-    expect(state.fullSettings.playbackSpeed, 1.25);
+    expect(state.fullSettings.playbackSpeed, 1.2);
     expect(state.fullSettings.showTranscript, isFalse);
     expect(state.fullSettings.singleSentenceMode, isFalse);
     expect(state.bookmarkSettings.playbackSpeed, 0.8);
     expect(state.bookmarkSettings.singleSentenceMode, isTrue);
     expect(state.bookmarkSettings.loopSentence, isTrue);
-    expect(state.settings.playbackSpeed, 1.25);
+    expect(state.settings.playbackSpeed, 1.2);
   });
 
   test('切换到收藏 tab 时立即应用收藏 tab 的倍速设置', () async {
@@ -292,16 +292,16 @@ void main() {
       bookmarkedIndices: {0, 2},
     );
     lp.state = lp.state.copyWith(
-      bookmarkSettings: const PlaybackSettings(playbackSpeed: 0.75),
+      bookmarkSettings: const PlaybackSettings(playbackSpeed: 0.8),
     );
 
     await lp.setPlaylistMode(PlaylistMode.bookmarks);
 
     expect(
       container.read(listeningPracticeProvider).settings.playbackSpeed,
-      0.75,
+      0.8,
     );
-    expect(engine.playbackSpeed, 0.75);
+    expect(engine.playbackSpeed, 0.8);
   });
 
   test('切换到收藏 tab 时默认启用单句循环 1 次 + 1 秒', () async {

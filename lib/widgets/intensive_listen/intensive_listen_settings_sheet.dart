@@ -6,11 +6,13 @@ library;
 
 import 'package:flutter/material.dart';
 import '../common/app_dropdown.dart';
+import '../common/setting_labeled_row.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/intensive_listen_settings.dart';
 import '../../providers/learning_session/intensive_listen_player_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/playback_speed.dart';
 
 /// 显示精听设置底部弹窗
 void showIntensiveListenSettingsSheet({required BuildContext context}) {
@@ -122,7 +124,7 @@ class _IntensiveListenSettingsSheet extends ConsumerWidget {
 
   /// 播放速度滑块
   ///
-  /// 速度仅对当前会话生效，步进为 0.05x，覆盖 0.5x-2.0x。
+  /// 速度仅对当前会话生效，使用统一离散档位。
   Widget _buildPlaybackSpeedSection(
     AppLocalizations l10n,
     ThemeData theme,
@@ -132,31 +134,29 @@ class _IntensiveListenSettingsSheet extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              l10n.playbackSpeed,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+        SettingLabeledRow(
+          label: Text(
+            l10n.playbackSpeed,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
             ),
-            Text(
-              _formatSpeed(settings.playbackSpeed),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          ),
+          trailing: Text(
+            _formatSpeed(settings.playbackSpeed),
+            textAlign: TextAlign.right,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
             ),
-          ],
+          ),
         ),
         Slider(
-          value: settings.playbackSpeed.clamp(0.5, 2.0),
-          min: 0.5,
-          max: 2.0,
-          divisions: 30,
+          value: playbackSpeedSliderValue(settings.playbackSpeed),
+          min: 0,
+          max: (kUnifiedPlaybackSpeeds.length - 1).toDouble(),
+          divisions: kUnifiedPlaybackSpeeds.length - 1,
           label: _formatSpeed(settings.playbackSpeed),
           onChanged: (value) {
-            final speed = (value * 20).round() / 20;
+            final speed = playbackSpeedFromSliderValue(value);
             ref
                 .read(intensiveListenPlayerProvider.notifier)
                 .updateSettings(settings.copyWith(playbackSpeed: speed));
@@ -166,14 +166,8 @@ class _IntensiveListenSettingsSheet extends ConsumerWidget {
     );
   }
 
-  /// 统一显示速度标签：整数速度显示为 1x，0.05 步进保留必要小数。
-  String _formatSpeed(double speed) {
-    if (speed == speed.roundToDouble()) return '${speed.toInt()}x';
-    if ((speed * 10).roundToDouble() == speed * 10) {
-      return '${speed.toStringAsFixed(1)}x';
-    }
-    return '${speed.toStringAsFixed(2)}x';
-  }
+  /// 统一显示速度标签：始终保留一位小数。
+  String _formatSpeed(double speed) => formatPlaybackSpeedLabel(speed);
 
   /// 控制模式选择区域
   Widget _buildControlModeSection(

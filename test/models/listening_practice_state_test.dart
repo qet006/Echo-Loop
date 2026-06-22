@@ -195,11 +195,11 @@ void main() {
       test('bookmarks 模式下 settings 返回 bookmarkSettings', () {
         const state = ListeningPracticeState(
           playlistMode: PlaylistMode.bookmarks,
-          fullSettings: PlaybackSettings(playbackSpeed: 1.25),
-          bookmarkSettings: PlaybackSettings(playbackSpeed: 0.75),
+          fullSettings: PlaybackSettings(playbackSpeed: 1.2),
+          bookmarkSettings: PlaybackSettings(playbackSpeed: 0.8),
         );
 
-        expect(state.settings.playbackSpeed, 0.75);
+        expect(state.settings.playbackSpeed, 0.8);
       });
     });
 

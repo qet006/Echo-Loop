@@ -23,6 +23,7 @@ import 'package:go_router/go_router.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/speech_practice_models.dart';
+import '../utils/playback_speed.dart';
 import '../providers/learning_session/bookmark_review_provider.dart';
 import '../providers/learning_session/review_difficult_practice_provider.dart';
 import '../providers/repeat_flow/repeat_flow_state.dart';
@@ -612,11 +613,5 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
   }
 }
 
-/// 统一显示速度标签：整数速度显示为 1x，0.05 步进保留必要小数。
-String _formatSpeed(double speed) {
-  if (speed == speed.roundToDouble()) return '${speed.toInt()}x';
-  if ((speed * 10).roundToDouble() == speed * 10) {
-    return '${speed.toStringAsFixed(1)}x';
-  }
-  return '${speed.toStringAsFixed(2)}x';
-}
+/// 统一显示速度标签：始终保留一位小数。
+String _formatSpeed(double speed) => formatPlaybackSpeedLabel(speed);

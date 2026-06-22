@@ -174,9 +174,9 @@ void main() {
     });
 
     group('fromJson 范围校验', () {
-      test('旧持久化速度若不在新档位中则回退到 1x', () {
+      test('旧持久化速度若不在新档位中则吸附到最近新档位', () {
         final settings = PlaybackSettings.fromJson({'playbackSpeed': 1.75});
-        expect(settings.playbackSpeed, 1.0);
+        expect(settings.playbackSpeed, 2.0);
       });
 
       test('新档位速度从 JSON 读取时保留原值', () {
@@ -235,7 +235,7 @@ void main() {
         const settings = PlaybackSettings(
           loopWhole: true,
           wholeLoopCount: 9,
-          playbackSpeed: 1.25,
+          playbackSpeed: 1.2,
           showTranscript: false,
           singleSentenceMode: true,
         );
@@ -246,7 +246,7 @@ void main() {
         expect(copied.sentenceLoopCount, 1);
         expect(copied.sentenceInterval, const Duration(seconds: 1));
         expect(copied.wholeLoopCount, 9);
-        expect(copied.playbackSpeed, 1.25);
+        expect(copied.playbackSpeed, 1.2);
         expect(copied.showTranscript, isFalse);
         expect(copied.singleSentenceMode, isTrue);
       });

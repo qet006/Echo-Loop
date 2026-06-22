@@ -22,18 +22,19 @@ void main() {
       expect(updated.repeatCount, 1);
     });
 
-    test('入口播放速度选项符合跟读要求（含 0.75/0.85/0.95 难度档位）', () {
+    test('入口播放速度选项符合统一 0.1 步进档位', () {
       expect(IntensiveListenSettings.briefingPlaybackSpeedOptions, const [
+        0.4,
         0.5,
+        0.6,
         0.7,
-        0.75,
         0.8,
-        0.85,
         0.9,
-        0.95,
         1.0,
         1.1,
+        1.2,
         1.3,
+        1.4,
         1.5,
         2.0,
       ]);
@@ -45,7 +46,7 @@ void main() {
       final s2 = IntensiveListenSettings.fromJson({'playbackSpeed': 0.1});
       expect(s2.playbackSpeed, 1.0);
       final s3 = IntensiveListenSettings.fromJson({'playbackSpeed': 1.25});
-      expect(s3.playbackSpeed, 1.25);
+      expect(s3.playbackSpeed, 1.3);
     });
 
     test('copyWith 更新单个字段', () {

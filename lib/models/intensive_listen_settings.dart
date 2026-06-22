@@ -4,6 +4,8 @@
 /// 控制精听播放器的每句循环次数和句间停顿行为。
 library;
 
+import '../utils/playback_speed.dart';
+
 /// 跟读控制模式
 enum ShadowingControlMode {
   /// 自动模式：自动开始录音、自动停止、自动推进下一句
@@ -50,20 +52,7 @@ class IntensiveListenSettings {
   /// 入口弹窗使用的离散速度选项
   ///
   /// 与 [BlindListenSettings.briefingPlaybackSpeedOptions] / [RetellSettings.briefingPlaybackSpeedOptions] 保持一致。
-  static const List<double> briefingPlaybackSpeedOptions = [
-    0.5,
-    0.7,
-    0.75,
-    0.8,
-    0.85,
-    0.9,
-    0.95,
-    1.0,
-    1.1,
-    1.3,
-    1.5,
-    2.0,
-  ];
+  static const List<double> briefingPlaybackSpeedOptions = kUnifiedPlaybackSpeeds;
 
   /// 固定间隔可选值
   static const List<int> fixedPauseOptions = [
@@ -146,12 +135,10 @@ class IntensiveListenSettings {
     );
   }
 
-  /// 解析播放速度：范围 0.5–2.0，否则回退 1.0
+  /// 解析播放速度：归一化到统一支持档位，否则回退 1.0
   static double _parsePlaybackSpeed(dynamic raw) {
     if (raw is! num) return 1.0;
-    final value = raw.toDouble();
-    if (value < 0.5 || value > 2.0) return 1.0;
-    return value;
+    return normalizePlaybackSpeed(raw.toDouble());
   }
 
   /// 解析循环次数：`0`=∞；`1-10` 合法；`>10` 截到 10；其余非法值回退 1。

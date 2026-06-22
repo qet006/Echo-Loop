@@ -53,6 +53,8 @@ class AppDropdown<T> extends StatelessWidget {
       dropdownColor: theme.colorScheme.surface,
       elevation: 8,
       style: theme.textTheme.bodyMedium,
+      // 统一胶囊内部左右留白，避免文案贴边或箭头位置漂移。
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       icon: const Icon(Icons.arrow_drop_down),
     );
   }

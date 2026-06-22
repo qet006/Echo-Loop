@@ -4,18 +4,11 @@ import '../models/playback_settings.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../providers/audio_engine/audio_engine_provider.dart';
 import '../theme/app_theme.dart';
+import '../utils/playback_speed.dart';
 import 'common/anchored_bubble.dart';
 import 'settings_dialog.dart';
 
-String _formatPlaybackSpeedLabel(double speed) {
-  if (speed == speed.roundToDouble()) {
-    return '${speed.toStringAsFixed(1)}x';
-  }
-  if ((speed * 10).roundToDouble() == speed * 10) {
-    return '${speed.toStringAsFixed(1)}x';
-  }
-  return '${speed.toStringAsFixed(2)}x';
-}
+String _formatPlaybackSpeedLabel(double speed) => formatPlaybackSpeedLabel(speed);
 
 class PlaybackControls extends ConsumerWidget {
   const PlaybackControls({super.key});

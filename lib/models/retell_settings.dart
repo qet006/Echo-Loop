@@ -6,6 +6,7 @@ library;
 
 import '../database/enums.dart';
 import 'intensive_listen_settings.dart';
+import '../utils/playback_speed.dart';
 import 'rating_thresholds.dart';
 
 // 复用跟读模块的控制模式枚举（ShadowingControlMode）
@@ -158,22 +159,8 @@ class RetellSettings {
 
   /// 入口弹窗使用的离散速度选项
   ///
-  /// 包含 0.75 / 0.85 / 0.95 这几个"按难度+轮次回升映射"会落到的档位，
-  /// 保证下拉默认值在选项列表中可被命中。
-  static const List<double> briefingPlaybackSpeedOptions = [
-    0.5,
-    0.7,
-    0.75,
-    0.8,
-    0.85,
-    0.9,
-    0.95,
-    1.0,
-    1.1,
-    1.3,
-    1.5,
-    2.0,
-  ];
+  /// 与其他练习入口共用统一档位，保证默认值都能命中。
+  static const List<double> briefingPlaybackSpeedOptions = kUnifiedPlaybackSpeeds;
 
   /// 固定间隔可选值（秒）
   static const List<int> fixedPauseOptions = [10, 20, 30, 45, 60, 90, 120, 180];

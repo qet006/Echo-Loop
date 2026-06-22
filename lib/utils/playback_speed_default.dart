@@ -15,8 +15,8 @@ import '../database/enums.dart';
 /// | 难度     | FL   | R0   | R1   | R2   | R4   | R7   | R14  | R28  |
 /// |---------|------|------|------|------|------|------|------|------|
 /// | 中等及以下 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-/// | 困难     | 0.85 | 0.85 | 0.85 | 0.90 | 0.90 | 0.95 | 1.00 | 1.00 |
-/// | 很困难   | 0.75 | 0.80 | 0.80 | 0.85 | 0.85 | 0.90 | 0.95 | 1.00 |
+/// | 困难     | 0.90 | 0.90 | 0.90 | 0.90 | 0.90 | 1.00 | 1.00 | 1.00 |
+/// | 很困难   | 0.80 | 0.80 | 0.80 | 0.90 | 0.90 | 0.90 | 1.00 | 1.00 |
 ///
 /// [LearningStage.completed] 视同 review28（已通关，全速）。
 double defaultPlaybackSpeedFor(
@@ -32,20 +32,23 @@ double defaultPlaybackSpeedFor(
       return switch (stage) {
         LearningStage.firstLearn ||
         LearningStage.review0 ||
-        LearningStage.review1 => 0.85,
-        LearningStage.review2 || LearningStage.review4 => 0.90,
-        LearningStage.review7 => 0.95,
+        LearningStage.review1 ||
+        LearningStage.review2 ||
+        LearningStage.review4 => 0.9,
+        LearningStage.review7 ||
         LearningStage.review14 ||
         LearningStage.review28 ||
         LearningStage.completed => 1.0,
       };
     case DifficultyLevel.veryHard:
       return switch (stage) {
-        LearningStage.firstLearn => 0.75,
-        LearningStage.review0 || LearningStage.review1 => 0.80,
-        LearningStage.review2 || LearningStage.review4 => 0.85,
-        LearningStage.review7 => 0.90,
-        LearningStage.review14 => 0.95,
+        LearningStage.firstLearn ||
+        LearningStage.review0 ||
+        LearningStage.review1 => 0.8,
+        LearningStage.review2 ||
+        LearningStage.review4 ||
+        LearningStage.review7 => 0.9,
+        LearningStage.review14 ||
         LearningStage.review28 || LearningStage.completed => 1.0,
       };
   }

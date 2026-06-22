@@ -1,7 +1,29 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-22（学习计划页 Free Player 入口显眼度优化 / 收藏 tab 进度条跳零修复）
+> 最后更新：2026-06-22（任务引导页与设置弹窗设置项横向对齐统一）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：任务引导页与设置弹窗设置项横向对齐统一
+
+逐句精听、跟读、复习、盲听、复述等任务引导页与设置弹窗此前各自手写 `Row + Text + Dropdown/Text`，导致标签列宽、右侧值区宽度和左右边距视觉上不一致。现统一抽出公共设置项横向布局骨架，只修对齐，不改业务逻辑和控件语义。
+
+- [x] `setting_labeled_row.dart`：新增公共“左标签 + 右侧固定宽度值区”布局组件，统一设置项横向对齐约束。
+- [x] `intensive_listen_briefing_sheet.dart` / `listen_and_repeat_briefing_sheet.dart` / `review_briefing_sheet.dart` / `paragraph_selection_sheet.dart`：入口引导弹窗里的下拉设置行统一切到公共骨架，并补测试 key。
+- [x] `intensive_listen_settings_sheet.dart` / `listen_and_repeat_settings_sheet.dart` / `blind_listen_settings_sheet.dart` / `retell_settings_sheet.dart`：播放速度标题行统一切到公共骨架，收敛标签列和值区对齐。
+- [x] 测试：新增 briefing/settings 相关 widget 回归，覆盖标签列左边界一致、右侧值区宽度一致，防止后续布局回退。
+
+  **完成时间**: 2026-06-22 19:39:05 +0800
+
+## 已完成：统一播放速度档位到 0.1 步进
+
+此前 Free Player、各学习模式入口和设置面板仍混用 `0.75 / 0.85 / 0.95 / 1.25 / 1.75` 等旧档位，默认值映射与显示格式也不一致。现统一为 `0.4-1.5` 按 `0.1` 递增，另保留 `2.0`；所有速度文案统一显示一位小数，默认值映射中的旧档位同步上调到最近的 `0.1` 档。
+
+- [x] `playback_speed.dart` + `playback_settings.dart`：新增统一速度档位、格式化和归一化工具；Free Player 速度档位与旧值兼容读取统一走同一套逻辑。
+- [x] `intensive_listen_settings.dart` / `difficult_practice_settings.dart` / `blind_listen_settings.dart` / `retell_settings.dart` / `playback_speed_default.dart`：练习入口离散档位和默认速度映射统一到新规则，旧 `0.75 / 0.85 / 0.95` 默认值分别改为 `0.8 / 0.9 / 1.0`。
+- [x] `playback_controls.dart`、各 briefing sheet、各 settings sheet、各练习页状态标签：速度显示统一为 `1.0x` / `2.0x`，并将设置面板滑块从 `0.05x` 连续步进改为统一离散档位。
+- [x] 测试：更新模型、provider、briefing、settings、screen 相关回归，覆盖新档位列表、默认值映射、旧值归一化和 `1.0x / 2.0x` 文案。
+
+  **完成时间**: 2026-06-22 18:19:35 +0800
 
 ## 已完成：所有练习页循环次数支持无限 ∞
 
