@@ -1,7 +1,23 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-23（修复 Free Player 整篇循环次数不准 + 播放/暂停图标错乱）
+> 最后更新：2026-06-23（Free Player 精听单句模式切句改为 iPhone 相册式跟手滑动）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：Free Player 精听单句模式切句改为 iPhone 相册式跟手滑动
+
+此前 Free Player「单句模式（= 精听模式）」切句用 `AnimatedSwitcher` + `FadeTransition`，淡入淡出期间新旧文字在同一 Stack 内叠加 → 文字相互遮挡，且不跟手。改为业界标准的 `PageView.builder` + `PageController` 横向分页：内容跟手左右滑动、松手吸附，类似 iPhone 相册照片切换。
+
+- [x] `player_screen.dart`：`_buildSingleSentenceView` 用 PageView 重构，删除 `AnimatedSwitcher`/`_SingleSentenceAnimatedPage`/`_handleSingleSentenceSwipe` 及方向追踪字段；header + 难句标记行固定在 PageView 之上。
+- [x] 双向同步：provider→PageView 用 post-frame `animateToPage`（首次 `jumpToPage`）跟随自动推进/选句；PageView→provider 用 `onPageChanged` → `select{Full,Bookmarked}Sentence(autoPlay: isPlaying)`；两端按当前 truth 比较 guard，屏蔽 `animateToPage` 落点回声，避免回环。
+- [x] 全文 / 收藏两 tab 各持一个 `PageController` + 独立 key + 显式传 `PlaylistMode`：规避 TabBarView 切换动画期间两 body 同存导致单 controller 多挂、及离屏 tab 用全局 playlistMode 错配列表。
+- [x] 端点吸附天然替代手动边界 guard；`AnnotationContentView` 预建仅本地 SQLite 无网络，PageView.builder ±1 预建安全。
+- [x] 测试：`player_screen_test.dart` 改写两条 swipe 用例为 PageView 翻页 + 选句记录，新增「保持播放态 autoPlay:true」「首页右滑端点吸附不触发」「外部推进自动跟随不回环」3 条，单文件 21 通过。
+- [x] 修正：点击解析/翻译/意群工具栏按钮触发「当前句自然播完后暂停」（`onToolbarButtonTapped` → `pauseAfterCurrentSentence()`），避免打断当前朗读；意群试听播放前仍立即暂停（`onStopMainPlayer` → `pause()`）。句级循环在 clip 边界停在本句、整篇 gapless 在跨句边界回退停留在刚播完的句子（`_pauseGaplessHoldingSentence`），使解析面板停留在用户点击的句子上。
+- [x] 修复：PageView 预建相邻页导致 showcaseview 新手引导崩溃（`ShowcaseController.register` 落在已 unmount 的 State）。`AnnotationContentView` 新增 `enableGuide`（默认 true），离屏页置 false → 四个 GuideStep 为 null（`_wrapGuide` 不包 Showcase）、flows 为空；`player_screen` 仅对 `position == targetPosition` 的当前页启用引导。
+- [x] 修正：句级循环（单句循环/收藏）暂停续播保留已完成遍数——`play()` 改为 flag 驱动（`_sentenceLoopResumePending`）的句级 resumable 分支 + `_resumeSentenceDriven`（不清零 `_sentenceRepeatsDone`/`_wholeLoopsDone`），立即暂停与延迟暂停统一置位、换句/seek/stop 清零。此前句级路径恒走 `_startCurrent` 清零，暂停后从第一遍重来。`free_player_playback_flow_test.dart` 新增续播保留遍数、延迟暂停（句级/gapless）、未播放退化立即暂停共 4 条回归。
+- [x] 修正：整篇循环播放中开启单句循环不再重置整篇遍数——两套循环状态互不影响。根因：`_maybeHandoffFromGapless` 从 gapless 交接到句级时调 `_startCurrent` 无条件清零 `_wholeLoopsDone`。抽出 `_launchSentenceDriven({resetWholeLoops, resetSentenceRepeats})` 公共入口，交接路径只重置当前句单句遍数、保留整篇遍数；`_startCurrent`(true,true) / `_resumeSentenceDriven`(false,false) 复用同一入口。`free_player_playback_flow_test.dart` 新增「整篇循环中开单句循环不重置整篇遍数」回归。
+
+  **完成时间**: 2026-06-23
 
 ## 已完成：修复 Free Player 整篇循环次数不准 + 播放/暂停图标错乱
 

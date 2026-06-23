@@ -93,6 +93,17 @@ class ListeningPractice extends _$ListeningPractice {
   /// 作用只是把主播放按钮从“从当前句再播”改为“从当前列表开头再播”。
   bool _awaitingReplayFromStart = false;
 
+  /// 「当前句自然播完后暂停」请求。点击解析/翻译/意群工具栏按钮时置位，避免打断
+  /// 当前朗读：句级循环在 clip 边界、整篇 gapless 在句边界消费它，暂停后停在用户
+  /// 点击的句子，续播时按记住的遍数/位置继续。任何立即起播/暂停入口都会清零它。
+  bool _pauseAfterCurrentSentence = false;
+
+  /// 句级循环被暂停、等待续播时按记住的遍数继续（不回第一遍）。
+  ///
+  /// 立即暂停（主播放按钮）与延迟暂停（解析工具栏）都会置位；[play] 消费后从当前句
+  /// 续播并保留计数。换句/seek/stop 等「全新起播」入口会清零它。
+  bool _sentenceLoopResumePending = false;
+
   /// LP 自己发起播放时持有的 AudioEngine sessionId。
   ///
   /// engine 的 position/playerState 流是全局共享的：句子讲解页等组件会旁路
@@ -203,8 +214,37 @@ class ListeningPractice extends _$ListeningPractice {
     if (!_engine.isActiveSession(_playbackSessionId)) return;
     if (!_engine.isPlaying) return;
     if (_activeSentenceDrivenPlayback) return;
+    // 延迟暂停：记下推进前的当前句，跨句边界即「当前句已播完」。
+    final indexBeforeAdvance = state.currentFullIndex;
     final sentenceChanged = _updateHighlight(absolutePosition);
+    if (sentenceChanged &&
+        _pauseAfterCurrentSentence &&
+        indexBeforeAdvance != null) {
+      _pauseAfterCurrentSentence = false;
+      unawaited(_pauseGaplessHoldingSentence(indexBeforeAdvance));
+      return;
+    }
     _maybeHandoffFromGapless(sentenceChanged);
+  }
+
+  /// 整篇 gapless 下「当前句播完后暂停」：回到刚播完的句子句首暂停，使解析/翻译面板
+  /// 停留在用户点击的句子上（而非随高亮滑到下一句），续播时从本句继续。
+  Future<void> _pauseGaplessHoldingSentence(int finishedIndex) async {
+    _playbackGen++;
+    _pendingPlaybackModeHandoff = false;
+    _setLogicalPlaying(false);
+    if (finishedIndex >= 0 && finishedIndex < state.sentences.length) {
+      state = state.copyWith(
+        currentFullIndex: finishedIndex,
+        lastPlayedFullIndex: finishedIndex,
+      );
+      await _engine.pauseKeepSession();
+      await _engine.seek(state.sentences[finishedIndex].startTime);
+    } else {
+      await _engine.pauseKeepSession();
+    }
+    _playbackSessionId = _engine.currentSessionId;
+    _autoSaveProgress();
   }
 
   /// 按实际播放位置刷新当前句高亮（gapless 下连续）。
@@ -399,6 +439,19 @@ class ListeningPractice extends _$ListeningPractice {
       _sentenceRepeatsDone += 1;
       _autoSaveProgress();
 
+      // 解析/翻译/意群触发的延迟暂停：当前 clip 已自然播完，停在本句暂停，
+      // 不再推进循环；遍数与位置保留，续播时从记住的进度继续。
+      if (_pauseAfterCurrentSentence) {
+        _pauseAfterCurrentSentence = false;
+        _activeSentenceDrivenPlayback = false;
+        _pendingPlaybackModeHandoff = false;
+        _sentenceLoopResumePending = true;
+        _setLogicalPlaying(false);
+        await _engine.pause();
+        _playbackSessionId = _engine.currentSessionId;
+        return;
+      }
+
       final s = state.settings;
       final action = decideNext(
         loopSentence: s.loopSentence,
@@ -471,7 +524,10 @@ class ListeningPractice extends _$ListeningPractice {
     }
 
     _pendingPlaybackModeHandoff = false;
-    unawaited(_startCurrent());
+    if (_playable.isEmpty) return;
+    // 整篇 gapless 中途开启单句循环：交接到句级循环，保留整篇已播遍数，
+    // 只重置当前句的单句遍数——两套循环状态互不影响。
+    _launchSentenceDriven(resetWholeLoops: false, resetSentenceRepeats: true);
   }
 
   /// 从句级 clip 模式自然交接回 gapless。
@@ -713,6 +769,18 @@ class ListeningPractice extends _$ListeningPractice {
       return;
     }
 
+    // 句级循环（单句循环 / 收藏跳播）暂停续播：保留已完成的单句/整篇遍数，从当前句
+    // 句首重新拉起 clip 循环，从「记住的遍数」继续而非回到第一遍。立即暂停与解析延迟
+    // 暂停都置位 _sentenceLoopResumePending；模式已变/会话失效则清零，按常规起播。
+    if (_sentenceLoopResumePending) {
+      _sentenceLoopResumePending = false;
+      if (_usesSentenceDrivenPlayback &&
+          _engine.isActiveSession(_playbackSessionId)) {
+        await _resumeSentenceDriven();
+        return;
+      }
+    }
+
     if (!_usesSentenceDrivenPlayback &&
         _engine.isActiveSession(_playbackSessionId)) {
       final ps = _engine.processingState;
@@ -729,6 +797,14 @@ class ListeningPractice extends _$ListeningPractice {
     }
 
     await _startCurrent();
+  }
+
+  /// 句级循环的暂停续播：与 [_startCurrent] 的句级分支一致，唯一区别是
+  /// 不清零 _sentenceRepeatsDone / _wholeLoopsDone，使续播从记住的遍数继续。
+  Future<void> _resumeSentenceDriven() async {
+    if (_playable.isEmpty) return;
+    // 续播：两套遍数都保留，从记住的进度继续。
+    _launchSentenceDriven(resetWholeLoops: false, resetSentenceRepeats: false);
   }
 
   /// 已播完后再次点击主播放按钮：从当前播放列表开头重新开始。
@@ -759,20 +835,38 @@ class ListeningPractice extends _$ListeningPractice {
     final playable = _playable;
     if (playable.isEmpty) return;
 
+    // 全新起播：清零任何待定的延迟暂停 / 续播标记（换句、点击列表等都经此）。
+    _pauseAfterCurrentSentence = false;
+    _sentenceLoopResumePending = false;
+
     if (_usesSentenceDrivenPlayback) {
-      final gen = ++_playbackGen;
-      _awaitingReplayFromStart = false;
-      _activeSentenceDrivenPlayback = true;
-      _pendingPlaybackModeHandoff = false;
-      _sentenceRepeatsDone = 0;
-      _wholeLoopsDone = 0;
-      _playbackSessionId = _engine.newSession();
-      _setLogicalPlaying(true);
-      unawaited(_playSentenceDriven(gen, _playbackSessionId));
+      // 全新起播：单句与整篇遍数都清零。
+      _launchSentenceDriven(resetWholeLoops: true, resetSentenceRepeats: true);
     } else {
       // 整篇连续播放：从当前句句首起播确定性循环，清零遍数。
       await _startWholeDriven(startPos: _currentPos ?? 0, resetCounters: true);
     }
+  }
+
+  /// 启动句级 clip 循环协程（单句循环 / 收藏跳播）的公共入口。
+  ///
+  /// [resetWholeLoops]：true 清零整篇遍数（全新起播）；false 保留——暂停续播、
+  /// 以及整篇 gapless 播放中途开启单句循环交接进来时，整篇与单句两套循环状态互不
+  /// 影响（开单句循环不应把整篇已播遍数清零）。
+  /// [resetSentenceRepeats]：是否清零当前句的单句遍数。
+  void _launchSentenceDriven({
+    required bool resetWholeLoops,
+    required bool resetSentenceRepeats,
+  }) {
+    final gen = ++_playbackGen;
+    _awaitingReplayFromStart = false;
+    _activeSentenceDrivenPlayback = true;
+    _pendingPlaybackModeHandoff = false;
+    if (resetSentenceRepeats) _sentenceRepeatsDone = 0;
+    if (resetWholeLoops) _wholeLoopsDone = 0;
+    _playbackSessionId = _engine.newSession();
+    _setLogicalPlaying(true);
+    unawaited(_playSentenceDriven(gen, _playbackSessionId));
   }
 
   void _ensureValidIndex() {
@@ -794,6 +888,9 @@ class ListeningPractice extends _$ListeningPractice {
   Future<void> pause() async {
     _playbackGen++;
     _awaitingReplayFromStart = false;
+    // 句级循环正在驱动时暂停 → 续播保留遍数；任何待定的延迟暂停被立即暂停取代。
+    _sentenceLoopResumePending = _activeSentenceDrivenPlayback;
+    _pauseAfterCurrentSentence = false;
     _activeSentenceDrivenPlayback = false;
     _pendingPlaybackModeHandoff = false;
     _setLogicalPlaying(false);
@@ -804,9 +901,21 @@ class ListeningPractice extends _$ListeningPractice {
     _playbackSessionId = _engine.currentSessionId;
   }
 
+  /// 请求「当前句自然播完后暂停」——点击解析/翻译/意群工具栏按钮时调用，避免打断
+  /// 当前朗读。未在播放时退化为立即暂停。
+  Future<void> pauseAfterCurrentSentence() async {
+    if (!state.isPlaying) {
+      await pause();
+      return;
+    }
+    _pauseAfterCurrentSentence = true;
+  }
+
   Future<void> stop() async {
     _playbackGen++;
     _awaitingReplayFromStart = false;
+    _sentenceLoopResumePending = false;
+    _pauseAfterCurrentSentence = false;
     _activeSentenceDrivenPlayback = false;
     _pendingPlaybackModeHandoff = false;
     _setLogicalPlaying(false);
@@ -843,6 +952,8 @@ class ListeningPractice extends _$ListeningPractice {
     final wasPlaying = _engine.isPlaying;
     _playbackGen++;
     _awaitingReplayFromStart = false;
+    _sentenceLoopResumePending = false;
+    _pauseAfterCurrentSentence = false;
     _activeSentenceDrivenPlayback = false;
     _pendingPlaybackModeHandoff = false;
 
@@ -910,6 +1021,8 @@ class ListeningPractice extends _$ListeningPractice {
   Future<void> _alignEngineToCurrent() async {
     _playbackGen++;
     _awaitingReplayFromStart = false;
+    _sentenceLoopResumePending = false;
+    _pauseAfterCurrentSentence = false;
     _activeSentenceDrivenPlayback = false;
     _pendingPlaybackModeHandoff = false;
     _setLogicalPlaying(false);

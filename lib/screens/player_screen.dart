@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import '../l10n/app_localizations.dart';
+import '../models/audio_item.dart';
 import '../models/playback_settings.dart';
 import '../models/retell_settings.dart';
 import '../models/sentence.dart';
@@ -29,6 +30,9 @@ import 'sentence_detail_screen.dart';
 const kPlayerSingleSentenceSwipeAreaKey = ValueKey(
   'player-single-sentence-swipe-area',
 );
+const kPlayerBookmarkSingleSentenceSwipeAreaKey = ValueKey(
+  'player-bookmark-single-sentence-swipe-area',
+);
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
@@ -39,11 +43,16 @@ class PlayerScreen extends ConsumerStatefulWidget {
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen>
     with SingleTickerProviderStateMixin {
-  static const double _singleSentenceSwipeVelocityThreshold = 250;
-  String? _lastSingleSentenceContentId;
-  PlaylistMode? _lastSingleSentencePlaylistMode;
-  int? _lastSingleSentenceIndex;
-  int _singleSentenceTransitionDirection = 0;
+  /// 精听单句模式横向分页控制器。全文 / 收藏两 tab 各持一个：TabBarView 切换动画
+  /// 期间两 tab body 会同时存在，单个 PageController 不能同时挂到两个 PageView。
+  /// 在字段初始化时创建、[dispose] 释放，绝不在 build 内重建。
+  final PageController _fullPageController = PageController();
+  final PageController _bookmarkPageController = PageController();
+
+  /// 各 pager 是否已完成首次对齐。首次用 jumpToPage 瞬切到当前句（恢复进度不滑动），
+  /// 之后的索引变化用 animateToPage 滑动过渡。
+  bool _fullPagerSynced = false;
+  bool _bookmarkPagerSynced = false;
 
   late TabController _tabController;
   int _previousTabIndex = 0;
@@ -90,6 +99,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _fullPageController.dispose();
+    _bookmarkPageController.dispose();
     super.dispose();
   }
 
@@ -254,6 +265,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
           controller,
           playerState.currentFullIndex!,
           settings,
+          PlaylistMode.full,
         );
       }
       return Center(
@@ -353,6 +365,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         controller,
         playerState.currentBookmarkIndex!,
         settings,
+        PlaylistMode.bookmarks,
       );
     }
 
@@ -399,6 +412,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     ListeningPractice controller,
     int index,
     PlaybackSettings settings,
+    PlaylistMode mode,
   ) {
     final currentSentence = playerState.sentences[index];
     final isBookmarked = playerState.bookmarkedIndices.contains(
@@ -408,183 +422,193 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     if (audioItem == null) {
       return const SizedBox.shrink();
     }
-    final contentId = '${playerState.playlistMode.name}-$index';
-    if (_lastSingleSentenceContentId != contentId) {
-      if (_lastSingleSentencePlaylistMode == playerState.playlistMode &&
-          _lastSingleSentenceIndex != null) {
-        final previousIndex = _lastSingleSentenceIndex!;
-        _singleSentenceTransitionDirection = index > previousIndex
-            ? 1
-            : index < previousIndex
-            ? -1
-            : 0;
+
+    // 当前 tab 的播放列表：全文 → sentences；收藏 → bookmarkedSentences。
+    // 用入参 mode 而非 playerState.playlistMode：TabBarView 切换动画期间离屏 tab 仍
+    // 在重建，全局 playlistMode 可能已切到另一个 tab，会与本 tab 的列表/索引错配。
+    // PageView 的页按列表内「位置」索引，位置↔句子经 playable[pos].index 映射。
+    final isBookmarkMode = mode == PlaylistMode.bookmarks;
+    final playable = isBookmarkMode
+        ? playerState.bookmarkedSentences
+        : playerState.sentences;
+    final pageController = isBookmarkMode
+        ? _bookmarkPageController
+        : _fullPageController;
+    // index 是全局句下标，换算成 playable 列表内的位置。
+    final targetPosition = playable.indexWhere((s) => s.index == index);
+
+    // provider → PageView 单向对齐（自动推进/程序选句的外部变化）。
+    // post-frame + 位置比较 guard 避免回环，详见 _onSentencePageChanged 注释。
+    if (targetPosition >= 0) {
+      final firstSync = isBookmarkMode
+          ? !_bookmarkPagerSynced
+          : !_fullPagerSynced;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !pageController.hasClients) return;
+        if (pageController.page?.round() == targetPosition) return;
+        if (firstSync) {
+          // 首次对齐到当前句（恢复进度），瞬切不滑动。
+          pageController.jumpToPage(targetPosition);
+        } else {
+          pageController.animateToPage(
+            targetPosition,
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      });
+      if (isBookmarkMode) {
+        _bookmarkPagerSynced = true;
       } else {
-        _singleSentenceTransitionDirection = 0;
+        _fullPagerSynced = true;
       }
-      _lastSingleSentenceContentId = contentId;
-      _lastSingleSentencePlaylistMode = playerState.playlistMode;
-      _lastSingleSentenceIndex = index;
     }
 
-    return GestureDetector(
-      key: kPlayerSingleSentenceSwipeAreaKey,
-      behavior: HitTestBehavior.translucent,
-      onHorizontalDragEnd: (details) =>
-          _handleSingleSentenceSwipe(details, playerState, controller),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 序号 + 时间区间（弱化辅助信息）
-            Padding(
-              padding: const EdgeInsets.only(
-                top: AppSpacing.m,
-                bottom: AppSpacing.s,
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    '#${currentSentence.index + 1}',
-                    style: AppTextStyles.caption(context),
-                  ),
-                  const SizedBox(width: AppSpacing.l),
-                  Text(
-                    '${SubtitleParser.formatDuration(currentSentence.startTime)} - ${SubtitleParser.formatDuration(currentSentence.endTime)}',
-                    style: AppTextStyles.caption(context),
-                  ),
-                ],
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 序号 + 时间区间（弱化辅助信息）—— 固定在 PageView 之上，随当前页重渲。
+          Padding(
+            padding: const EdgeInsets.only(
+              top: AppSpacing.m,
+              bottom: AppSpacing.s,
             ),
-            // 难句标记行（复用精听）—— 不被遮蔽，盲听时仍可标记
-            BookmarkToggleRow(
-              isDifficult: isBookmarked,
-              onTap: () => controller.toggleBookmark(currentSentence.index),
-            ),
-            const SizedBox(height: AppSpacing.m),
-            // 精听解析内容 + 隐藏字幕遮罩。切句时做轻量滑动过渡，降低跳变感。
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeOutCubic,
-                layoutBuilder: (currentChild, previousChildren) => Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ...previousChildren,
-                    if (currentChild != null) currentChild,
-                  ],
+            child: Row(
+              children: [
+                Text(
+                  '#${currentSentence.index + 1}',
+                  style: AppTextStyles.caption(context),
                 ),
-                transitionBuilder: (child, animation) {
-                  final page = child is _SingleSentenceAnimatedPage
-                      ? child
-                      : _SingleSentenceAnimatedPage(direction: 0, child: child);
-                  final beginOffset = switch (page.direction) {
-                    1 => const Offset(0.1, 0),
-                    -1 => const Offset(-0.1, 0),
-                    _ => const Offset(0, 0),
-                  };
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position:
-                          Tween<Offset>(
-                            begin: beginOffset,
-                            end: Offset.zero,
-                          ).animate(
-                            CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeOutCubic,
-                            ),
-                          ),
-                      child: page.child,
-                    ),
-                  );
-                },
-                child: _SingleSentenceAnimatedPage(
-                  key: ValueKey(contentId),
-                  direction: _singleSentenceTransitionDirection,
-                  child: Stack(
-                    children: [
-                      AnnotationContentView(
-                        // 切句时重建，确保 AnnotationContentView 内部意群等状态重置
-                        key: ValueKey(currentSentence.index),
-                        text: currentSentence.text,
-                        aiNotifier: ref.read(sentenceAiNotifierProvider),
-                        audioItemId: audioItem.id,
-                        sentenceIndex: currentSentence.index,
-                        sentenceStartMs:
-                            currentSentence.startTime.inMilliseconds,
-                        sentenceEndMs: currentSentence.endTime.inMilliseconds,
-                        // 意群试听与主播放共用引擎，播放前先暂停主播放
-                        onStopMainPlayer: () => controller.pause(),
-                      ),
-                      // 隐藏字幕遮罩：覆盖整个内容区（含工具栏），模糊且不可点击
-                      if (!settings.showTranscript)
-                        Positioned.fill(
-                          child: IgnorePointer(
-                            child: ClipRRect(
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                                child: Container(
-                                  color: Theme.of(context).colorScheme.onSurface
-                                      .withValues(alpha: 0.05),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                const SizedBox(width: AppSpacing.l),
+                Text(
+                  '${SubtitleParser.formatDuration(currentSentence.startTime)} - ${SubtitleParser.formatDuration(currentSentence.endTime)}',
+                  style: AppTextStyles.caption(context),
                 ),
+              ],
+            ),
+          ),
+          // 难句标记行（复用精听）—— 不被遮蔽，盲听时仍可标记。
+          BookmarkToggleRow(
+            isDifficult: isBookmarked,
+            onTap: () => controller.toggleBookmark(currentSentence.index),
+          ),
+          const SizedBox(height: AppSpacing.m),
+          // 精听解析内容 + 隐藏字幕遮罩。横向 PageView 跟手翻页，松手吸附，
+          // 类似 iPhone 相册照片切换（无淡入淡出文字遮挡）。
+          Expanded(
+            child: PageView.builder(
+              key: isBookmarkMode
+                  ? kPlayerBookmarkSingleSentenceSwipeAreaKey
+                  : kPlayerSingleSentenceSwipeAreaKey,
+              controller: pageController,
+              itemCount: playable.length,
+              onPageChanged: (pos) =>
+                  _onSentencePageChanged(pos, playerState, controller, mode),
+              itemBuilder: (context, position) => _buildSentencePage(
+                playable[position],
+                audioItem,
+                controller,
+                settings,
+                // 仅当前页启用新手引导：离屏预建页注册 showcase 后随 PageView 回收
+                // 销毁会崩溃（见 AnnotationContentView.enableGuide 注释）。
+                isActivePage: position == targetPosition,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  void _handleSingleSentenceSwipe(
-    DragEndDetails details,
-    ListeningPracticeState playerState,
+  /// 构建 PageView 单页内容：解析视图 + 可选隐藏字幕遮罩。
+  ///
+  /// 每页按句子 index keyed，PageView.builder 会预建相邻 ±1 页。
+  /// 预建安全：[AnnotationContentView] 初始化只查本地词级时间戳缓存与 L2 SQLite，
+  /// 不发起 AI/网络请求；若未来其初始化新增 eager 网络调用，需重新评估预建开销。
+  Widget _buildSentencePage(
+    Sentence sentence,
+    AudioItem audioItem,
     ListeningPractice controller,
-  ) {
-    final velocity = details.primaryVelocity ?? 0;
-    if (velocity.abs() < _singleSentenceSwipeVelocityThreshold) {
-      return;
-    }
-    if (velocity < 0) {
-      if (playerState.playlistMode == PlaylistMode.bookmarks) {
-        final currentIndex = playerState.currentBookmarkIndex;
-        final bookmarked = playerState.bookmarkedSentences;
-        final currentPos = currentIndex == null
-            ? -1
-            : bookmarked.indexWhere((s) => s.index == currentIndex);
-        if (currentPos >= bookmarked.length - 1) {
-          return;
-        }
-      } else if ((playerState.currentFullIndex ?? 0) >=
-          playerState.sentences.length - 1) {
-        return;
-      }
-      unawaited(controller.nextSentence());
-      return;
-    }
+    PlaybackSettings settings, {
+    required bool isActivePage,
+  }) {
+    return Stack(
+      children: [
+        AnnotationContentView(
+          // 按句 index keyed，确保 AnnotationContentView 内部意群等状态随句重置
+          key: ValueKey(sentence.index),
+          text: sentence.text,
+          aiNotifier: ref.read(sentenceAiNotifierProvider),
+          audioItemId: audioItem.id,
+          sentenceIndex: sentence.index,
+          sentenceStartMs: sentence.startTime.inMilliseconds,
+          sentenceEndMs: sentence.endTime.inMilliseconds,
+          // 意群试听与主播放共用引擎，播放前需立即暂停主播放
+          onStopMainPlayer: () => controller.pause(),
+          // 点击解析/翻译/意群工具栏按钮时，等当前句自然播完后再暂停，避免打断朗读。
+          // 暂停保留循环遍数，恢复播放时从记住的进度继续。
+          onToolbarButtonTapped: () => controller.pauseAfterCurrentSentence(),
+          // 仅当前页启用引导，避免离屏预建页 showcase 注册后回收崩溃。
+          enableGuide: isActivePage,
+        ),
+        // 隐藏字幕遮罩：覆盖整个内容区（含工具栏），模糊且不可点击
+        if (!settings.showTranscript)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ClipRRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                  child: Container(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.05),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 
-    if (playerState.playlistMode == PlaylistMode.bookmarks) {
-      final currentIndex = playerState.currentBookmarkIndex;
-      final bookmarked = playerState.bookmarkedSentences;
-      final currentPos = currentIndex == null
-          ? -1
-          : bookmarked.indexWhere((s) => s.index == currentIndex);
-      if (currentPos <= 0) {
-        return;
-      }
-    } else if ((playerState.currentFullIndex ?? 0) <= 0) {
-      return;
+  /// PageView → provider：用户跟手滑动落到新页时更新真相源索引。
+  ///
+  /// [pos] 是 playable 列表内的位置，换算成全局句下标后经 select* 写回，
+  /// `autoPlay: state.isPlaying` 复刻原 swipe「保持播放/暂停态」语义（用逻辑播放
+  /// 态而非引擎 flag，后者自然播完后仍为 true，见 CLAUDE.md §7.6）。
+  ///
+  /// 防回环：`animateToPage` 落点会再触发一次本回调，此时目标全局下标已等于当前
+  /// 真相源 → 直接 return，不二次写、不再触发 provider→PageView 对齐。
+  void _onSentencePageChanged(
+    int pos,
+    ListeningPracticeState state,
+    ListeningPractice controller,
+    PlaylistMode mode,
+  ) {
+    final isBookmarkMode = mode == PlaylistMode.bookmarks;
+    final playable = isBookmarkMode
+        ? state.bookmarkedSentences
+        : state.sentences;
+    if (pos < 0 || pos >= playable.length) return;
+    final globalIndex = playable[pos].index;
+    final currentGlobal = isBookmarkMode
+        ? state.currentBookmarkIndex
+        : state.currentFullIndex;
+    if (globalIndex == currentGlobal) return;
+    if (isBookmarkMode) {
+      unawaited(
+        controller.selectBookmarkedSentence(
+          globalIndex,
+          autoPlay: state.isPlaying,
+        ),
+      );
+    } else {
+      unawaited(
+        controller.selectFullSentence(globalIndex, autoPlay: state.isPlaying),
+      );
     }
-    unawaited(controller.previousSentence());
   }
 
   /// 点击句子主体 → 暂停播放 → 进入句子讲解页
@@ -847,20 +871,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       ],
     );
   }
-}
-
-class _SingleSentenceAnimatedPage extends StatelessWidget {
-  final int direction;
-  final Widget child;
-
-  const _SingleSentenceAnimatedPage({
-    super.key,
-    required this.direction,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) => child;
 }
 
 class _HotkeyTipsCarousel extends StatefulWidget {

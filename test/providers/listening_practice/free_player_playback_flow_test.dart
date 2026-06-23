@@ -477,6 +477,159 @@ void main() {
     expect(s.sentenceRepeatsDone, 0, reason: '新句第 1 遍 → 状态栏显示 1/2');
   });
 
+  test('单句循环：暂停后续播保留已完成遍数，不从第一遍重新开始', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(
+        loopSentence: true,
+        sentenceLoopCount: 3,
+        sentenceInterval: Duration.zero,
+      ),
+    );
+
+    await start();
+    await completeClip(); // 第 1 遍完成 → 已完成 1，第 2 遍播放中
+    expect(container.read(listeningPracticeProvider).sentenceRepeatsDone, 1);
+
+    // 第 2 遍播放到中途（position > 0），暂停。
+    engine.position = const Duration(milliseconds: 500);
+    await lp.pause();
+    expect(
+      container.read(listeningPracticeProvider).sentenceRepeatsDone,
+      1,
+      reason: '暂停不清零遍数',
+    );
+
+    // 续播：应保留已完成 1 遍，从「记住的进度」继续，而非回到第 1 遍。
+    await start();
+    expect(
+      container.read(listeningPracticeProvider).sentenceRepeatsDone,
+      1,
+      reason: '续播保留已完成遍数（修复前会被重置为 0）',
+    );
+
+    await completeClip(); // 第 2 遍完成 → 已完成 2，第 3 遍播放中
+    expect(container.read(listeningPracticeProvider).sentenceRepeatsDone, 2);
+
+    await completeClip(); // 第 3 遍完成 → 满 3 遍进入第 1 句，计数归零
+    final s = container.read(listeningPracticeProvider);
+    expect(s.currentFullIndex, 1);
+    expect(s.sentenceRepeatsDone, 0);
+  });
+
+  test('整篇循环播放中开启单句循环：整篇遍数不被重置（两套循环状态互不影响）', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(
+        loopWhole: true,
+        wholeLoopCount: 0, // 无限整篇循环
+        wholeInterval: Duration.zero,
+      ),
+    );
+
+    await start();
+    await completeWhole(); // 整篇播完第 1 遍 → wholeLoopsDone=1，回卷重播
+    expect(container.read(listeningPracticeProvider).wholeLoopsDone, 1);
+
+    // 播放中开启单句循环 → 标记待交接（不立即打断当前播放态）。
+    await lp.updateSettings(
+      const PlaybackSettings(
+        loopWhole: true,
+        wholeLoopCount: 0,
+        wholeInterval: Duration.zero,
+        loopSentence: true,
+        sentenceLoopCount: 2,
+        sentenceInterval: Duration.zero,
+      ),
+    );
+
+    // 跨句边界触发从 gapless 交接到句级循环。
+    engine.emitPosition(const Duration(milliseconds: 3000));
+    await flushBoundary();
+
+    final s = container.read(listeningPracticeProvider);
+    expect(s.wholeLoopsDone, 1, reason: '开启单句循环不应清零整篇已播遍数');
+    expect(s.sentenceRepeatsDone, 0, reason: '新进入单句循环，当前句从第 1 遍开始');
+  });
+
+  test('单句循环：解析延迟暂停在当前句播完后才暂停，停在本句并保留遍数', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(
+        loopSentence: true,
+        sentenceLoopCount: 3,
+        sentenceInterval: Duration.zero,
+      ),
+    );
+
+    await start();
+    await completeClip(); // 第 1 遍完成 → 已完成 1，第 2 遍播放中
+    expect(container.read(listeningPracticeProvider).sentenceRepeatsDone, 1);
+
+    // 第 2 遍播放中点击解析：请求延迟暂停，但当前仍在播放、未中断。
+    await lp.pauseAfterCurrentSentence();
+    expect(
+      container.read(listeningPracticeProvider).isPlaying,
+      isTrue,
+      reason: '当前句尚未播完，不立即暂停',
+    );
+    expect(container.read(listeningPracticeProvider).sentenceRepeatsDone, 1);
+
+    // 第 2 遍自然播完 → 此时才暂停，停在第 0 句，保留已完成 2 遍。
+    await completeClip();
+    final paused = container.read(listeningPracticeProvider);
+    expect(paused.isPlaying, isFalse, reason: '当前句播完后才暂停');
+    expect(paused.currentFullIndex, 0, reason: '停在本句，不推进');
+    expect(paused.sentenceRepeatsDone, 2);
+
+    // 续播：从记住的 2 遍继续，再播一遍即满 3 遍进入下一句。
+    await start();
+    expect(container.read(listeningPracticeProvider).sentenceRepeatsDone, 2);
+    await completeClip();
+    final resumed = container.read(listeningPracticeProvider);
+    expect(resumed.currentFullIndex, 1);
+    expect(resumed.sentenceRepeatsDone, 0);
+  });
+
+  test('整篇 gapless：解析延迟暂停在跨句边界暂停并停留在刚播完的句子', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(loopSentence: false),
+      currentFullIndex: 1,
+    );
+
+    await start();
+    expect(container.read(listeningPracticeProvider).isPlaying, isTrue);
+
+    // 第 1 句播放中点击解析：请求延迟暂停，当前不中断。
+    await lp.pauseAfterCurrentSentence();
+    expect(container.read(listeningPracticeProvider).isPlaying, isTrue);
+
+    // 位置推进越过第 1 句进入第 2 句（6300ms ∈ 第 2 句[6200,7900]）→ 在边界暂停，
+    // 并回退到刚播完的第 1 句，使解析面板停留在用户点击的句子上。
+    engine.emitPosition(const Duration(milliseconds: 6300));
+    await flushBoundary();
+
+    final paused = container.read(listeningPracticeProvider);
+    expect(paused.isPlaying, isFalse, reason: '跨句边界后暂停');
+    expect(paused.currentFullIndex, 1, reason: '停留在刚播完的第 1 句，不滑到第 2 句');
+    expect(engine.lastSeek, const Duration(milliseconds: 2600), reason: '回到第 1 句句首');
+  });
+
+  test('未播放时 pauseAfterCurrentSentence 退化为立即暂停', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(
+        loopSentence: true,
+        sentenceLoopCount: 3,
+      ),
+    );
+    // 未起播，isPlaying 为 false。
+    expect(container.read(listeningPracticeProvider).isPlaying, isFalse);
+    await lp.pauseAfterCurrentSentence();
+    expect(container.read(listeningPracticeProvider).isPlaying, isFalse);
+  });
+
   test('无限单句循环：多次越界都回到当前句句首', () async {
     lp.seed(
       sentences: sentences,

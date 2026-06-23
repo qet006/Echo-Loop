@@ -62,47 +62,28 @@ class _TestAudioItemDao implements AudioItemDao {
 class _RecordingListeningPractice extends TestListeningPractice {
   _RecordingListeningPractice(super.initialState);
 
-  int nextSentenceCalls = 0;
-  int previousSentenceCalls = 0;
+  /// 记录 PageView 翻页触发的选句调用（含全局下标与是否起播）。
+  final List<({int index, bool autoPlay})> selectFullCalls = [];
+  final List<({int index, bool autoPlay})> selectBookmarkCalls = [];
 
   @override
-  Future<void> nextSentence() async {
-    nextSentenceCalls += 1;
-    if (state.playlistMode == PlaylistMode.bookmarks) {
-      final bookmarked = state.bookmarkedSentences;
-      final currentIndex = state.currentBookmarkIndex;
-      final pos = currentIndex == null
-          ? -1
-          : bookmarked.indexWhere((s) => s.index == currentIndex);
-      if (pos >= 0 && pos < bookmarked.length - 1) {
-        state = state.copyWith(currentBookmarkIndex: bookmarked[pos + 1].index);
-      }
-      return;
-    }
-    final currentIndex = state.currentFullIndex ?? 0;
-    if (currentIndex < state.sentences.length - 1) {
-      state = state.copyWith(currentFullIndex: currentIndex + 1);
-    }
+  Future<void> selectFullSentence(int index, {bool autoPlay = true}) async {
+    selectFullCalls.add((index: index, autoPlay: autoPlay));
+    await super.selectFullSentence(index, autoPlay: autoPlay);
   }
 
   @override
-  Future<void> previousSentence() async {
-    previousSentenceCalls += 1;
-    if (state.playlistMode == PlaylistMode.bookmarks) {
-      final bookmarked = state.bookmarkedSentences;
-      final currentIndex = state.currentBookmarkIndex;
-      final pos = currentIndex == null
-          ? -1
-          : bookmarked.indexWhere((s) => s.index == currentIndex);
-      if (pos > 0) {
-        state = state.copyWith(currentBookmarkIndex: bookmarked[pos - 1].index);
-      }
-      return;
-    }
-    final currentIndex = state.currentFullIndex ?? 0;
-    if (currentIndex > 0) {
-      state = state.copyWith(currentFullIndex: currentIndex - 1);
-    }
+  Future<void> selectBookmarkedSentence(
+    int index, {
+    bool autoPlay = true,
+  }) async {
+    selectBookmarkCalls.add((index: index, autoPlay: autoPlay));
+    await super.selectBookmarkedSentence(index, autoPlay: autoPlay);
+  }
+
+  /// 模拟播放中外部推进当前句（gapless 自动翻页路径），不经 PageView。
+  void emitFullIndex(int index) {
+    state = state.copyWith(currentFullIndex: index);
   }
 }
 
@@ -149,6 +130,31 @@ List<Override> _audioOverrides({
     ),
   ];
 }
+
+/// 单句模式（精听）swipe 测试 overrides：注入指定的 [player]（录制选句调用），
+/// 并补齐 [AnnotationContentView] 的 AI / DAO / 学习设置依赖。
+List<Override> _recordingOverrides(_RecordingListeningPractice player) => [
+  appSettingsProvider.overrideWith(() => TestAppSettings()),
+  audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
+  collectionListProvider.overrideWith(() => TestCollectionList()),
+  listeningPracticeProvider.overrideWith(() => player),
+  audioEngineProvider.overrideWith(
+    () => TestAudioEngine(
+      initialState: const AudioEngineState(
+        totalDuration: Duration(seconds: 120),
+      ),
+    ),
+  ),
+  ...learningSettingsOverrides(),
+  bookmarkDaoProvider.overrideWithValue(_TestBookmarkDao()),
+  audioItemDaoProvider.overrideWithValue(_TestAudioItemDao()),
+  sentenceAiNotifierProvider.overrideWithValue(
+    SentenceAiNotifier(
+      cacheDao: createStubbedMockCacheDao(),
+      apiClient: _MockApiClient(),
+    ),
+  ),
+];
 
 /// 替换 widget tree 触发 dispose，再 pump 一帧让 deactivate 中的
 /// Future(...) 和 _HotkeyTipsCarousel 的 periodic Timer 全部完成/取消
@@ -580,7 +586,7 @@ void main() {
         await _disposeTree(tester);
       });
 
-      testWidgets('全文 tab 单句模式左滑切到下一句', (tester) async {
+      testWidgets('全文 tab 单句模式左滑切到下一句（PageView 翻页）', (tester) async {
         final item = createTestAudioItem();
         final sentences = createTestSentences(count: 3);
         final player = _RecordingListeningPractice(
@@ -595,28 +601,7 @@ void main() {
         await tester.pumpWidget(
           createTestScreen(
             const PlayerScreen(),
-            overrides: [
-              appSettingsProvider.overrideWith(() => TestAppSettings()),
-              audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
-              collectionListProvider.overrideWith(() => TestCollectionList()),
-              listeningPracticeProvider.overrideWith(() => player),
-              audioEngineProvider.overrideWith(
-                () => TestAudioEngine(
-                  initialState: const AudioEngineState(
-                    totalDuration: Duration(seconds: 120),
-                  ),
-                ),
-              ),
-              ...learningSettingsOverrides(),
-              bookmarkDaoProvider.overrideWithValue(_TestBookmarkDao()),
-              audioItemDaoProvider.overrideWithValue(_TestAudioItemDao()),
-              sentenceAiNotifierProvider.overrideWithValue(
-                SentenceAiNotifier(
-                  cacheDao: createStubbedMockCacheDao(),
-                  apiClient: _MockApiClient(),
-                ),
-              ),
-            ],
+            overrides: _recordingOverrides(player),
           ),
         );
         await tester.pumpAndSettle();
@@ -628,12 +613,109 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(player.nextSentenceCalls, 1);
+        // 暂停态翻页：selectFullSentence(1, autoPlay:false)。
+        expect(player.selectFullCalls, [(index: 1, autoPlay: false)]);
         expect(player.state.currentFullIndex, 1);
         await _disposeTree(tester);
       });
 
-      testWidgets('收藏 tab 单句模式左右滑动切换收藏句', (tester) async {
+      testWidgets('播放中翻页保持播放态（autoPlay:true）', (tester) async {
+        final item = createTestAudioItem();
+        final sentences = createTestSentences(count: 3);
+        final player = _RecordingListeningPractice(
+          ListeningPracticeState(
+            currentAudioItem: item,
+            sentences: sentences,
+            currentFullIndex: 0,
+            isPlaying: true,
+            settings: const PlaybackSettings(singleSentenceMode: true),
+          ),
+        );
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            overrides: _recordingOverrides(player),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.fling(
+          find.byKey(kPlayerSingleSentenceSwipeAreaKey),
+          const Offset(-500, 0),
+          1000,
+        );
+        await tester.pumpAndSettle();
+
+        expect(player.selectFullCalls, [(index: 1, autoPlay: true)]);
+        await _disposeTree(tester);
+      });
+
+      testWidgets('首页右滑被端点吸附拦截，不触发选句', (tester) async {
+        final item = createTestAudioItem();
+        final sentences = createTestSentences(count: 3);
+        final player = _RecordingListeningPractice(
+          ListeningPracticeState(
+            currentAudioItem: item,
+            sentences: sentences,
+            currentFullIndex: 0,
+            settings: const PlaybackSettings(singleSentenceMode: true),
+          ),
+        );
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            overrides: _recordingOverrides(player),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // 首页向右滑（回上一句）应被 PageView 端点吸附拦截。
+        await tester.fling(
+          find.byKey(kPlayerSingleSentenceSwipeAreaKey),
+          const Offset(500, 0),
+          1000,
+        );
+        await tester.pumpAndSettle();
+
+        expect(player.selectFullCalls, isEmpty);
+        expect(player.state.currentFullIndex, 0);
+        await _disposeTree(tester);
+      });
+
+      testWidgets('外部推进当前句时 PageView 自动跟随，不回环触发选句', (tester) async {
+        final item = createTestAudioItem();
+        final sentences = createTestSentences(count: 3);
+        final player = _RecordingListeningPractice(
+          ListeningPracticeState(
+            currentAudioItem: item,
+            sentences: sentences,
+            currentFullIndex: 0,
+            isPlaying: true,
+            settings: const PlaybackSettings(singleSentenceMode: true),
+          ),
+        );
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            overrides: _recordingOverrides(player),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // 模拟 gapless 播放外部推进到第 2 句。
+        player.emitFullIndex(1);
+        await tester.pumpAndSettle();
+
+        // PageView 跟随到 pos 1（animateToPage 落点回声被 guard 拦截，无新选句调用）。
+        expect(player.state.currentFullIndex, 1);
+        expect(player.selectFullCalls, isEmpty);
+        await _disposeTree(tester);
+      });
+
+      testWidgets('收藏 tab 单句模式左右滑动切换收藏句（PageView 翻页）', (tester) async {
         final item = createTestAudioItem();
         final sentences = createTestSentences(count: 3);
         final player = _RecordingListeningPractice(
@@ -652,28 +734,7 @@ void main() {
         await tester.pumpWidget(
           createTestScreen(
             const PlayerScreen(),
-            overrides: [
-              appSettingsProvider.overrideWith(() => TestAppSettings()),
-              audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
-              collectionListProvider.overrideWith(() => TestCollectionList()),
-              listeningPracticeProvider.overrideWith(() => player),
-              audioEngineProvider.overrideWith(
-                () => TestAudioEngine(
-                  initialState: const AudioEngineState(
-                    totalDuration: Duration(seconds: 120),
-                  ),
-                ),
-              ),
-              ...learningSettingsOverrides(),
-              bookmarkDaoProvider.overrideWithValue(_TestBookmarkDao()),
-              audioItemDaoProvider.overrideWithValue(_TestAudioItemDao()),
-              sentenceAiNotifierProvider.overrideWithValue(
-                SentenceAiNotifier(
-                  cacheDao: createStubbedMockCacheDao(),
-                  apiClient: _MockApiClient(),
-                ),
-              ),
-            ],
+            overrides: _recordingOverrides(player),
           ),
         );
         await tester.pumpAndSettle();
@@ -683,24 +744,25 @@ void main() {
         // fling 命中点会落到正在滑出的全文页上而非收藏页滑动区。
         await tester.pumpAndSettle();
 
+        // 收藏子集 {0,2}：pos0→pos1 对应全局下标 2。
         await tester.fling(
-          find.byKey(kPlayerSingleSentenceSwipeAreaKey),
+          find.byKey(kPlayerBookmarkSingleSentenceSwipeAreaKey),
           const Offset(-500, 0),
           1000,
         );
         await tester.pumpAndSettle();
 
-        expect(player.nextSentenceCalls, 1);
+        expect(player.selectBookmarkCalls.last, (index: 2, autoPlay: false));
         expect(player.state.currentBookmarkIndex, 2);
 
         await tester.fling(
-          find.byKey(kPlayerSingleSentenceSwipeAreaKey),
+          find.byKey(kPlayerBookmarkSingleSentenceSwipeAreaKey),
           const Offset(500, 0),
           1000,
         );
         await tester.pumpAndSettle();
 
-        expect(player.previousSentenceCalls, 1);
+        expect(player.selectBookmarkCalls.last, (index: 0, autoPlay: false));
         expect(player.state.currentBookmarkIndex, 0);
         await _disposeTree(tester);
       });

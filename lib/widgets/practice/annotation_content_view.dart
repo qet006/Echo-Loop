@@ -73,6 +73,13 @@ class AnnotationContentView extends ConsumerStatefulWidget {
   /// 用户点击工具栏按钮（意群/翻译/解析）时触发，通知外部切换到手动模式
   final VoidCallback? onToolbarButtonTapped;
 
+  /// 是否启用新手引导（句子→意群→翻译→解析 showcase）。
+  ///
+  /// 默认 true。Free Player 单句模式用 PageView 预建相邻页时，必须仅对**当前页**
+  /// 置 true：showcaseview 的 [Showcase] 一挂载即向全局注册，离屏页随 PageView
+  /// 回收销毁时其注册回调会落在已 unmount 的 State 上而崩溃。
+  final bool enableGuide;
+
   const AnnotationContentView({
     super.key,
     required this.text,
@@ -85,6 +92,7 @@ class AnnotationContentView extends ConsumerStatefulWidget {
     this.onStopMainPlayer,
     this.onTimingsChanged,
     this.onToolbarButtonTapped,
+    this.enableGuide = true,
   });
 
   @override
@@ -560,30 +568,48 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     final savedTexts = savedTextsAsync.valueOrNull ?? {};
 
     final l10n = AppLocalizations.of(context)!;
-    final sentenceStep = GuideStep(
-      key: _guideSentenceKey,
-      description: l10n.guideSentenceAnnotationSentenceDescription,
-    );
-    final senseGroupStep = GuideStep(
-      key: _guideSenseGroupKey,
-      description: l10n.guideSentenceAnnotationSenseGroupDescription,
-    );
-    final translationStep = GuideStep(
-      key: _guideTranslationKey,
-      description: l10n.guideSentenceAnnotationTranslationDescription,
-    );
-    final analysisStep = GuideStep(
-      key: _guideAnalysisKey,
-      description: l10n.guideSentenceAnnotationAnalysisDescription,
-    );
-    final guideFlows = <GuideFlow>[
-      GuideFlow(
-        flowId: GuideFlowIds.sentenceAnnotationTour,
-        shouldRun: true,
-        // 句子 → 意群 → 翻译 → 解析
-        steps: [sentenceStep, senseGroupStep, translationStep, analysisStep],
-      ),
-    ];
+    // 引导关闭时（PageView 离屏页）四个 step 一律为 null：SentenceAnnotationCard 的
+    // _wrapGuide 见 null 即不包 Showcase，离屏页不会向 showcaseview 注册，规避回收崩溃。
+    final enableGuide = widget.enableGuide;
+    final sentenceStep = enableGuide
+        ? GuideStep(
+            key: _guideSentenceKey,
+            description: l10n.guideSentenceAnnotationSentenceDescription,
+          )
+        : null;
+    final senseGroupStep = enableGuide
+        ? GuideStep(
+            key: _guideSenseGroupKey,
+            description: l10n.guideSentenceAnnotationSenseGroupDescription,
+          )
+        : null;
+    final translationStep = enableGuide
+        ? GuideStep(
+            key: _guideTranslationKey,
+            description: l10n.guideSentenceAnnotationTranslationDescription,
+          )
+        : null;
+    final analysisStep = enableGuide
+        ? GuideStep(
+            key: _guideAnalysisKey,
+            description: l10n.guideSentenceAnnotationAnalysisDescription,
+          )
+        : null;
+    final guideFlows = enableGuide
+        ? <GuideFlow>[
+            GuideFlow(
+              flowId: GuideFlowIds.sentenceAnnotationTour,
+              shouldRun: true,
+              // 句子 → 意群 → 翻译 → 解析
+              steps: [
+                sentenceStep!,
+                senseGroupStep!,
+                translationStep!,
+                analysisStep!,
+              ],
+            ),
+          ]
+        : const <GuideFlow>[];
 
     return GuideFlowSequenceHost(
       flows: guideFlows,
