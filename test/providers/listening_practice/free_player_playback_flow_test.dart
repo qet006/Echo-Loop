@@ -128,6 +128,15 @@ class _FlowAudioEngine extends TestAudioEngine {
     _positionController.add(value);
   }
 
+  void emitPlayerState({
+    required bool playing,
+    required ja.ProcessingState processingState,
+  }) {
+    isPlaying = playing;
+    processingStateValue = processingState;
+    _playerStateController.add(ja.PlayerState(playing, processingState));
+  }
+
   /// 模拟一次自然播完。
   ///
   /// 解析当前挂起的 clip/整篇完成。`playing` 仍为 true——贴近 just_audio 在
@@ -274,6 +283,39 @@ void main() {
 
     expect(container.read(listeningPracticeProvider).currentFullIndex, 2);
     expect(engine.lastClipStart, isNull);
+  });
+
+  test('外部暂停会回写逻辑播放态且保留当前播放会话', () async {
+    lp.seed(sentences: sentences, settings: const PlaybackSettings());
+
+    await start();
+    engine.emitPlayerState(
+      playing: false,
+      processingState: ja.ProcessingState.ready,
+    );
+    await flushBoundary();
+
+    final state = container.read(listeningPracticeProvider);
+    expect(state.isPlaying, isFalse);
+    expect(engine.currentSessionId, 1);
+  });
+
+  test('外部恢复播放会回写逻辑播放态', () async {
+    lp.seed(sentences: sentences, settings: const PlaybackSettings());
+
+    await start();
+    engine.emitPlayerState(
+      playing: false,
+      processingState: ja.ProcessingState.ready,
+    );
+    await flushBoundary();
+    engine.emitPlayerState(
+      playing: true,
+      processingState: ja.ProcessingState.ready,
+    );
+    await flushBoundary();
+
+    expect(container.read(listeningPracticeProvider).isPlaying, isTrue);
   });
 
   test('全文与收藏 tab 各自保存独立设置', () async {

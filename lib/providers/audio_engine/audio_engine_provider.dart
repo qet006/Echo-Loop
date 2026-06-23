@@ -7,6 +7,7 @@ import '../../models/audio_engine_state.dart';
 import '../../models/audio_item.dart';
 import '../../models/sentence.dart';
 import '../../services/app_logger.dart';
+import '../../services/background_audio_handler.dart';
 import '../../services/study_event_recorder.dart';
 import '../../services/subtitle_parser.dart';
 
@@ -14,8 +15,6 @@ part 'audio_engine_provider.g.dart';
 
 @Riverpod(keepAlive: true)
 class AudioEngine extends _$AudioEngine {
-  late final ja.AudioPlayer _audioPlayer;
-
   /// 学习事件记录器（由 StudyTaskControllerMixin 注入）
   StudyEventRecorder? _recorder;
 
@@ -26,25 +25,25 @@ class AudioEngine extends _$AudioEngine {
 
   @override
   AudioEngineState build() {
-    _audioPlayer = ja.AudioPlayer();
-    ref.onDispose(() => _audioPlayer.dispose());
+    ref.onDispose(() {});
     return const AudioEngineState();
   }
 
-  ja.AudioPlayer get audioPlayer => _audioPlayer;
+  EchoLoopAudioHandler get _handler => echoLoopAudioHandler;
+  ja.AudioPlayer get audioPlayer => _handler.player;
 
   // --- Streams ---
   Stream<Duration> get absolutePositionStream =>
-      _audioPlayer.positionStream.map((rel) => state.clipStart + rel);
+      _handler.player.positionStream.map((rel) => state.clipStart + rel);
 
   Stream<ja.PlayerState> get playerStateStream =>
-      _audioPlayer.playerStateStream;
+      _handler.player.playerStateStream;
 
-  bool get isPlaying => _audioPlayer.playing;
-  ja.ProcessingState get processingState => _audioPlayer.processingState;
-  Duration get currentPosition => _audioPlayer.position;
+  bool get isPlaying => _handler.player.playing;
+  ja.ProcessingState get processingState => _handler.player.processingState;
+  Duration get currentPosition => _handler.player.position;
   Duration get absoluteCurrentPosition =>
-      state.clipStart + _audioPlayer.position;
+      state.clipStart + _handler.player.position;
 
   /// 当前 session id。调用方据此判断「引擎是否仍停在自己上次驱动的 session」，
   /// 用于隔离讲解页等外来组件对共享引擎的旁路驱动。
@@ -66,24 +65,27 @@ class AudioEngine extends _$AudioEngine {
         '🔊 loadAudio: id=${item.id}, path=$fullAudioPath, '
             'exists=$fileExists, sessionId=${state.sessionId}',
       );
-      await _audioPlayer.setFilePath(fullAudioPath);
-      await _audioPlayer.setSpeed(speed);
-
-      Duration? duration = _audioPlayer.duration;
-      if (duration == null) {
-        await _audioPlayer.durationStream.first;
-        duration = _audioPlayer.duration;
+      final duration = await _handler.loadFile(
+        id: item.id,
+        filePath: fullAudioPath,
+        title: item.name,
+        speed: speed,
+      );
+      var resolvedDuration = duration ?? _handler.player.duration;
+      if (resolvedDuration == null) {
+        await _handler.player.durationStream.first;
+        resolvedDuration = _handler.player.duration;
       }
 
       state = state.copyWith(
-        totalDuration: duration,
+        totalDuration: resolvedDuration,
         clipStart: Duration.zero,
         isClipActive: false,
         currentAudioId: item.id,
         isLoading: false,
       );
 
-      return duration;
+      return resolvedDuration;
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
       rethrow;
@@ -126,11 +128,11 @@ class AudioEngine extends _$AudioEngine {
   }
 
   // --- 基础控制 ---
-  Future<void> play() async => await _audioPlayer.play();
+  Future<void> play() async => await _handler.play();
 
   Future<void> pause() async {
     state = state.copyWith(sessionId: state.sessionId + 1);
-    await _audioPlayer.pause();
+    await _handler.pause();
   }
 
   /// 暂停但不递增 sessionId。
@@ -140,7 +142,7 @@ class AudioEngine extends _$AudioEngine {
   /// 续播时会被误判为「被外来 session 顶掉」而走重新起播逻辑；本方法保留 session，
   /// 让调用方能从精确位置继续。
   Future<void> pauseKeepSession() async {
-    await _audioPlayer.pause();
+    await _handler.pause();
   }
 
   Future<void> stop() async {
@@ -150,7 +152,7 @@ class AudioEngine extends _$AudioEngine {
       'AudioEngine',
       '⏹ stop(): sessionId $oldId → ${state.sessionId}',
     );
-    await _audioPlayer.stop();
+    await _handler.stop();
   }
 
   /// 停止音频播放（不改变 sessionId）
@@ -158,10 +160,10 @@ class AudioEngine extends _$AudioEngine {
   /// 用于 pause 场景：先通过 newSession() 使旧 session 失效，
   /// 再调用此方法真正停止底层播放器，避免额外递增 sessionId。
   Future<void> stopPlayback() async {
-    await _audioPlayer.stop();
+    await _handler.stop();
   }
 
-  Future<void> seek(Duration pos) async => await _audioPlayer.seek(pos);
+  Future<void> seek(Duration pos) async => await _handler.seek(pos);
 
   /// 按绝对音频时间跳转，自动转换为当前 clip 的相对位置。
   ///
@@ -170,22 +172,22 @@ class AudioEngine extends _$AudioEngine {
   /// 触发误 `completed`。本方法消除了调用方关心 clip 边界的必要。
   Future<void> seekToAbsolute(Duration absolute) async {
     final relative = absolute - state.clipStart;
-    await _audioPlayer.seek(relative.isNegative ? Duration.zero : relative);
+    await _handler.seek(relative.isNegative ? Duration.zero : relative);
   }
 
   Future<void> setSpeed(double speed) async =>
-      await _audioPlayer.setSpeed(speed);
+      await _handler.setSpeed(speed);
 
   // --- Clip 管理 ---
   Future<void> setClip(Duration start, Duration end) async {
     state = state.copyWith(clipStart: start, isClipActive: true);
-    await _audioPlayer.setClip(start: start, end: end);
+    await _handler.setClip(start: start, end: end);
   }
 
   Future<void> clearClip() async {
     if (!state.isClipActive) return;
     state = state.copyWith(clipStart: Duration.zero, isClipActive: false);
-    await _audioPlayer.setClip(start: null, end: null);
+    await _handler.setClip(start: null, end: null);
   }
 
   // --- 句子级播放基元（所有业务模式共享） ---
@@ -198,7 +200,7 @@ class AudioEngine extends _$AudioEngine {
           'clip=${sentence.startTime.inMilliseconds}-${sentence.endTime.inMilliseconds}ms',
     );
     state = state.copyWith(clipStart: sentence.startTime, isClipActive: true);
-    await _audioPlayer.setClip(
+    await _handler.setClip(
       start: sentence.startTime,
       end: sentence.endTime,
     );
@@ -215,7 +217,7 @@ class AudioEngine extends _$AudioEngine {
     // 标准 clip 播放流程：每次设置片段后显式回到 clip 相对起点。
     // just_audio 在连续切 clip 时可能保留旧相对 position；不 seek(0)
     // 会导致“点击句子却从句中间播放”的交互错误。
-    await _audioPlayer.seek(Duration.zero);
+    await _handler.seek(Duration.zero);
 
     if (!isActiveSession(sessionId)) {
       AppLogger.log(
@@ -226,17 +228,17 @@ class AudioEngine extends _$AudioEngine {
       return;
     }
 
-    await _audioPlayer.play();
+    await _handler.play();
     if (!isActiveSession(sessionId)) {
       AppLogger.log(
         'AudioEngine',
         '⚠ playClipOnce: session $sessionId 在 play() 后已过期，主动 pause',
       );
-      await _audioPlayer.pause();
+      await _handler.pause();
       return;
     }
 
-    await _audioPlayer.playerStateStream.firstWhere(
+    await _handler.player.playerStateStream.firstWhere(
       (s) =>
           !isActiveSession(sessionId) ||
           s.processingState == ja.ProcessingState.completed,
@@ -279,14 +281,14 @@ class AudioEngine extends _$AudioEngine {
   Future<void> playToEnd(int sessionId) async {
     if (!isActiveSession(sessionId)) return;
 
-    await _audioPlayer.play();
+    await _handler.play();
     // play() 是真正启动播放的点，并发场景下上游可能在此之前 bump session。
     if (!isActiveSession(sessionId)) {
-      await _audioPlayer.pause();
+      await _handler.pause();
       return;
     }
 
-    await _audioPlayer.playerStateStream.firstWhere(
+    await _handler.player.playerStateStream.firstWhere(
       (s) =>
           !isActiveSession(sessionId) ||
           s.processingState == ja.ProcessingState.completed,
@@ -321,7 +323,7 @@ class AudioEngine extends _$AudioEngine {
     }
 
     state = state.copyWith(clipStart: start, isClipActive: true);
-    await _audioPlayer.setClip(start: start, end: end);
+    await _handler.setClip(start: start, end: end);
 
     // setClip 是 await 点，microtask 可能在此期间改变 session
     if (!isActiveSession(sessionId)) {
@@ -336,7 +338,7 @@ class AudioEngine extends _$AudioEngine {
     // 在播放中切到同段另一句时，旧 position 可能仍落在新 clip 范围内，
     // 导致 play() 沿用旧 position 而非跳到 clip 起点。
     // 显式 seek 到 clip 相对起点（Duration.zero）保证从目标句开始播放。
-    await _audioPlayer.seek(Duration.zero);
+    await _handler.seek(Duration.zero);
 
     if (!isActiveSession(sessionId)) {
       AppLogger.log(
@@ -350,24 +352,24 @@ class AudioEngine extends _$AudioEngine {
     // play() 是真正启动音频的点，必须最后一次 check session：
     // 上游 pause / seek 在并发场景下可能在 setClip → seek(0) 期间 bump session，
     // 不在这里拦住会让旧 session 启动一段短暂的播放再被 stop。
-    await _audioPlayer.play();
+    await _handler.play();
     if (!isActiveSession(sessionId)) {
       AppLogger.log(
         'AudioEngine',
         '⚠ playRangeOnce: session $sessionId 在 play() 后已过期，主动 pause',
       );
-      await _audioPlayer.pause();
+      await _handler.pause();
       return;
     }
 
     AppLogger.log(
       'AudioEngine',
-      '│ play() returned: processingState=${_audioPlayer.processingState.name}, '
-          'playing=${_audioPlayer.playing}, '
+      '│ play() returned: processingState=${_handler.player.processingState.name}, '
+          'playing=${_handler.player.playing}, '
           'sessionActive=${isActiveSession(sessionId)}',
     );
 
-    await _audioPlayer.playerStateStream.firstWhere(
+    await _handler.player.playerStateStream.firstWhere(
       (s) =>
           !isActiveSession(sessionId) ||
           s.processingState == ja.ProcessingState.completed,
@@ -375,7 +377,7 @@ class AudioEngine extends _$AudioEngine {
     AppLogger.log(
       'AudioEngine',
       '✓ playRangeOnce done: sessionStillActive=${isActiveSession(sessionId)}, '
-          'processingState=${_audioPlayer.processingState.name}',
+          'processingState=${_handler.player.processingState.name}',
     );
   }
 

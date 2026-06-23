@@ -1,7 +1,22 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-23（Free Player 恢复进度条首帧同步）
+> 最后更新：2026-06-23（Free Player iOS 后台播放标准化迁移）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：Free Player iOS 后台播放标准化迁移
+
+将 Free Player 的共享播放底座升级为 `just_audio + audio_service + audio_session` 标准架构，先只覆盖 Free Player，解决 iOS 锁屏/后台继续播放，同时保留现有单句循环、整篇循环、收藏跳播、恢复断点等已验证行为不回退。本次不做复杂锁屏自定义控制，但已把系统媒体会话、状态广播和未来扩展边界收敛到统一 `AudioHandler`。
+
+- [x] `pubspec.yaml` / `pubspec.lock`：新增 `audio_service` 依赖；插件接入后同步更新锁文件与 macOS 插件注册文件 `macos/Flutter/GeneratedPluginRegistrant.swift`。
+- [x] `lib/services/background_audio_handler.dart`：新增全局 `EchoLoopAudioHandler`，内部托管唯一 `AudioPlayer`，统一承接系统媒体会话、后台播放状态广播、基础播放命令与 `audio_session` 中断配置。
+- [x] `lib/main.dart`：启动阶段改为初始化全局后台播放 handler，不再在 `main()` 里分散配置 `AudioSession`。
+- [x] `lib/providers/audio_engine/audio_engine_provider.dart`：从“直接持有 `AudioPlayer`”重构为 `AudioHandler` facade；保留 Free Player 现有高层接口，避免打破循环/seek/clip 语义。
+- [x] `lib/providers/listening_practice/listening_practice_provider.dart`：新增底层 `playerStateStream` 监听，把锁屏/系统媒体会话导致的被动暂停/恢复回写到 `isPlaying`，修复“实际停了但按钮仍显示暂停”。
+- [x] `lib/screens/player_screen.dart`：移除 `deactivate()` 的误停播逻辑，改为仅在页面真正 `dispose` 时暂停并保存进度，避免 iOS 锁屏/后台切换误触发暂停。
+- [x] `android/app/src/main/AndroidManifest.xml` / `android/app/src/main/kotlin/app/echoloop/MainActivity.kt`：补齐 `audio_service` 所需的前台媒体播放权限、service / receiver 声明，并让 `MainActivity` 继承 `AudioServiceActivity`。
+- [x] 测试：`free_player_playback_flow_test.dart` 新增“外部暂停/恢复回写逻辑播放态”回归；`player_screen_test.dart` 全量通过，确认页面生命周期改动未破坏既有 UI 行为。
+
+  **完成时间**: 2026-06-23 19:53:37 +0800
 
 ## 已完成：修复 Free Player 恢复后进度条停在 0:00
 

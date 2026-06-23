@@ -39,6 +39,7 @@ part 'listening_practice_provider.g.dart';
 @Riverpod(keepAlive: true)
 class ListeningPractice extends _$ListeningPractice {
   StreamSubscription? _positionSub;
+  StreamSubscription<ja.PlayerState>? _playerStateSub;
 
   /// 追踪正在进行的音频加载，避免重复调用时跳过未完成的加载
   Completer<void>? _loadingCompleter;
@@ -131,17 +132,21 @@ class ListeningPractice extends _$ListeningPractice {
     // defer listener setup to after first build
     Future.microtask(() {
       _positionSub = _engine.absolutePositionStream.listen(_onPositionChanged);
+      _playerStateSub = _engine.playerStateStream.listen(_onPlayerStateChanged);
     });
   }
 
   void _disposeListeners() {
     _positionSub?.cancel();
+    _playerStateSub?.cancel();
   }
 
   /// 暂停 stream 监听（学习模式期间调用，避免 LP 接管共享引擎）。
   void suspendListeners() {
     _positionSub?.cancel();
     _positionSub = null;
+    _playerStateSub?.cancel();
+    _playerStateSub = null;
   }
 
   /// 恢复 stream 监听（退出学习模式时调用）
@@ -225,6 +230,32 @@ class ListeningPractice extends _$ListeningPractice {
       return;
     }
     _maybeHandoffFromGapless(sentenceChanged);
+  }
+
+  /// 系统媒体会话/锁屏/耳机按钮可能绕过页面直接改变底层播放器状态。
+  ///
+  /// Free Player 的按钮图标和控制器逻辑不能只看“自己是否主动调用了 pause/play”，
+  /// 必须把这类被动状态同步回 provider，避免锁屏后音频已停、按钮仍显示暂停图标。
+  void _onPlayerStateChanged(ja.PlayerState playerState) {
+    if (!_engine.isActiveSession(_playbackSessionId)) return;
+
+    if (!playerState.playing && state.isPlaying) {
+      _setLogicalPlaying(false);
+      _pendingPlaybackModeHandoff = false;
+      if (_activeSentenceDrivenPlayback) {
+        _sentenceLoopResumePending = true;
+        _activeSentenceDrivenPlayback = false;
+      }
+      return;
+    }
+
+    if (playerState.playing && !state.isPlaying) {
+      _setLogicalPlaying(true);
+      if (_sentenceLoopResumePending && _usesSentenceDrivenPlayback) {
+        _activeSentenceDrivenPlayback = true;
+        _sentenceLoopResumePending = false;
+      }
+    }
   }
 
   /// 整篇 gapless 下「当前句播完后暂停」：回到刚播完的句子句首暂停，使解析/翻译面板

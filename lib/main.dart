@@ -4,7 +4,6 @@ import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:audio_session/audio_session.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -41,6 +40,7 @@ import 'services/app_logger.dart';
 import 'utils/app_data_dir.dart';
 import 'services/speech_practice_platform.dart';
 import 'services/storage_migration_service.dart';
+import 'services/background_audio_handler.dart';
 import 'features/official_collections/data/official_catalog_service.dart';
 import 'features/official_collections/data/trigger_official_sync.dart';
 import 'features/official_collections/download/official_download_notifier.dart';
@@ -122,33 +122,7 @@ void main() async {
     }
   }
 
-  if (!kIsWeb) {
-    try {
-      final session = await AudioSession.instance;
-      await session.configure(
-        const AudioSessionConfiguration(
-          avAudioSessionCategory: AVAudioSessionCategory.playback,
-          avAudioSessionCategoryOptions:
-              AVAudioSessionCategoryOptions.duckOthers,
-          avAudioSessionMode: AVAudioSessionMode.spokenAudio,
-          avAudioSessionRouteSharingPolicy:
-              AVAudioSessionRouteSharingPolicy.defaultPolicy,
-          avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
-          androidAudioAttributes: AndroidAudioAttributes(
-            contentType: AndroidAudioContentType.speech,
-            usage: AndroidAudioUsage.media,
-          ),
-          androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
-          androidWillPauseWhenDucked: false,
-        ),
-      );
-      print('Audio session configured for background playback');
-    } catch (e) {
-      print('Error configuring audio session: $e');
-    }
-  } else {
-    print('Web platform: skipping audio session configuration');
-  }
+  await initEchoLoopAudioHandler();
 
   // iOS: 通过原生网络栈触发系统网络权限弹窗。
   // 启动时立即触发（包括 Onboarding 期间的新用户），原因：埋点上报

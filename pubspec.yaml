@@ -41,6 +41,7 @@ dependencies:
   flutter_riverpod: ^2.6.1
   riverpod_annotation: ^2.6.1
   audio_session: ^0.2.2
+  audio_service: ^0.18.18
   subtitle: ^0.1.4
   file_picker: ^10.3.3
   audio_video_progress_bar: ^2.0.3

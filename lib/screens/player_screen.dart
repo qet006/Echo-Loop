@@ -43,6 +43,8 @@ class PlayerScreen extends ConsumerStatefulWidget {
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen>
     with SingleTickerProviderStateMixin {
+  late final ListeningPractice _notifier;
+
   /// 精听单句模式横向分页控制器。全文 / 收藏两 tab 各持一个：TabBarView 切换动画
   /// 期间两 tab body 会同时存在，单个 PageController 不能同时挂到两个 PageView。
   /// 在字段初始化时创建、[dispose] 释放，绝不在 build 内重建。
@@ -74,11 +76,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   @override
   void initState() {
     super.initState();
+    _notifier = ref.read(listeningPracticeProvider.notifier);
     _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await ref
-          .read(listeningPracticeProvider.notifier)
-          .setPlaylistMode(PlaylistMode.full);
+      await _notifier.setPlaylistMode(PlaylistMode.full);
     });
     _tabController.addListener(() {
       if (_tabController.index != _previousTabIndex) {
@@ -95,18 +96,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   }
 
   @override
-  void deactivate() {
-    // 延迟到下一帧执行，避免在 widget 树销毁过程中修改 provider state
-    final notifier = ref.read(listeningPracticeProvider.notifier);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      notifier.pause();
-      notifier.saveCurrentPlaybackState();
-    });
-    super.deactivate();
-  }
-
-  @override
   void dispose() {
+    scheduleMicrotask(() async {
+      await _notifier.pause();
+      await _notifier.saveCurrentPlaybackState();
+    });
     _tabController.dispose();
     _fullPageController.dispose();
     _bookmarkPageController.dispose();
