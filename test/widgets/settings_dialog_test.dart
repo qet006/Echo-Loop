@@ -17,15 +17,20 @@ import '../helpers/mock_providers.dart';
 import '../helpers/test_app.dart';
 
 /// 辅助函数：直接渲染循环设置浮层内容。
+///
+/// 单句循环依赖字幕分句，浮层会在无字幕时隐藏它。这些用例验证「有字幕」下的完整
+/// 双循环行为，故默认注入测试句子；显式传入已含句子的 state 时保持不变。
 Widget _buildLoopPopupTest({ListeningPracticeState? practiceState}) {
+  final base = practiceState ?? const ListeningPracticeState();
+  final state = base.hasSentences
+      ? base
+      : base.copyWith(sentences: createTestSentences(count: 3));
   return createTestApp(
     const Align(child: LoopSettingsPopup()),
     overrides: [
       appSettingsProvider.overrideWith(() => TestAppSettings()),
       listeningPracticeProvider.overrideWith(
-        () => TestListeningPractice(
-          practiceState ?? const ListeningPracticeState(),
-        ),
+        () => TestListeningPractice(state),
       ),
       audioEngineProvider.overrideWith(() => TestAudioEngine()),
     ],
@@ -111,6 +116,27 @@ void main() {
         expect(find.byType(Slider), findsNWidgets(2));
         expect(find.text('1x'), findsOneWidget);
         expect(find.text('1s'), findsOneWidget);
+      });
+
+      testWidgets('无字幕只显示整篇循环，隐藏单句循环', (tester) async {
+        await tester.pumpWidget(
+          createTestApp(
+            const Align(child: LoopSettingsPopup()),
+            overrides: [
+              appSettingsProvider.overrideWith(() => TestAppSettings()),
+              listeningPracticeProvider.overrideWith(
+                // 默认 state.sentences 为空 → 无字幕。
+                () => TestListeningPractice(const ListeningPracticeState()),
+              ),
+              audioEngineProvider.overrideWith(() => TestAudioEngine()),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Whole-text loop'), findsOneWidget);
+        expect(find.text('Single-sentence loop'), findsNothing);
+        expect(find.byType(Switch), findsOneWidget);
       });
     });
 

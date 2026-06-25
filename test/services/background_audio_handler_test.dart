@@ -81,6 +81,72 @@ void main() {
     });
   });
 
+  group('seek 回调（后退/前进 10 秒）', () {
+    test('注册后 rewind/fastForward 触发对应回调', () async {
+      var rewindCalls = 0;
+      var forwardCalls = 0;
+      handler.setSeekHandlers(
+        onRewind: () async => rewindCalls++,
+        onFastForward: () async => forwardCalls++,
+      );
+
+      await handler.rewind();
+      await handler.fastForward();
+
+      expect(rewindCalls, 1);
+      expect(forwardCalls, 1);
+    });
+
+    test('注册后控制列表与 systemActions 含 rewind/fastForward', () {
+      handler.setSeekHandlers(
+        onRewind: () async {},
+        onFastForward: () async {},
+      );
+
+      final state = handler.playbackState.value;
+      expect(state.controls.contains(MediaControl.rewind), isTrue);
+      expect(state.controls.contains(MediaControl.fastForward), isTrue);
+      expect(state.systemActions.contains(MediaAction.rewind), isTrue);
+      expect(state.systemActions.contains(MediaAction.fastForward), isTrue);
+      // seek 模式不出现切句按钮。
+      expect(state.controls.contains(MediaControl.skipToNext), isFalse);
+      expect(state.controls.contains(MediaControl.skipToPrevious), isFalse);
+    });
+
+    test('切句回调优先于 seek 回调（互斥）', () {
+      handler.setSeekHandlers(
+        onRewind: () async {},
+        onFastForward: () async {},
+      );
+      handler.setSkipHandlers(onPrevious: () async {}, onNext: () async {});
+
+      final state = handler.playbackState.value;
+      expect(state.controls.contains(MediaControl.skipToPrevious), isTrue);
+      expect(state.controls.contains(MediaControl.skipToNext), isTrue);
+      expect(state.controls.contains(MediaControl.rewind), isFalse);
+      expect(state.controls.contains(MediaControl.fastForward), isFalse);
+    });
+
+    test('清空 seek 回调后恢复为播放/停止', () {
+      handler.setSeekHandlers(
+        onRewind: () async {},
+        onFastForward: () async {},
+      );
+      handler.setSeekHandlers(onRewind: null, onFastForward: null);
+
+      final state = handler.playbackState.value;
+      expect(state.controls.contains(MediaControl.rewind), isFalse);
+      expect(state.controls.contains(MediaControl.fastForward), isFalse);
+      expect(state.controls, contains(MediaControl.stop));
+    });
+
+    test('未注册时 rewind/fastForward 为 no-op', () async {
+      await handler.rewind();
+      await handler.fastForward();
+      // 不抛异常即通过。
+    });
+  });
+
   group('play/pause 命令路由', () {
     test('未注册时 play/pause 直接驱动底层播放器', () async {
       await handler.play();

@@ -51,6 +51,12 @@ class EchoLoopAudioHandler extends BaseAudioHandler with SeekHandler {
   Future<void> Function()? _onPlayCommand;
   Future<void> Function()? _onPauseCommand;
 
+  /// 后退/前进 N 秒回调。仅无字幕音频注册（见 [setSeekHandlers]）；与切句回调
+  /// 互斥，注册后锁屏显示 rewind/fastForward 按钮替代上一首/下一首。
+  Future<void> Function()? _onRewind;
+  Future<void> Function()? _onFastForward;
+  bool get _canSeekRelative => _onRewind != null || _onFastForward != null;
+
   List<MediaControl> _controls = const [MediaControl.play, MediaControl.stop];
   List<int> _compactActionIndices = const [0];
 
@@ -101,6 +107,19 @@ class EchoLoopAudioHandler extends BaseAudioHandler with SeekHandler {
     _onPauseCommand = onPause;
   }
 
+  /// 注册/清空后退、前进 N 秒回调（传 null 清空）。
+  ///
+  /// 与 [setSkipHandlers] 互斥：有字幕注册切句、无字幕注册相对 seek，由 controller
+  /// 按当前音频是否有字幕分流。注册后锁屏控制列表换成 rewind/fastForward。
+  void setSeekHandlers({
+    Future<void> Function()? onRewind,
+    Future<void> Function()? onFastForward,
+  }) {
+    _onRewind = onRewind;
+    _onFastForward = onFastForward;
+    _broadcastState();
+  }
+
   Future<void> configureSession() async {
     if (kIsWeb) return;
     final session = await AudioSession.instance;
@@ -128,7 +147,8 @@ class EchoLoopAudioHandler extends BaseAudioHandler with SeekHandler {
   /// 未来锁屏控制扩展统一改这里，不让页面直接拼系统 controls。
   ///
   /// 注册了切句回调（[_canSkip]）时，控制列表拼成「上一句 / 播放暂停 / 下一句」，
-  /// 对齐 iOS 锁屏的 prev/play/next 布局；否则保持「播放暂停 / 停止」。
+  /// 对齐 iOS 锁屏的 prev/play/next 布局；注册了相对 seek 回调（[_canSeekRelative]，
+  /// 无字幕场景）时拼成「后退 / 播放暂停 / 前进」；否则保持「播放暂停 / 停止」。
   void setMediaControls({required bool playing, bool canStop = true}) {
     final List<MediaControl> controls;
     if (_canSkip) {
@@ -136,6 +156,13 @@ class EchoLoopAudioHandler extends BaseAudioHandler with SeekHandler {
         MediaControl.skipToPrevious,
         playing ? MediaControl.pause : MediaControl.play,
         MediaControl.skipToNext,
+      ];
+      _compactActionIndices = const [0, 1, 2];
+    } else if (_canSeekRelative) {
+      controls = <MediaControl>[
+        MediaControl.rewind,
+        playing ? MediaControl.pause : MediaControl.play,
+        MediaControl.fastForward,
       ];
       _compactActionIndices = const [0, 1, 2];
     } else {
@@ -159,7 +186,8 @@ class EchoLoopAudioHandler extends BaseAudioHandler with SeekHandler {
       MediaItem(
         id: id,
         title: title,
-        album: 'Echo Loop',
+        // 系统播放控制面板副标题展示所属合集名（subtitle）；不再附加 album「Echo
+        // Loop」造成「合集 – Echo Loop」。无合集时回退显示 app 名「Echo Loop」。
         artist: subtitle ?? 'Echo Loop',
         artUri: _artworkUri,
       ),
@@ -240,6 +268,18 @@ class EchoLoopAudioHandler extends BaseAudioHandler with SeekHandler {
     await _onSkipToPrevious?.call();
   }
 
+  // 覆盖 SeekHandler 的默认实现（按 config 间隔 seek），改走业务回调，使锁屏
+  // 后退/前进与 App 内逻辑一致。未注册时为 no-op。
+  @override
+  Future<void> rewind() async {
+    await _onRewind?.call();
+  }
+
+  @override
+  Future<void> fastForward() async {
+    await _onFastForward?.call();
+  }
+
   Future<void> disposePlayer() async {
     await _playbackEventSub?.cancel();
     await _durationSub?.cancel();
@@ -259,6 +299,10 @@ class EchoLoopAudioHandler extends BaseAudioHandler with SeekHandler {
           MediaAction.seek,
           MediaAction.stop,
           if (_canSkip) ...{MediaAction.skipToNext, MediaAction.skipToPrevious},
+          if (_canSeekRelative) ...{
+            MediaAction.rewind,
+            MediaAction.fastForward,
+          },
         },
         androidCompactActionIndices: _compactActionIndices,
         processingState: _mapProcessingState(_player.processingState),

@@ -42,6 +42,9 @@ class AudioEngine extends _$AudioEngine {
   bool get isPlaying => _handler.player.playing;
   ja.ProcessingState get processingState => _handler.player.processingState;
   Duration get currentPosition => _handler.player.position;
+
+  /// 已解析的音频总时长（loadAudio 时写入 [AudioEngineState.totalDuration]）。
+  Duration? get totalDuration => state.totalDuration;
   Duration get absoluteCurrentPosition =>
       state.clipStart + _handler.player.position;
 
@@ -65,6 +68,17 @@ class AudioEngine extends _$AudioEngine {
     Future<void> Function()? onPause,
   }) {
     _handler.setTransportHandlers(onPlay: onPlay, onPause: onPause);
+  }
+
+  /// 注册/清空锁屏「后退/前进 N 秒」回调，转发给底层 handler。
+  ///
+  /// 无字幕音频没有「上一句/下一句」语义，改用相对 seek；与 [setSkipHandlers]
+  /// 互斥（注册其一时另一个传 null），由 controller 按是否有字幕分流注册。
+  void setSeekHandlers({
+    Future<void> Function()? onRewind,
+    Future<void> Function()? onFastForward,
+  }) {
+    _handler.setSeekHandlers(onRewind: onRewind, onFastForward: onFastForward);
   }
 
   // --- 音频加载 ---

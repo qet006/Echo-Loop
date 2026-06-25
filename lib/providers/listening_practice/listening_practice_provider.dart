@@ -165,14 +165,31 @@ class ListeningPractice extends _$ListeningPractice {
       _positionSub = _engine.absolutePositionStream.listen(_onPositionChanged);
       _playerStateSub = _engine.playerStateStream.listen(_onPlayerStateChanged);
       _listenersAttached = true;
-      // 接管共享引擎时注册锁屏切句 + 播放/暂停回调，使锁屏控件走 controller 同一套
-      // 业务逻辑（出现上一句/下一句按钮、播放/暂停含播完重播与续播语义）。
+      // 接管共享引擎时注册锁屏控制回调，使锁屏控件走 controller 同一套业务逻辑。
+      _applyLockScreenHandlers();
+    });
+  }
+
+  /// 按当前音频是否有字幕注册锁屏控制回调。
+  ///
+  /// 播放/暂停回调始终注册；有字幕注册「上一句/下一句」、清空相对 seek；无字幕注册
+  /// 「后退/前进 10 秒」、清空切句。在 [_setupListeners] 与 [loadAudio]（字幕就绪后）
+  /// 各调一次，使锁屏按钮形态随当前音频是否有字幕切换。
+  void _applyLockScreenHandlers() {
+    _engine.setTransportHandlers(onPlay: play, onPause: pause);
+    if (state.hasSentences) {
       _engine.setSkipHandlers(
         onPrevious: previousSentence,
         onNext: nextSentence,
       );
-      _engine.setTransportHandlers(onPlay: play, onPause: pause);
-    });
+      _engine.setSeekHandlers(onRewind: null, onFastForward: null);
+    } else {
+      _engine.setSkipHandlers(onPrevious: null, onNext: null);
+      _engine.setSeekHandlers(
+        onRewind: () => seekRelative(const Duration(seconds: -10)),
+        onFastForward: () => seekRelative(const Duration(seconds: 10)),
+      );
+    }
   }
 
   void _disposeListeners() {
@@ -184,6 +201,7 @@ class ListeningPractice extends _$ListeningPractice {
     _listenersAttached = false;
     // 用缓存引用清空，避免在 provider 销毁阶段 ref.read 抛 already disposed。
     _cachedEngineForSkip?.setSkipHandlers(onPrevious: null, onNext: null);
+    _cachedEngineForSkip?.setSeekHandlers(onRewind: null, onFastForward: null);
     _cachedEngineForSkip?.setTransportHandlers(onPlay: null, onPause: null);
   }
 
@@ -197,6 +215,7 @@ class ListeningPractice extends _$ListeningPractice {
     _listenersAttached = false;
     // LP 不再驱动引擎时一并撤销锁屏回调，避免学习模式下误触。
     _engine.setSkipHandlers(onPrevious: null, onNext: null);
+    _engine.setSeekHandlers(onRewind: null, onFastForward: null);
     _engine.setTransportHandlers(onPlay: null, onPause: null);
   }
 
@@ -378,10 +397,13 @@ class ListeningPractice extends _$ListeningPractice {
   ///
   /// [startPos] 非空：把真相源对齐到该句并 seek 到句首后起播（全新起播 / 模型交接）；
   /// 为空：从引擎当前精确位置继续（暂停后续播，保留已完成遍数）。
-  /// [resetCounters] 为 true 时清零整篇/单句计数（全新起播）。
+  /// [resetWholeLoops] 清零整篇遍数；[resetSentenceRepeats] 清零单句遍数。两者分开
+  /// 控制：全新起播两者都清；播放中切上一句/下一句只清单句遍数、保留整篇遍数（切句是
+  /// 「同一遍内换句」而非重新开始整篇循环）。
   Future<void> _startWholeDriven({
     int? startPos,
-    required bool resetCounters,
+    bool resetWholeLoops = false,
+    bool resetSentenceRepeats = false,
   }) async {
     final playable = _playable;
     if (playable.isEmpty) return;
@@ -390,10 +412,8 @@ class ListeningPractice extends _$ListeningPractice {
     _awaitingReplayFromStart = false;
     _activeSentenceDrivenPlayback = false;
     _pendingPlaybackModeHandoff = false;
-    if (resetCounters) {
-      _wholeLoopsDone = 0;
-      _sentenceRepeatsDone = 0;
-    }
+    if (resetWholeLoops) _wholeLoopsDone = 0;
+    if (resetSentenceRepeats) _sentenceRepeatsDone = 0;
     _playbackSessionId = _engine.newSession();
     await _engine.clearClip();
 
@@ -423,7 +443,8 @@ class ListeningPractice extends _$ListeningPractice {
       '▶ 整篇起播 gen=$gen sid=$_playbackSessionId '
           'loopWhole=${s.loopWhole} count=${s.wholeLoopCount} '
           'loopsDone=$_wholeLoopsDone '
-          'startPos=${startPos ?? '续播(当前位置)'} resetCounters=$resetCounters',
+          'startPos=${startPos ?? '续播(当前位置)'} '
+          'resetWhole=$resetWholeLoops resetSentence=$resetSentenceRepeats',
     );
     unawaited(_playWholeDriven(gen, _playbackSessionId));
   }
@@ -504,6 +525,84 @@ class ListeningPractice extends _$ListeningPractice {
         );
       }
       await _engine.seek(first.startTime);
+      _autoSaveProgress();
+    }
+  }
+
+  /// 引擎当前位置是否已到（或极接近）音频结尾。
+  ///
+  /// 恢复进入时存档位置可能正好停在结尾，此时 just_audio 的 processingState 仍是
+  /// `ready`（非 `completed`，completed 只在本 session 内真正播到尾才触发），不能据
+  /// completed 区分「中途暂停续播」与「停在结尾的全新恢复」。用位置接近总时长来识别，
+  /// 使后者被当作从头重播而非从结尾续播（否则首次点击会从结尾起播立即结束）。
+  bool _isAtAudioEnd() {
+    final total = _engine.totalDuration;
+    if (total == null || total <= Duration.zero) return false;
+    return _engine.currentPosition >= total - const Duration(milliseconds: 200);
+  }
+
+  /// 无字幕音频起播：用确定性 await-完成循环驱动，使「自然播完→停在暂停态」和
+  /// 「播完后再播→从头开始」都成立。
+  ///
+  /// 关键在于必须 [AudioEngine.newSession] 并认领 `_playbackSessionId`——否则
+  /// `_onPositionChanged`/`_onPlayerStateChanged` 的 session 校验对无字幕永远失败，
+  /// 被动状态同步（含锁屏被动暂停回写）全部失效。
+  Future<void> _startNoTranscriptPlayback() async {
+    final gen = ++_playbackGen;
+    _activeSentenceDrivenPlayback = false;
+    _pendingPlaybackModeHandoff = false;
+    _pauseAfterCurrentSentence = false;
+    _sentenceLoopResumePending = false;
+    _playbackSessionId = _engine.newSession();
+    await _engine.clearClip();
+
+    // 区分「续播」与「全新起播 / 播完重播」：续播从精确位置继续并保留整篇遍数；
+    // 否则回到开头并清零遍数。just_audio 对已 completed 的播放器 play() 不会自动
+    // 回头，全新/重播必须显式 seek(0)。
+    final ps = _engine.processingState;
+    final resuming =
+        !_awaitingReplayFromStart &&
+        !_isAtAudioEnd() &&
+        ps != ja.ProcessingState.completed &&
+        ps != ja.ProcessingState.idle &&
+        _engine.currentPosition > Duration.zero;
+    if (!resuming) {
+      await _engine.seek(Duration.zero);
+      _wholeLoopsDone = 0;
+    }
+    _awaitingReplayFromStart = false;
+    _setLogicalPlaying(true);
+    unawaited(_playNoTranscriptDriven(gen, _playbackSessionId));
+  }
+
+  /// 无字幕整段播放的确定性循环。
+  ///
+  /// 每遍 `await` [AudioEngine.playToEnd] 播到自然结束后用 [shouldLoopWhole] 决定
+  /// 回卷重播还是停止；遍数在协程内自增，对 just_audio 重复/滞后的 `completed`
+  /// 事件免疫。`loopWhole == false` 时第一遍后即停止。自然结束（停止）保留媒体会话
+  /// 并停在暂停态，`_awaitingReplayFromStart` 使下次 play() 从头重播。
+  Future<void> _playNoTranscriptDriven(int gen, int sid) async {
+    while (gen == _playbackGen && _engine.isActiveSession(sid)) {
+      await _engine.playToEnd(sid);
+      if (gen != _playbackGen || !_engine.isActiveSession(sid)) return;
+
+      _wholeLoopsDone += 1;
+      _autoSaveProgress();
+
+      final s = state.settings;
+      if (!shouldLoopWhole(s.loopWhole, s.wholeLoopCount, _wholeLoopsDone)) {
+        _awaitingReplayFromStart = true;
+        _setLogicalPlaying(false);
+        // 不 stop：保留媒体会话与锁屏 Now Playing（暂停态），用户可在锁屏直接重播。
+        await _engine.pauseKeepSession();
+        return;
+      }
+
+      await _delayInterval(s.wholeInterval);
+      if (gen != _playbackGen || !_engine.isActiveSession(sid)) return;
+
+      // 回卷到开头继续下一遍。
+      await _engine.seek(Duration.zero);
       _autoSaveProgress();
     }
   }
@@ -650,7 +749,7 @@ class ListeningPractice extends _$ListeningPractice {
           _wholeLoopsDone += 1;
         }
         // 切回 gapless 整篇循环模型：从目标句句首起播确定性循环，保留已完成遍数。
-        await _startWholeDriven(startPos: position, resetCounters: false);
+        await _startWholeDriven(startPos: position);
     }
   }
 
@@ -802,6 +901,8 @@ class ListeningPractice extends _$ListeningPractice {
       state = state.copyWith(clearCurrentAudioItem: true);
     } finally {
       state = state.copyWith(isLoading: false);
+      // 字幕已就绪：按是否有字幕重新注册锁屏控制（无字幕用后退/前进 10 秒替代切句）。
+      if (_listenersAttached) _applyLockScreenHandlers();
       if (_loadingCompleter != null && !_loadingCompleter!.isCompleted) {
         _loadingCompleter!.complete();
       }
@@ -849,8 +950,7 @@ class ListeningPractice extends _$ListeningPractice {
     if (state.currentAudioItem == null) return;
 
     if (state.sentences.isEmpty) {
-      _setLogicalPlaying(true);
-      await _engine.play();
+      await _startNoTranscriptPlayback();
       return;
     }
 
@@ -860,7 +960,9 @@ class ListeningPractice extends _$ListeningPractice {
       return;
     }
 
-    if (_awaitingReplayFromStart) {
+    // 已播完后重播，或恢复进入时存档位置正好停在结尾（processingState 仍是 ready
+    // 而非 completed，区分不出），都从播放列表开头重新开始，而不是从最后一句续播。
+    if (_awaitingReplayFromStart || _isAtAudioEnd()) {
       await _restartFromPlayableBeginning();
       return;
     }
@@ -887,7 +989,7 @@ class ListeningPractice extends _$ListeningPractice {
       if (resumable) {
         // 从暂停的精确位置续播：重新拉起整篇确定性循环，保留已完成遍数，
         // 不 seek、不清零，使续播后仍能正确地播满剩余遍数。
-        await _startWholeDriven(resetCounters: false);
+        await _startWholeDriven();
         return;
       }
     }
@@ -927,7 +1029,10 @@ class ListeningPractice extends _$ListeningPractice {
   }
 
   /// 从当前真相源 index 起播（全新 session）。
-  Future<void> _startCurrent() async {
+  ///
+  /// [resetWholeLoops] 默认 true（全新起播清零整篇遍数）；播放中切上一句/下一句传
+  /// false——切句是「同一遍内换句」，应保留整篇已播遍数，只重置当前句的单句遍数。
+  Future<void> _startCurrent({bool resetWholeLoops = true}) async {
     final playable = _playable;
     if (playable.isEmpty) return;
 
@@ -936,11 +1041,18 @@ class ListeningPractice extends _$ListeningPractice {
     _sentenceLoopResumePending = false;
 
     if (_usesSentenceDrivenPlayback) {
-      // 全新起播：单句与整篇遍数都清零。
-      _launchSentenceDriven(resetWholeLoops: true, resetSentenceRepeats: true);
+      _launchSentenceDriven(
+        resetWholeLoops: resetWholeLoops,
+        resetSentenceRepeats: true,
+      );
     } else {
-      // 整篇连续播放：从当前句句首起播确定性循环，清零遍数。
-      await _startWholeDriven(startPos: _currentPos ?? 0, resetCounters: true);
+      // 整篇连续播放：从当前句句首起播确定性循环。单句遍数总清零；整篇遍数按
+      // resetWholeLoops 决定（切句保留）。
+      await _startWholeDriven(
+        startPos: _currentPos ?? 0,
+        resetWholeLoops: resetWholeLoops,
+        resetSentenceRepeats: true,
+      );
     }
   }
 
@@ -1105,12 +1217,27 @@ class ListeningPractice extends _$ListeningPractice {
         await _startCurrent();
       } else {
         // 整篇连续播放：从落点起播确定性循环（不再裸 play，否则播完无人接管循环）。
-        await _startWholeDriven(resetCounters: false);
+        // 此处上方已显式清零两套遍数，进度条拖动语义即「重新从落点数」。
+        await _startWholeDriven();
       }
     } else {
       _setLogicalPlaying(false);
       _playbackSessionId = _engine.currentSessionId;
     }
+  }
+
+  /// 相对当前位置后退/前进（[delta] 负为后退），并钳制到 `[0, total]`。
+  ///
+  /// 供无字幕场景的 App 内「后退/前进 10 秒」按钮与锁屏 rewind/fastForward 共用。
+  /// 复用 [seekAbsolute]：无字幕分支仅 clearClip + seek，不打断在途 `playToEnd`
+  /// 循环，播放中 seek 后循环继续从新位置播到结尾。
+  Future<void> seekRelative(Duration delta) async {
+    final total = ref.read(audioEngineProvider).totalDuration ?? Duration.zero;
+    var target = _engine.absoluteCurrentPosition + delta;
+    if (target < Duration.zero) target = Duration.zero;
+    if (total > Duration.zero && target > total) target = total;
+    _awaitingReplayFromStart = false;
+    await seekAbsolute(target);
   }
 
   /// 未播放时把引擎对齐到当前真相源句的起点。
@@ -1253,7 +1380,8 @@ class ListeningPractice extends _$ListeningPractice {
     }
 
     if (wasPlaying) {
-      await _startCurrent();
+      // 切上一句/下一句是「同一遍内换句」：保留整篇已播遍数，不重置为第一遍。
+      await _startCurrent(resetWholeLoops: false);
     } else {
       await _alignEngineToCurrent();
     }

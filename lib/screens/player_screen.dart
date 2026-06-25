@@ -792,27 +792,30 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     final statusRow = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              playerState.settings.singleSentenceMode
-                  ? Icons.format_quote
-                  : Icons.article,
-              size: 14,
-              color: iconColor,
-            ),
-            const SizedBox(width: 3),
-            Text(
-              playerState.settings.singleSentenceMode
-                  ? l10n.singleSentenceMode
-                  : l10n.listMode,
-              style: captionStyle,
-            ),
-          ],
-        ),
+        // 模式标签（列表/精听）依赖字幕分句，无字幕时隐藏。
+        if (playerState.hasSentences) ...[
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                playerState.settings.singleSentenceMode
+                    ? Icons.format_quote
+                    : Icons.article,
+                size: 14,
+                color: iconColor,
+              ),
+              const SizedBox(width: 3),
+              Text(
+                playerState.settings.singleSentenceMode
+                    ? l10n.singleSentenceMode
+                    : l10n.listMode,
+                style: captionStyle,
+              ),
+            ],
+          ),
+          const SizedBox(width: 12),
+        ],
         // 倍速
-        const SizedBox(width: 12),
         Text('${playerState.settings.playbackSpeed}x', style: captionStyle),
         // 整篇循环徽标：播放中显示「当前遍/总遍」进度，未播放时显示设置值。
         if (playerState.settings.loopWhole) ...[

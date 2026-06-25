@@ -37,6 +37,37 @@ class PlaybackControls extends ConsumerWidget {
     ListeningPracticeState playerState,
     ListeningPractice controller,
   ) {
+    // 无字幕：上一句/下一句、模式切换、字幕显示、单句循环都无意义，隐藏它们；
+    // 速度、整篇循环（_LoopButton 内部会隐藏单句循环）、后退/前进 10 秒仍保留。
+    if (!playerState.hasSentences) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [_SpeedButton(), SizedBox(width: 12), _LoopButton()],
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildSeekButton(controller, Icons.replay_10, -10, 32),
+                  const SizedBox(width: 12),
+                  _buildPlayPauseButton(context, playerState, controller),
+                  const SizedBox(width: 12),
+                  _buildSeekButton(controller, Icons.forward_10, 10, 32),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
       child: Column(
@@ -90,9 +121,7 @@ class PlaybackControls extends ConsumerWidget {
                 IconButton(
                   icon: const Icon(Icons.skip_previous),
                   iconSize: 32,
-                  onPressed: playerState.hasSentences
-                      ? () => controller.previousSentence()
-                      : null,
+                  onPressed: () => controller.previousSentence(),
                 ),
                 const SizedBox(width: 12),
                 _buildPlayPauseButton(context, playerState, controller),
@@ -100,9 +129,7 @@ class PlaybackControls extends ConsumerWidget {
                 IconButton(
                   icon: const Icon(Icons.skip_next),
                   iconSize: 32,
-                  onPressed: playerState.hasSentences
-                      ? () => controller.nextSentence()
-                      : null,
+                  onPressed: () => controller.nextSentence(),
                 ),
               ],
             ),
@@ -118,6 +145,27 @@ class PlaybackControls extends ConsumerWidget {
     ListeningPracticeState playerState,
     ListeningPractice controller,
   ) {
+    // 无字幕：保留速度 + 后退/前进 10 秒 + 整篇循环（见 [_buildMobileLayout] 注释）。
+    if (!playerState.hasSentences) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const _SpeedButton(),
+            const SizedBox(width: 16),
+            _buildSeekButton(controller, Icons.replay_10, -10, 28),
+            const SizedBox(width: 6),
+            _buildPlayPauseButton(context, playerState, controller),
+            const SizedBox(width: 6),
+            _buildSeekButton(controller, Icons.forward_10, 10, 28),
+            const SizedBox(width: 16),
+            const _LoopButton(),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -143,9 +191,7 @@ class PlaybackControls extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.skip_previous),
             iconSize: 28,
-            onPressed: playerState.hasSentences
-                ? () => controller.previousSentence()
-                : null,
+            onPressed: () => controller.previousSentence(),
           ),
           const SizedBox(width: 6),
           _buildPlayPauseButton(context, playerState, controller),
@@ -153,9 +199,7 @@ class PlaybackControls extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.skip_next),
             iconSize: 28,
-            onPressed: playerState.hasSentences
-                ? () => controller.nextSentence()
-                : null,
+            onPressed: () => controller.nextSentence(),
           ),
           const SizedBox(width: 16),
           _buildToggleButton(
@@ -176,6 +220,20 @@ class PlaybackControls extends ConsumerWidget {
           const _LoopButton(),
         ],
       ),
+    );
+  }
+
+  /// 后退/前进若干秒按钮（无字幕场景），[seconds] 负为后退。
+  Widget _buildSeekButton(
+    ListeningPractice controller,
+    IconData icon,
+    int seconds,
+    double size,
+  ) {
+    return IconButton(
+      icon: Icon(icon),
+      iconSize: size,
+      onPressed: () => controller.seekRelative(Duration(seconds: seconds)),
     );
   }
 

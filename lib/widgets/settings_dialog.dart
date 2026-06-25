@@ -30,6 +30,10 @@ class LoopSettingsPopup extends ConsumerWidget {
     final settings = ref.watch(
       listeningPracticeProvider.select((s) => s.settings),
     );
+    // 单句循环依赖字幕分句，无字幕时只保留整篇循环。
+    final hasSentences = ref.watch(
+      listeningPracticeProvider.select((s) => s.hasSentences),
+    );
     final controller = ref.read(listeningPracticeProvider.notifier);
 
     void update(PlaybackSettings next) => controller.updateSettings(next);
@@ -55,28 +59,31 @@ class LoopSettingsPopup extends ConsumerWidget {
             onIntervalChanged: (v) =>
                 update(settings.copyWith(wholeInterval: Duration(seconds: v))),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-            child: Divider(
-              height: 1,
-              thickness: 1,
-              color: theme.colorScheme.outlineVariant,
+          // 单句循环（无字幕时隐藏，连同分隔线）
+          if (hasSentences) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+              child: Divider(
+                height: 1,
+                thickness: 1,
+                color: theme.colorScheme.outlineVariant,
+              ),
             ),
-          ),
-          // 单句循环
-          _LoopSection(
-            icon: Icons.repeat_one,
-            title: l10n.singleSentenceLoop,
-            enabled: settings.loopSentence,
-            count: settings.sentenceLoopCount,
-            intervalSeconds: settings.sentenceInterval.inSeconds,
-            onEnabledChanged: (v) => update(settings.copyWith(loopSentence: v)),
-            onCountChanged: (v) =>
-                update(settings.copyWith(sentenceLoopCount: v)),
-            onIntervalChanged: (v) => update(
-              settings.copyWith(sentenceInterval: Duration(seconds: v)),
+            _LoopSection(
+              icon: Icons.repeat_one,
+              title: l10n.singleSentenceLoop,
+              enabled: settings.loopSentence,
+              count: settings.sentenceLoopCount,
+              intervalSeconds: settings.sentenceInterval.inSeconds,
+              onEnabledChanged: (v) =>
+                  update(settings.copyWith(loopSentence: v)),
+              onCountChanged: (v) =>
+                  update(settings.copyWith(sentenceLoopCount: v)),
+              onIntervalChanged: (v) => update(
+                settings.copyWith(sentenceInterval: Duration(seconds: v)),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

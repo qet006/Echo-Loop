@@ -1,7 +1,21 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-25（学习计划页当前阶段 item 可点击）
+> 最后更新：2026-06-25（Free Player 无字幕场景修复）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：Free Player 无字幕场景修复
+
+无字幕音频（`transcriptSource == null` → `sentences` 为空）在 Free Player 有多处问题：① 播完后播放按钮卡在「暂停」图标（根因：无字幕 `play()` 从不 `newSession()`，`_playbackSessionId` 停在 `-1`，`_onPlayerStateChanged` 永远 early-return，逻辑播放态没有路径置回 false）；② 播完后点击无法从头重播（just_audio 对 `completed` 播放器 `play()` 不回头，且未设 `_awaitingReplayFromStart`）；③ 显示无意义的「上一句/下一句」（App 内 + 锁屏）；④ 显示无法使用的模式切换/字幕显示/单句循环；⑤ 整篇循环开启后不循环。
+
+- [x] `lib/providers/listening_practice/listening_practice_provider.dart`：新增 `_startNoTranscriptPlayback`/`_playNoTranscriptDriven`（确定性 await-完成循环 + 认领 session + honor `loopWhole`）、`seekRelative`（相对 seek 钳制）、`_applyLockScreenHandlers`（按 `hasSentences` 注册切句 vs 后退/前进回调）。
+- [x] `lib/providers/audio_engine/audio_engine_provider.dart`、`lib/services/background_audio_handler.dart`：新增 `setSeekHandlers` + 锁屏 rewind/fastForward 控件（与切句互斥）。
+- [x] `lib/widgets/playback_controls.dart`：无字幕只显示 速度 + 后退/前进10秒 + 整篇循环；隐藏模式切换/字幕显示。
+- [x] `lib/widgets/settings_dialog.dart`：`LoopSettingsPopup` 无字幕时隐藏单句循环。
+- [x] `lib/screens/player_screen.dart`：状态栏无字幕时隐藏模式标签。
+- [x] 顺带修复（有字幕）：播放中点上一句/下一句会把整篇循环遍数重置为第一遍。`_startWholeDriven` 拆分 `resetWholeLoops`/`resetSentenceRepeats`，`_startCurrent` 增 `resetWholeLoops` 参数，`_moveToIndex`（prev/next）传 `false`——切句视为「同一遍内换句」，保留整篇遍数、只重置单句遍数。
+- [x] 测试：provider 无字幕场景（起播/播完/重播/整篇循环/seekRelative）+ 有字幕切句保留整篇遍数；`playback_controls_test`、`settings_dialog_test`、`background_audio_handler_test` 新增/更新。
+
+  **完成时间**: 2026-06-25
 
 ## 已完成：学习计划页当前阶段 item 可点击
 

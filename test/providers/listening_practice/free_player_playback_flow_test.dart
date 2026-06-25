@@ -900,6 +900,30 @@ void main() {
     expect(engine.playCount, 2);
   });
 
+  test('有字幕恢复进入时存档位置停在结尾：首次点击从第 1 句重播，不从最后一句续播', () async {
+    // 模拟 _restorePlaybackState 把高亮恢复到最后一句、引擎 seek 到结尾位置：
+    // 本次 session 未真正播过，processingState 仍是 ready、_awaitingReplayFromStart
+    // 为 false——此前会误判为「从当前句（最后一句）续播」。
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(),
+      currentFullIndex: 4,
+    );
+    engine.setTotalDuration(const Duration(milliseconds: 17600));
+    engine.position = const Duration(milliseconds: 17600);
+
+    await lp.play();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(
+      container.read(listeningPracticeProvider).currentFullIndex,
+      0,
+      reason: '存档位置在结尾应识别为「已播完」，从第 1 句重播而非从最后一句',
+    );
+    expect(engine.lastSeek, Duration.zero, reason: '从第 1 句句首起播');
+    expect(engine.playCount, 1);
+  });
+
   test('收藏非循环播完后，再点播放从收藏列表第 1 句重新开始', () async {
     lp.seed(
       sentences: sentences,
@@ -1131,5 +1155,191 @@ void main() {
     expect(engine.pauseKeepSessionCount, 1);
     expect(engine.stopCount, 0);
     expect(container.read(listeningPracticeProvider).isPlaying, isFalse);
+  });
+
+  test('整篇循环播放中切下一句：保留已完成遍数，不重置为第一遍', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(
+        loopWhole: true,
+        wholeLoopCount: 3,
+        wholeInterval: Duration.zero,
+      ),
+    );
+
+    await start();
+    await flushBoundary();
+
+    await completeWhole(); // 第 1 遍播完 → wholeLoopsDone=1，回卷续播第 2 遍
+    expect(container.read(listeningPracticeProvider).wholeLoopsDone, 1);
+
+    await lp.nextSentence();
+    await flushBoundary();
+
+    expect(
+      container.read(listeningPracticeProvider).wholeLoopsDone,
+      1,
+      reason: '切句是同一遍内换句，整篇遍数应保留',
+    );
+    expect(container.read(listeningPracticeProvider).isPlaying, isTrue);
+  });
+
+  test('整篇循环播放中切上一句：保留已完成遍数', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(
+        loopWhole: true,
+        wholeLoopCount: 3,
+        wholeInterval: Duration.zero,
+      ),
+      currentFullIndex: 2,
+    );
+
+    await start();
+    await flushBoundary();
+
+    await completeWhole(); // wholeLoopsDone=1
+    expect(container.read(listeningPracticeProvider).wholeLoopsDone, 1);
+
+    // 回卷后高亮在第 0 句，先推进到第 2 句再切上一句。
+    await lp.nextSentence();
+    await lp.nextSentence();
+    await lp.previousSentence();
+    await flushBoundary();
+
+    expect(container.read(listeningPracticeProvider).wholeLoopsDone, 1);
+  });
+
+  group('无字幕音频', () {
+    test('起播：进入确定性循环、认领 session、逻辑播放态为真', () async {
+      lp.seed(sentences: const [], settings: const PlaybackSettings());
+
+      await start();
+      await flushBoundary();
+
+      expect(container.read(listeningPracticeProvider).isPlaying, isTrue);
+      expect(engine.playCount, 1);
+      // 关键：必须认领 session（≠ 初值 -1），否则被动状态同步对无字幕失效。
+      expect(engine.currentSessionId, isNot(-1));
+    });
+
+    test('自然播完：逻辑播放态置假、保留会话停在暂停态（修复按钮卡暂停）', () async {
+      lp.seed(sentences: const [], settings: const PlaybackSettings());
+
+      await start();
+      await flushBoundary();
+
+      await completeWhole(); // 解析 playToEnd 的挂起 → 自然播完
+
+      expect(
+        container.read(listeningPracticeProvider).isPlaying,
+        isFalse,
+        reason: '播完后逻辑播放态应为假，按钮回到「播放」图标',
+      );
+      expect(engine.pauseKeepSessionCount, 1);
+      expect(engine.stopCount, 0);
+    });
+
+    test('播完后再次播放：显式 seek(0) 从头重播（修复点了也播不起来）', () async {
+      lp.seed(sentences: const [], settings: const PlaybackSettings());
+
+      await start();
+      await flushBoundary();
+      await completeWhole();
+
+      engine.lastSeek = null;
+      await lp.play();
+      await flushBoundary();
+
+      expect(
+        engine.lastSeek,
+        Duration.zero,
+        reason: '播完后重播必须 seek 回开头，just_audio 对 completed 直接 play 不回头',
+      );
+      expect(container.read(listeningPracticeProvider).isPlaying, isTrue);
+    });
+
+    test('恢复进入时存档位置停在结尾：首次点击 seek(0) 从头播（修复需点两次）', () async {
+      lp.seed(sentences: const [], settings: const PlaybackSettings());
+      // 模拟 _restorePlaybackState 把引擎 seek 到上次的结尾位置：position 等于
+      // 总时长、processingState 仍是 ready（非 completed）、未置 awaitingReplay。
+      engine.setTotalDuration(const Duration(seconds: 42));
+      engine.position = const Duration(seconds: 42);
+
+      unawaited(lp.play());
+      await flushBoundary();
+
+      expect(
+        engine.lastSeek,
+        Duration.zero,
+        reason: '存档位置在结尾应识别为「已播完」，首次点击即从头重播而非从结尾续播',
+      );
+      expect(engine.playCount, 1, reason: '一次点击就起播');
+      expect(container.read(listeningPracticeProvider).isPlaying, isTrue);
+    });
+
+    test('恢复进入时存档位置在中段：首次点击从落点续播，不 seek(0)', () async {
+      lp.seed(sentences: const [], settings: const PlaybackSettings());
+      engine.setTotalDuration(const Duration(seconds: 42));
+      engine.position = const Duration(seconds: 20);
+
+      unawaited(lp.play());
+      await flushBoundary();
+
+      expect(engine.lastSeek, isNull, reason: '中段位置是真正的续播，不应回卷到开头');
+      expect(engine.playCount, 1);
+    });
+
+    test('整篇循环开启：播完一遍后回卷重播，不停止', () async {
+      lp.seed(
+        sentences: const [],
+        settings: const PlaybackSettings(
+          loopWhole: true,
+          wholeLoopCount: 2,
+          wholeInterval: Duration.zero,
+        ),
+      );
+
+      await start();
+      await flushBoundary();
+
+      // 第 1 遍播完 → 回卷重播第 2 遍（不暂停）。
+      await completeWhole();
+      expect(container.read(listeningPracticeProvider).wholeLoopsDone, 1);
+      expect(engine.pauseKeepSessionCount, 0, reason: '未播满，不应停止');
+      expect(engine.lastSeek, Duration.zero, reason: '回卷到开头');
+      expect(engine.playCount, 2, reason: '重新起播第 2 遍');
+      expect(container.read(listeningPracticeProvider).isPlaying, isTrue);
+
+      // 第 2 遍播完 → 已满 2 遍 → 停在暂停态。
+      await completeWhole();
+      expect(container.read(listeningPracticeProvider).wholeLoopsDone, 2);
+      expect(engine.pauseKeepSessionCount, 1);
+      expect(container.read(listeningPracticeProvider).isPlaying, isFalse);
+    });
+
+    test('seekRelative 前进：按相对位置 seek，不依赖字幕', () async {
+      lp.seed(sentences: const [], settings: const PlaybackSettings());
+
+      await start();
+      engine.position = const Duration(milliseconds: 5000);
+      await flushBoundary();
+
+      await lp.seekRelative(const Duration(seconds: 10));
+
+      expect(engine.lastSeek, const Duration(milliseconds: 15000));
+    });
+
+    test('seekRelative 后退到负值：钳制到 0', () async {
+      lp.seed(sentences: const [], settings: const PlaybackSettings());
+
+      await start();
+      engine.position = const Duration(milliseconds: 3000);
+      await flushBoundary();
+
+      await lp.seekRelative(const Duration(seconds: -10));
+
+      expect(engine.lastSeek, Duration.zero);
+    });
   });
 }

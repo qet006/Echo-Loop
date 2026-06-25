@@ -433,6 +433,9 @@ class FakeListeningPractice extends ListeningPractice {
   Future<void> seekAbsolute(Duration absolutePosition) async {}
 
   @override
+  Future<void> seekRelative(Duration delta) async {}
+
+  @override
   Future<void> selectFullSentence(int index, {bool autoPlay = true}) async {
     state = state.copyWith(currentFullIndex: index);
   }
@@ -1830,6 +1833,12 @@ class FakeAudioEngine extends AudioEngine {
   void setTransportHandlers({
     Future<void> Function()? onPlay,
     Future<void> Function()? onPause,
+  }) {}
+
+  @override
+  void setSeekHandlers({
+    Future<void> Function()? onRewind,
+    Future<void> Function()? onFastForward,
   }) {}
 
   @override
