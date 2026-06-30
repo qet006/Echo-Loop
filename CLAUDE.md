@@ -390,3 +390,92 @@ flutter test integration_test -d macos
 - **规则**：**`StatefulShellRoute` 全屏子页（带 rootNavigatorKey）若路径与某分支前缀重叠，必须嵌套在该分支子树内、用相对路径**，不能拍平成顶层兄弟路由——否则 null-state 重解析会按 URI 重建而丢失 imperative push 的中间层，把分支重置回初始 location。「是否上 tab bar」由 `parentNavigatorKey` 表达，「属于哪个分支」由路由树嵌套表达，二者解耦
 - **相关代码**：`lib/router/app_router.dart`（branch-0 `:collectionId` 的 `routes:` 子路由）；测试 `test/router/app_router_test.dart`（嵌套结构重解析后 pop 回合集详情 / 顶层平级结构复现分支塌回根）
 - **修复时间**：2026-06-29
+
+### 7.18 统一 TTS：嵌入式发音组件不可在 provider build 期触碰平台/数据库（惰性化）
+
+- **背景**：统一 TTS 架构（详见 PLAN.md ADR-8）。发音按钮 `SpeakButton` 是 `ConsumerWidget`，`watch(ttsControllerProvider)`；词典例句 `_ExampleView` 改 `ConsumerWidget` 内嵌它。结果：**任何宿主页面渲染发音按钮就会触发 `ttsControllerProvider.build`**。
+- **现象**：初版 `ttsControllerProvider.build` 里 ① `initialTtsSettingsProvider` 未 override 时 `throw`（仿 learning_settings）② `ref.read(ttsCacheDaoProvider)` 立即连库 ③ `configure()` 立即 `engine.initialize()`（flutter_tts method channel）④ `Future.delayed` 起清理定时器。导致**多个现有 widget 测试**（词典弹窗 resize、ai_dict_result_view 等只想渲染 UI）抛 `No ProviderScope found`/`UnimplementedError`/`MissingPluginException`/pending-timer，header 拖拽布局也被异常打乱（resize 测试 24 例炸）。
+- **根因**：发音是**辅助功能**，但其 provider 把"重副作用（DB/平台/定时器/必需 override）"放在 build 期同步执行，使"渲染一个喇叭图标"硬依赖整条 TTS+DB+平台栈就绪。
+- **解法**（让"渲染发音按钮"零副作用，副作用全部惰性到"真正发音"时）：
+  - `initialTtsSettingsProvider` 返回 `const TtsSettings()` 默认值（**不 throw**）——发音功能缺 override 时优雅降级，不崩宿主页（与 learning_settings 的"强制 override"取舍不同：那是核心流程，TTS 是辅助）
+  - `TtsCacheStore` 的 DAO 改**惰性解析** `TtsCacheDao Function()`，只在 lookup/store/cleanup 真正读写时才 `ref.read(ttsCacheDaoProvider)`
+  - `TtsCoordinator` 引擎**惰性创建**：`configure()` 只记录目标 kind/config（引擎已存在才热更新），首次 `speak()` 才 `_ensureEngine()` 建引擎 + `initialize`（flutter_tts 调用）+ 连库
+  - 缓存清理定时器从 provider build **移到 main.dart**（`Future.delayed` 用 `database.ttsCacheDao` 直接构造，独立于 provider，widget 测试不触发 pending-timer）
+  - 宿主测试该补 `ProviderScope` 的补（`ai_dict_result_view_test` 等视图现在消费 Riverpod）
+- **规则**：
+  - **被广泛内嵌的 Consumer 组件，其 provider 的 `build` 不得做 DB/平台通道/定时器/必需 override 等重副作用**——否则该组件的每个宿主页（含其 widget 测试）都被迫提供完整依赖栈。把副作用惰性到首次真实交互
+  - 辅助功能的 initial-settings provider 倾向"默认值降级"而非"未 override 即 throw"；强制 throw 只留给核心流程（router redirect / 启动同步路径）
+  - flutter_tts 在 widget 测试里调 method channel 会 `MissingPluginException`；引擎惰性化后，不点发音的测试根本不会实例化引擎，天然规避
+- **相关代码**：`lib/providers/tts/tts_controller_provider.dart`（惰性 dao + 无定时器）、`tts_settings_provider.dart`（initial 默认值）、`lib/services/tts/tts_coordinator.dart`（`_ensureEngine` 惰性）、`tts_cache_store.dart`（`resolveDao`）、`lib/main.dart`（延迟 cleanup）
+- **修复时间**：2026-06-28
+
+### 7.19 macOS flutter_tts：synthesizeToFile 不设 voice，英/美音合成产物完全相同
+
+> **已被 §7.24 取代（2026-06-30）**：不再「macOS 放弃合成 → 降级 speakLive 不缓存」，改为自家原生通道 `MacosTtsSynthHandler` 合成（正确设 voice → macOS 也缓存且口音正确）。本节保留为根因记录。
+
+- **现象**：macOS 上切换英音(en-GB)/美音(en-US)，发音听起来没区别；iOS/Android 正常
+- **根因**：统一 TTS 管线走「合成到文件→缓存→播放文件」（`synthesize`→`synthesizeToFile`）。对比 `flutter_tts-4.2.5` 两端插件源码——iOS `SwiftFlutterTtsPlugin.swift` 的 `synthesizeToFile` 合成前正确设 `utterance.voice = self.voice ?? AVSpeechSynthesisVoice(language: self.language)`；**macOS `FlutterTtsPlugin.swift` 的 `synthesizeToFile`（line 148-195）从不给 utterance 设 voice**（连 `self.voice` 都不读，只有 `speak` 设了），产物永远是系统默认音色 → 不管 `setLanguage('en-GB')` 还是 `'en-US'` 都同一个嗓音。cacheKey 因 voiceId 不同会建两条缓存，但音频内容相同。en-GB 音色其实已装（`say -v '?'` 可见 Daniel/Eddy(UK)），不是缺音色
+- **关键约束**：macOS `synthesizeToFile` 连 `self.voice` 也不读，所以即便 `setVoice` 指定具体音色也无效——这条路在 macOS 上无解；唯有 `speak()`（实时朗读）会用 `AVSpeechSynthesisVoice(language:)`，口音才生效
+- **解法**：`PlatformTtsEngine.synthesize` 在 macOS（`_accentAwareSynth()=false`）直接返回 null → 协调器降级 `speakLive`（走 `speak`，按 `setLanguage` 选 en-GB/en-US 音色）。代价：macOS 不缓存音频（非性能敏感平台，可接受）；iOS/Android 的 synthesizeToFile 正确设 voice，照常走缓存合成路径
+- **规则**：依赖 flutter_tts `synthesizeToFile` 反映音色/口音前，须确认目标平台插件确实给 utterance 设了 voice——macOS 端漏设，是与 §7.5 isFullPath 同类的 macOS 平台遗漏。判断「平台是否支持口音合成」用注入式 `AccentAwareSynthResolver`（默认 `!Platform.isMacOS`），不在业务逻辑里硬判平台
+- **相关代码**：`lib/services/tts/platform_tts_engine.dart`（`_accentAwareSynth` + `synthesize` 提前返回 null）；参照 `flutter_tts-4.2.5/macos/Classes/FlutterTtsPlugin.swift:148`（无 voice）vs `ios/Classes/SwiftFlutterTtsPlugin.swift:173`（有 voice）
+- **修复时间**：2026-06-29
+
+### 7.20 Echo Loop TTS（Kokoro / sherpa-onnx）接入要点（设计约束，详见 PLAN.md ADR-9）
+
+- **模型必须取自 sherpa 官方打包，不能用裸 Kokoro onnx**：`sherpa_onnx` 的 `OfflineTts` 只能加载 sherpa 格式的 Kokoro（自带 `espeak-ng-data` 做 G2P）。thewh1teagle/kokoro-onnx 仓库的裸 onnx 用另一套音素化（misaki/phonemizer），**塞不进 sherpa FFI**。模型源 = k2-fsa/sherpa-onnx 的 TTS 发布，量化 int8 后重托管到 `cdn.echo-loop.top/model/tts/`，App 只从自家 CDN 下载（与 Whisper 一致）
+- **`extractFileToDisk` 按扩展名识别格式**：`archive` 包的 `extractFileToDisk(inputPath, outputPath)` 用文件扩展名（最多 2 段，如 `.tar.gz`）判断解压方式。下载的临时归档**文件名必须以 `.tar.gz` 结尾**（本项目用 `_dl_<id>.tar.gz`），否则抛 `No file extension detected`。流式解包（`InputFileStream`）省内存，勿用 `readAsBytes` 全量读 98MB
+- **`OfflineTts` 的 FFI 指针只能在创建它的 isolate 内用**：`generate`/`writeWave`/`free` 必须与 `OfflineTts(...)` 同 isolate。故 worker isolate 内建引擎、循环处理合成请求、回传 wav 路径（`GeneratedAudio.samples` 是 Dart `Float32List`，跨 isolate 可传，但本项目直接在 worker 内 `writeWave` 写盘更简单）。镜像 `sherpa_onnx_engine.dart` 的 `_AsrWorker` 结构
+- **固定 `provider='cpu'`**：满足"一直 CPU、可靠"，规避 §7.4 的 NNAPI 崩溃路径；TTS 不用 VAD，不涉 §7.4 的 Silero VAD 崩溃
+- **解包目录布局不写死**：归档解包后关键文件可能在根或子目录，用"递归定位 `model.int8.onnx`/`voices.bin`/`tokens.txt`/`espeak-ng-data`"判断就绪与解析路径（`KokoroModelManager._resolvePaths`），不假设层级
+- **`speakLive` 返回 false 而非抛异常**：Kokoro 始终产文件，无实时兜底。合成失败时返回 null（synthesize）/ false（speakLive），让 ADR-8 共享协调器优雅静默，不在共享管线里抛
+- **相关代码**：`lib/services/tts/kokoro_model_manager.dart`、`kokoro_synthesizer.dart`、`kokoro_tts_engine.dart`、`kokoro_voices.dart`、`lib/providers/tts/kokoro_model_provider.dart`、`tts_controller_provider.dart`（`effectiveTtsEngine` 门控）；集成测试 `integration_test/kokoro_tts_test.dart`
+- **修复时间**：2026-06-29
+
+### 7.21 Kokoro 归档若用 macOS tar 打包，PAX 扩展头令 archive 解压抛 FormatException
+
+- **现象**：设置页选 Echo Loop TTS 触发下载，进度走完后报 `FormatException: Missing extension byte (at offset 98)`，点「重试」无效
+- **排查方法论**：错误文案是 provider 兜底 `catch` 的 `'$e'`（非 `DioException`），先排除网络。逐段验证下载链路——`curl -I` CDN 返回 200 + 完整 ~98MB；`shasum` 与 `kokoroArchiveSha256` 一致 → 下载/SHA 全对，问题在解包。用项目 `archive` 包跑 `extractFileToDisk` 拿到栈:`TarDecoder.decodeStream:58` 的 `utf8.decode`
+- **根因**：归档在 **macOS 用 `tar`/`bsdtar` 重新打包**，混入 AppleDouble(`._*`) 与 **PAX 扩展属性头**（`com.apple.*` xattr，值为二进制；本例 792 条）。`archive` 包 `tar_decoder.dart:58` 对 PAX `x`/`g` 头做**无 try/catch 的 `utf8.decode`**，碰非 UTF-8 字节即抛 `FormatException`，从 `extractFileToDisk` 冒泡到 provider。CDN/下载/SHA 全部正常
+- **不能用 bz2 绕过**：sherpa-onnx 原始 `kokoro-int8-en-v0_19.tar.bz2`（Linux CI 打包）虽干净无 PAX，但 `archive` 包的 **bzip2 是纯 Dart 解码（无原生）**，解 ~100MB 移动端过慢（本机原生 `bunzip2` 都 >2min）；gzip 走 `dart:io` 原生 zlib，快
+- **解法**：用 **gzip 重打且禁 macOS 元数据**——`COPYFILE_DISABLE=1 tar --no-xattrs --no-mac-metadata -czf kokoro-en-v0_19-int8.tar.gz model.int8.onnx voices.bin tokens.txt LICENSE espeak-ng-data`；重传 CDN 覆盖 `model/tts/kokoro-en-v0_19-int8.tar.gz`；更新 `kokoroArchiveSha256` 常量。客户端解包逻辑/`.tar.gz` 后缀不变
+- **规则**：托管给客户端 `archive` 包解压的 tar.gz **不得含 macOS xattr/AppleDouble**（必在 Linux 打或加 `--no-xattrs --no-mac-metadata` + `COPYFILE_DISABLE=1`）；**不用 bz2**（纯 Dart 慢）。换归档必须同步改 SHA 常量，且**先传 CDN 再改常量/发版**，否则旧包对不上新 SHA
+- **相关代码**：`lib/services/tts/kokoro_model_manager.dart`（`kokoroArchiveSha256`）；参照 `archive-4.0.7/lib/src/codecs/tar_decoder.dart:58`（PAX `utf8.decode` 无防护）
+- **修复时间**：2026-06-29
+
+### 7.22 TTS 音色试听/预热：音色经 config 显式传入 synthesize，统一 render 主干（设计约束）
+
+- **背景**：Kokoro 首次合成有可感知延迟（CPU 推理 RTF≈3）。语音合成设置页落地业界标准「预生成 + 缓存命中即播」——进页面后台为全部 11 个音色预合成示范句入库，音色弹层点击即播（命中预热缓存秒播）。
+- **核心约束（防竞态）**：试听/预热要用**与当前选中不同**的音色合成，但全 App 共用单个 Kokoro 引擎 + 单 worker isolate（顺序 FIFO）。**音色必须经 `TtsEngine.synthesize(..., config:)` 显式传入**，在方法入口**同步**解析 sid（`KokoroTtsEngine` 用 `config ?? _config`）——**不可**靠 `applyConfig` 改引擎环境态再合成：`applyConfig`(async) 与 `synthesize` 之间有 await 间隙，并发的另一次试听/预热会改写 `_config`，导致音频被写到错误 sid（同 §7.1/7.2/7.6 「不依赖跨边界的可变态」）。平台引擎无具名音色，音色仍由 `applyConfig` 的 setLanguage/setVoice 设定，`config` 不消费（脆弱的 §7.19 macOS 路径零回归）。
+- **统一主干（避免打补丁）**：协调器只有一条渲染主干 `_render`（请求→缓存文件，cache-first 幂等，不碰播放器/代际）+ 一条播放主干 `_renderAndPlay`（抢占→渲染→播放→speakLive 降级）。`speak`/`speakWith`（试听）/`prewarm`（预热不播）全部委托主干，不新增与 `speak` 平行的重复逻辑。预热 fire-and-forget、命中缓存即跳过、按 `_prewarmToken` 取消在途旧批次。
+- **在途去重（`_inFlightRender`）**：`_render` 按 cacheKey 记「合成在途」Future——缓存未命中时若同 key 已在合成（如预热某音色时用户恰好点该音色），**复用同一 Future**，不重复入 worker 队列、不重复跑 native generate，第二方等同一份产物。完成（含失败）后 `finally` 移除。检查+登记是同步段（无 await 间隙），故并发不会双登记。这是「点正在生成的 item」不再二次合成的关键。
+- **缓存天然分桶**：缓存键含 `voiceId + modelTag(fp32/int8) + engine + speed + textHash`，故预热与试听用同句+同音色+同变体命中同一条目，无需新增缓存维度；切变体（modelTag 变）→ 新键 → 重新预热。
+- **测试注意**：`TtsEngine.synthesize` 加 `config` 后，mocktail 桩须补 `config: any(named: 'config')`（协调器恒传 config，非 null 实参不匹配缺省桩会返回 null 致崩）；`deriveKey` 桩须含 `modelTag: any(named: 'modelTag')`（非 null modelTag）。`ConsumerState.dispose` 内**不可用 ref**，取消预热须用 build 时缓存的 notifier 引用。
+- **相关代码**：`lib/services/tts/tts_coordinator.dart`（`_render`/`_renderAndPlay`/`speakWith`/`prewarm`）、`tts_engine.dart`/`kokoro_tts_engine.dart`/`platform_tts_engine.dart`（`synthesize` 的 `config`）、`lib/providers/tts/tts_controller_provider.dart`（`previewVoice`/`prewarmVoicePreviews`/`kTtsPreviewText`/`ttsVoicePreviewKey`）、`lib/screens/tts_settings_screen.dart`（`_VoicePreviewRow` + 进页预热）
+- **完成时间**：2026-06-30
+
+### 7.23 平台 TTS 口音试听：engine.stop() 打断在途 synthesizeToFile 致复用方挂起
+
+- **现象**：把 §7.22 的「试听+预热」扩到平台 TTS 口音（点美音/英音即朗读，进页预热两口音）后，点击「美音」无声。日志只到 `[TtsCoordinator] 合成在途复用 key=… voice=en-US` 后**戛然而止**（无「播放」、无「降级 speakLive」、无异常）——典型「awaited Future 永不 resolve」。
+- **根因**：进页预热把 en-US 合成登记为 `_inFlightRender` 在途 Future。用户点美音 → `previewAccent`→`speakWith`→`_renderAndPlay`。旧 `_renderAndPlay` 顺序是「`++gen` → `player.stop()` → **`engine.stop()`** → `_render`」。`engine.stop()`→平台引擎 `_tts.stop()` 在 `_render` 复用在途 Future **之前**就打断了那次正在跑的 `synthesizeToFile`——而 flutter_tts 的 `synthesizeToFile`(配 `awaitSynthCompletion(true)`)被 stop 打断后**完成回调可能永不到达**，其 Future 永久挂起 → 复用它的 `speakWith` 一起挂起。Kokoro 不复现：合成在 worker isolate 跑，`engine.stop()` 不影响它（同 §7.22 单 worker 串行，但 stop 动的是主 isolate 引擎态）。
+- **解法**（同 §7.6/7.18「不依赖音频库回调时序，确定性 await」）：`_renderAndPlay` 改为「`++gen` → `player.stop()`（只动播放器、不碰合成，可安全前置即时切断旧音频）→ **先 `_render`**（复用在途合成、**不打断**它）→ 仅当 `_inFlightRender.isEmpty` 时才 `engine.stop()` → 播放」。两点缺一不可：① 渲染先于 stop，本次依赖的在途合成不被杀；② `engine.stop()` 用 `_inFlightRender.isEmpty` 门控，避免误杀**其他**在途合成（如另一口音的预热）使其 Future 挂起、后续点该口音复用时再次卡死。抢占仍由 generation 守卫 +（降级分支）`speakLive` 自带的 stop 保证。
+- **平台引擎 config 修正**：平台 `synthesize` 旧版「不消费 config」、靠 `applyConfig` 环境态。试听非当前口音时产物口音错误却以目标口音 key 入缓存。改为 `config != null` 时入口 `applyConfig(config)`（按本次口音 `setLanguage`），使产物与缓存键一致。
+- **规则**：
+  - **平台引擎 `engine.stop()`（=`_tts.stop()`）绝不可在一段 `synthesizeToFile` 在途时调用**——会让其 Future 永久挂起。任何「抢占/打断」逻辑要么在合成完成后再 stop，要么用 `_inFlightRender.isEmpty` 门控跳过。
+  - 切断旧**播放**用 `player.stop()`（安全、即时）；切断旧**实时朗读**靠 `speakLive` 自带的 `await stop()`；二者都不该为抢占而盲目 `engine.stop()`。
+- **相关代码**：`lib/services/tts/tts_coordinator.dart`（`_renderAndPlay` 重排 + `_inFlightRender.isEmpty` 门控）、`platform_tts_engine.dart`（`synthesize` 应用传入 config）、`lib/providers/tts/tts_controller_provider.dart`（`previewAccent`/`prewarmAccentPreviews`/`ttsAccentPreviewKey`）、`lib/screens/tts_settings_screen.dart`（`_AccentPreviewRow`）
+- **修复时间**：2026-06-30
+
+### 7.24 macOS 平台 TTS 自实现 synthesizeToFile（原生通道）→ 三端合成行为一致
+
+- **背景**：§7.19 因 flutter_tts 4.2.5 的 macOS `synthesizeToFile` 漏设 voice，让 macOS「放弃合成 → 降级 speakLive」。代价是 **macOS 平台 TTS 永不入 `tts_cache`**（speakLive 不产文件），用户观察到「Apple 语音播完没缓存、tts_cache 里 engine 全是 echoLoop」。iOS/Android 的 synthesizeToFile 正确设 voice、照常缓存——三端行为不一致。
+- **解法（自实现 synthesizeToFile，仅补 macOS）**：新增原生 handler `macos/Runner/MacosTtsSynthHandler.swift`（通道 `top.echo-loop/tts_synth`，方法 `synthesizeToFile`），用 `AVSpeechSynthesizer.write` 自行合成，合成前**正确设 `utterance.voice = AVSpeechSynthesisVoice(language:)`**（flutter_tts 漏的就是这步），按 PCM buffer 写 caf 到调用方给的**绝对路径**。`PlatformTtsEngine` 在 macOS（`_useNativeMacosSynth()=true`）走该通道，iOS/Android 仍用 flutter_tts（本就正常，零改动）。结果：三端都「合成入缓存 + 口音正确」。
+- **要点 / 坑**：
+  - **末尾空 buffer = 合成结束**：`synth.write` 的 buffer 回调最后会以 `frameLength==0` 触发，据此判定完成（对齐 flutter_tts 自身实现）；完成时先 `output=nil` 关闭 `AVAudioFile`（flush 落盘）**再**回报结果，确保 Dart 读取时文件已写完。
+  - **`FlutterResult` 必须主线程调用**：write 回调在后台队列，完成回报用 `DispatchQueue.main.async`。
+  - **macOS 10.15+**：`AVSpeechSynthesizer.write` 需 10.15+，低版本返回 FlutterError（协调器降级 speakLive）。
+  - **新 Swift 文件要登记 pbxproj**：macOS Runner 用 Xcode 工程，新增 `.swift` 必须在 `Runner.xcodeproj/project.pbxproj` 补 4 处（PBXBuildFile / PBXFileReference / Runner group children / Sources build phase），否则不参与编译。镜像 `NotificationPermissionHandler.swift` 的条目即可（注意分配新的唯一 ID）。`MainFlutterWindow.swift` 里 `awakeFromNib` 实例化并强引用持有 handler（同其他 Mac*Handler）。
+  - **失败优雅降级**：原生返回 false / 产出为空 → `synthesize` 返回 null → 协调器降级 speakLive（macOS speak 仍按 `setLanguage` 选英/美音，口音不丢）。
+  - **音色注入式可测**：`PlatformTtsEngine` 把「是否走原生」与「原生合成函数」做成注入参数（`NativeMacosSynthResolver`/`NativeMacosSynthesize`），单测无需真机/真通道；§7.19 遗留的 `accentAwareSynth`/`useDocumentsWorkaround`/`documentsDirResolver` 及 Documents 中转修法一并删除（macOS 不再经 flutter_tts 合成，Documents 中转无意义）。
+- **相关代码**：`macos/Runner/MacosTtsSynthHandler.swift`（新）、`macos/Runner/MainFlutterWindow.swift`（注册）、`macos/Runner.xcodeproj/project.pbxproj`（登记）、`lib/services/tts/platform_tts_engine.dart`（`_useNativeMacosSynth`/`_nativeMacosSynth`/`_synthesizeViaNativeMacos`）；测试 `test/services/tts/platform_tts_engine_test.dart`（原生成功/失败/空产出）
+- **修复时间**：2026-06-30

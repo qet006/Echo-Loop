@@ -19,7 +19,8 @@ import '../models/audio_item.dart' as model;
 import '../models/dict_entry.dart';
 import '../screens/sentence_detail_screen.dart';
 import '../providers/audio_engine/audio_engine_provider.dart';
-import '../services/tts_service.dart';
+import '../providers/tts/tts_controller_provider.dart';
+import '../widgets/tts/speak_button.dart';
 import '../providers/flashcard/flashcard_provider.dart';
 import '../providers/learning_session/bookmark_review_provider.dart';
 import '../models/flashcard_item.dart';
@@ -220,7 +221,12 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                     index: _currentView == _FavoritesView.sentences ? 0 : 1,
                     children: [
                       _SentencesView(firstItemStep: stepSentencesList),
-                      _WordsView(firstItemStep: stepWordsList),
+                      _WordsView(
+                        firstItemStep: stepWordsList,
+                        // 仅词汇 tab 激活时才预热（IndexedStack 会同时构建两个 tab，
+                        // 不门控则停在句子 tab 也会为词汇起引擎合成、浪费 CPU）。
+                        isActive: _currentView == _FavoritesView.words,
+                      ),
                     ],
                   ),
 
@@ -783,7 +789,11 @@ class _WordsView extends ConsumerStatefulWidget {
   /// 新手引导高亮目标：只包第一个词汇 tile
   final GuideStep? firstItemStep;
 
-  const _WordsView({this.firstItemStep});
+  /// 词汇 tab 当前是否激活（IndexedStack 会同时构建两个 tab，用此门控预热——
+  /// 仅激活时才为词汇起引擎合成，停在句子 tab 不预热）。
+  final bool isActive;
+
+  const _WordsView({this.firstItemStep, this.isActive = false});
 
   @override
   ConsumerState<_WordsView> createState() => _WordsViewState();
@@ -799,6 +809,12 @@ class _WordsViewState extends ConsumerState<_WordsView> {
   /// 首个词汇卡片的展开控制器：引导激活时自动展开
   final ExpansibleController _firstItemController = ExpansibleController();
 
+  /// 统一 TTS 控制器（build 时缓存，供 dispose 取消预热——dispose 内不可用 ref，§7.14）。
+  TtsController? _ttsController;
+
+  /// 上次预热的发音文本签名：仅当列表发音文本变化才重启预热批次（避免 rebuild 反复重启）。
+  String? _prewarmSignature;
+
   @override
   void initState() {
     super.initState();
@@ -812,6 +828,47 @@ class _WordsViewState extends ConsumerState<_WordsView> {
         if (_firstItemController.isExpanded) return;
         _firstItemController.expand();
       });
+    });
+  }
+
+  @override
+  void didUpdateWidget(_WordsView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 切离词汇 tab（IndexedStack 不销毁本视图）→ 停在途预热；重置签名使重新
+    // 激活时可再次触发（届时已缓存的命中即跳过，未完成的续上）。
+    if (oldWidget.isActive && !widget.isActive) {
+      _ttsController?.cancelTextsPrewarm();
+      _prewarmSignature = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    // 离开收藏页即停在途预热，避免继续占用 CPU 合成用不到的发音。
+    _ttsController?.cancelTextsPrewarm();
+    super.dispose();
+  }
+
+  /// 后台预热全部收藏单词 + 意群发音，进入页面即合成入缓存（列表点击/复习秒播）。
+  ///
+  /// 仅当发音文本集合变化时重启批次（签名去重，避免每次 rebuild 都重启）；用
+  /// postFrame 触发，避免在 build 期改 provider 态。空串由 [prewarmTexts] 内部跳过。
+  void _schedulePrewarm(List<SavedWord> words, List<SavedSenseGroup> phrases) {
+    // 仅词汇 tab 激活时预热：停在句子 tab 不为词汇起引擎合成（IndexedStack 仍会
+    // 构建本视图，故必须显式门控）。切到词汇 tab 时本视图重建、isActive=true 再触发。
+    if (!widget.isActive) return;
+    _ttsController = ref.read(ttsControllerProvider.notifier);
+    final speakTexts = <String>[
+      for (final w in words) w.word,
+      for (final p in phrases) p.displayText,
+    ];
+    final sig = speakTexts.join('');
+    if (sig == _prewarmSignature) return;
+    _prewarmSignature = sig;
+    final controller = _ttsController!;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      controller.prewarmTexts(speakTexts);
     });
   }
 
@@ -857,6 +914,9 @@ class _WordsViewState extends ConsumerState<_WordsView> {
 
     // 触发批量字典查询
     _loadDictEntries(words);
+
+    // 后台预热全部单词 + 意群发音（进入收藏词汇页即合成入缓存）。
+    _schedulePrewarm(words, phrases);
 
     // 合并并按 createdAt 倒序排列
     final items = <_VocabularyItem>[
@@ -1396,17 +1456,16 @@ class _SavedWordTileState extends ConsumerState<_SavedWordTile> {
                               ),
                             ),
                             // TTS 发音按钮
-                            GestureDetector(
-                              onTap: () => TtsService.instance.speak(word.word),
-                              child: Padding(
-                                padding: const EdgeInsets.only(
-                                  left: AppSpacing.xs,
-                                ),
-                                child: Icon(
-                                  Icons.volume_up,
-                                  size: 18,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                left: AppSpacing.xs,
+                              ),
+                              child: SpeakButton(
+                                text: word.word,
+                                size: 18,
+                                padding: EdgeInsets.zero,
+                                visualDensity: VisualDensity.compact,
+                                constraints: const BoxConstraints(),
                               ),
                             ),
                           ],

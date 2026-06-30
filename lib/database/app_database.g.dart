@@ -10971,6 +10971,886 @@ class DailyStageStudyRecordsCompanion
   }
 }
 
+class $TtsCacheTable extends TtsCache
+    with TableInfo<$TtsCacheTable, TtsCacheData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TtsCacheTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _cacheKeyMeta = const VerificationMeta(
+    'cacheKey',
+  );
+  @override
+  late final GeneratedColumn<String> cacheKey = GeneratedColumn<String>(
+    'cache_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _textHashMeta = const VerificationMeta(
+    'textHash',
+  );
+  @override
+  late final GeneratedColumn<String> textHash = GeneratedColumn<String>(
+    'text_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceTextMeta = const VerificationMeta(
+    'sourceText',
+  );
+  @override
+  late final GeneratedColumn<String> sourceText = GeneratedColumn<String>(
+    'source_text',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _engineMeta = const VerificationMeta('engine');
+  @override
+  late final GeneratedColumn<String> engine = GeneratedColumn<String>(
+    'engine',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _voiceMeta = const VerificationMeta('voice');
+  @override
+  late final GeneratedColumn<String> voice = GeneratedColumn<String>(
+    'voice',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _languageCodeMeta = const VerificationMeta(
+    'languageCode',
+  );
+  @override
+  late final GeneratedColumn<String> languageCode = GeneratedColumn<String>(
+    'language_code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _speedMeta = const VerificationMeta('speed');
+  @override
+  late final GeneratedColumn<double> speed = GeneratedColumn<double>(
+    'speed',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _formatMeta = const VerificationMeta('format');
+  @override
+  late final GeneratedColumn<String> format = GeneratedColumn<String>(
+    'format',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _filePathMeta = const VerificationMeta(
+    'filePath',
+  );
+  @override
+  late final GeneratedColumn<String> filePath = GeneratedColumn<String>(
+    'file_path',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fileSizeMeta = const VerificationMeta(
+    'fileSize',
+  );
+  @override
+  late final GeneratedColumn<int> fileSize = GeneratedColumn<int>(
+    'file_size',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastAccessedAtMeta = const VerificationMeta(
+    'lastAccessedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastAccessedAt =
+      GeneratedColumn<DateTime>(
+        'last_accessed_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _expiresAtMeta = const VerificationMeta(
+    'expiresAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> expiresAt = GeneratedColumn<DateTime>(
+    'expires_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isPinnedMeta = const VerificationMeta(
+    'isPinned',
+  );
+  @override
+  late final GeneratedColumn<bool> isPinned = GeneratedColumn<bool>(
+    'is_pinned',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_pinned" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    cacheKey,
+    textHash,
+    sourceText,
+    engine,
+    voice,
+    languageCode,
+    speed,
+    format,
+    filePath,
+    fileSize,
+    createdAt,
+    lastAccessedAt,
+    expiresAt,
+    isPinned,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'tts_cache';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TtsCacheData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('cache_key')) {
+      context.handle(
+        _cacheKeyMeta,
+        cacheKey.isAcceptableOrUnknown(data['cache_key']!, _cacheKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cacheKeyMeta);
+    }
+    if (data.containsKey('text_hash')) {
+      context.handle(
+        _textHashMeta,
+        textHash.isAcceptableOrUnknown(data['text_hash']!, _textHashMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_textHashMeta);
+    }
+    if (data.containsKey('source_text')) {
+      context.handle(
+        _sourceTextMeta,
+        sourceText.isAcceptableOrUnknown(data['source_text']!, _sourceTextMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceTextMeta);
+    }
+    if (data.containsKey('engine')) {
+      context.handle(
+        _engineMeta,
+        engine.isAcceptableOrUnknown(data['engine']!, _engineMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_engineMeta);
+    }
+    if (data.containsKey('voice')) {
+      context.handle(
+        _voiceMeta,
+        voice.isAcceptableOrUnknown(data['voice']!, _voiceMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_voiceMeta);
+    }
+    if (data.containsKey('language_code')) {
+      context.handle(
+        _languageCodeMeta,
+        languageCode.isAcceptableOrUnknown(
+          data['language_code']!,
+          _languageCodeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_languageCodeMeta);
+    }
+    if (data.containsKey('speed')) {
+      context.handle(
+        _speedMeta,
+        speed.isAcceptableOrUnknown(data['speed']!, _speedMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_speedMeta);
+    }
+    if (data.containsKey('format')) {
+      context.handle(
+        _formatMeta,
+        format.isAcceptableOrUnknown(data['format']!, _formatMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_formatMeta);
+    }
+    if (data.containsKey('file_path')) {
+      context.handle(
+        _filePathMeta,
+        filePath.isAcceptableOrUnknown(data['file_path']!, _filePathMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_filePathMeta);
+    }
+    if (data.containsKey('file_size')) {
+      context.handle(
+        _fileSizeMeta,
+        fileSize.isAcceptableOrUnknown(data['file_size']!, _fileSizeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fileSizeMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('last_accessed_at')) {
+      context.handle(
+        _lastAccessedAtMeta,
+        lastAccessedAt.isAcceptableOrUnknown(
+          data['last_accessed_at']!,
+          _lastAccessedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_lastAccessedAtMeta);
+    }
+    if (data.containsKey('expires_at')) {
+      context.handle(
+        _expiresAtMeta,
+        expiresAt.isAcceptableOrUnknown(data['expires_at']!, _expiresAtMeta),
+      );
+    }
+    if (data.containsKey('is_pinned')) {
+      context.handle(
+        _isPinnedMeta,
+        isPinned.isAcceptableOrUnknown(data['is_pinned']!, _isPinnedMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {cacheKey},
+  ];
+  @override
+  TtsCacheData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TtsCacheData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      cacheKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cache_key'],
+      )!,
+      textHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}text_hash'],
+      )!,
+      sourceText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_text'],
+      )!,
+      engine: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}engine'],
+      )!,
+      voice: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}voice'],
+      )!,
+      languageCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}language_code'],
+      )!,
+      speed: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}speed'],
+      )!,
+      format: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}format'],
+      )!,
+      filePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_path'],
+      )!,
+      fileSize: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}file_size'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      lastAccessedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_accessed_at'],
+      )!,
+      expiresAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}expires_at'],
+      ),
+      isPinned: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_pinned'],
+      )!,
+    );
+  }
+
+  @override
+  $TtsCacheTable createAlias(String alias) {
+    return $TtsCacheTable(attachedDatabase, alias);
+  }
+}
+
+class TtsCacheData extends DataClass implements Insertable<TtsCacheData> {
+  /// 自增主键。
+  final int id;
+
+  /// 缓存键（唯一），由 `sha256(textHash|engine|voice|speed|format)` 派生。
+  /// 同一文本在不同引擎/音色/语速/格式下生成不同条目，互不串音。
+  final String cacheKey;
+
+  /// 被合成文本的 SHA-256 哈希（归一化后），用于去重与统计。
+  final String textHash;
+
+  /// 被合成的原始文本（可读），用于调试时识别每条缓存对应的内容。
+  /// 缓存对象为单词/例句/示范句等短文本，存储成本可忽略。
+  final String sourceText;
+
+  /// 合成引擎标识（`platform` / 未来 `kokoro`）。
+  final String engine;
+
+  /// 音色/口音标识（如 `en-US` / `en-GB`，或未来具体 voice name）。
+  final String voice;
+
+  /// 语言标签（`en-US` / `en-GB`）。
+  final String languageCode;
+
+  /// 语速（归一化值）。
+  final double speed;
+
+  /// 音频格式（平台 TTS：Android `wav` / iOS·macOS `caf`）。
+  final String format;
+
+  /// 本地音频文件绝对路径。
+  final String filePath;
+
+  /// 文件字节数（用于容量统计与 LRU 淘汰）。
+  final int fileSize;
+
+  /// 创建时间。
+  final DateTime createdAt;
+
+  /// 最后访问时间（LRU 淘汰依据）。
+  final DateTime lastAccessedAt;
+
+  /// 过期时间（可空）。null 表示不按时间过期（永久缓存）。
+  final DateTime? expiresAt;
+
+  /// 是否永久保留（不自动清理）。本期恒 false，为未来长文音频预留。
+  final bool isPinned;
+  const TtsCacheData({
+    required this.id,
+    required this.cacheKey,
+    required this.textHash,
+    required this.sourceText,
+    required this.engine,
+    required this.voice,
+    required this.languageCode,
+    required this.speed,
+    required this.format,
+    required this.filePath,
+    required this.fileSize,
+    required this.createdAt,
+    required this.lastAccessedAt,
+    this.expiresAt,
+    required this.isPinned,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['cache_key'] = Variable<String>(cacheKey);
+    map['text_hash'] = Variable<String>(textHash);
+    map['source_text'] = Variable<String>(sourceText);
+    map['engine'] = Variable<String>(engine);
+    map['voice'] = Variable<String>(voice);
+    map['language_code'] = Variable<String>(languageCode);
+    map['speed'] = Variable<double>(speed);
+    map['format'] = Variable<String>(format);
+    map['file_path'] = Variable<String>(filePath);
+    map['file_size'] = Variable<int>(fileSize);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['last_accessed_at'] = Variable<DateTime>(lastAccessedAt);
+    if (!nullToAbsent || expiresAt != null) {
+      map['expires_at'] = Variable<DateTime>(expiresAt);
+    }
+    map['is_pinned'] = Variable<bool>(isPinned);
+    return map;
+  }
+
+  TtsCacheCompanion toCompanion(bool nullToAbsent) {
+    return TtsCacheCompanion(
+      id: Value(id),
+      cacheKey: Value(cacheKey),
+      textHash: Value(textHash),
+      sourceText: Value(sourceText),
+      engine: Value(engine),
+      voice: Value(voice),
+      languageCode: Value(languageCode),
+      speed: Value(speed),
+      format: Value(format),
+      filePath: Value(filePath),
+      fileSize: Value(fileSize),
+      createdAt: Value(createdAt),
+      lastAccessedAt: Value(lastAccessedAt),
+      expiresAt: expiresAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(expiresAt),
+      isPinned: Value(isPinned),
+    );
+  }
+
+  factory TtsCacheData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TtsCacheData(
+      id: serializer.fromJson<int>(json['id']),
+      cacheKey: serializer.fromJson<String>(json['cacheKey']),
+      textHash: serializer.fromJson<String>(json['textHash']),
+      sourceText: serializer.fromJson<String>(json['sourceText']),
+      engine: serializer.fromJson<String>(json['engine']),
+      voice: serializer.fromJson<String>(json['voice']),
+      languageCode: serializer.fromJson<String>(json['languageCode']),
+      speed: serializer.fromJson<double>(json['speed']),
+      format: serializer.fromJson<String>(json['format']),
+      filePath: serializer.fromJson<String>(json['filePath']),
+      fileSize: serializer.fromJson<int>(json['fileSize']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      lastAccessedAt: serializer.fromJson<DateTime>(json['lastAccessedAt']),
+      expiresAt: serializer.fromJson<DateTime?>(json['expiresAt']),
+      isPinned: serializer.fromJson<bool>(json['isPinned']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'cacheKey': serializer.toJson<String>(cacheKey),
+      'textHash': serializer.toJson<String>(textHash),
+      'sourceText': serializer.toJson<String>(sourceText),
+      'engine': serializer.toJson<String>(engine),
+      'voice': serializer.toJson<String>(voice),
+      'languageCode': serializer.toJson<String>(languageCode),
+      'speed': serializer.toJson<double>(speed),
+      'format': serializer.toJson<String>(format),
+      'filePath': serializer.toJson<String>(filePath),
+      'fileSize': serializer.toJson<int>(fileSize),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'lastAccessedAt': serializer.toJson<DateTime>(lastAccessedAt),
+      'expiresAt': serializer.toJson<DateTime?>(expiresAt),
+      'isPinned': serializer.toJson<bool>(isPinned),
+    };
+  }
+
+  TtsCacheData copyWith({
+    int? id,
+    String? cacheKey,
+    String? textHash,
+    String? sourceText,
+    String? engine,
+    String? voice,
+    String? languageCode,
+    double? speed,
+    String? format,
+    String? filePath,
+    int? fileSize,
+    DateTime? createdAt,
+    DateTime? lastAccessedAt,
+    Value<DateTime?> expiresAt = const Value.absent(),
+    bool? isPinned,
+  }) => TtsCacheData(
+    id: id ?? this.id,
+    cacheKey: cacheKey ?? this.cacheKey,
+    textHash: textHash ?? this.textHash,
+    sourceText: sourceText ?? this.sourceText,
+    engine: engine ?? this.engine,
+    voice: voice ?? this.voice,
+    languageCode: languageCode ?? this.languageCode,
+    speed: speed ?? this.speed,
+    format: format ?? this.format,
+    filePath: filePath ?? this.filePath,
+    fileSize: fileSize ?? this.fileSize,
+    createdAt: createdAt ?? this.createdAt,
+    lastAccessedAt: lastAccessedAt ?? this.lastAccessedAt,
+    expiresAt: expiresAt.present ? expiresAt.value : this.expiresAt,
+    isPinned: isPinned ?? this.isPinned,
+  );
+  TtsCacheData copyWithCompanion(TtsCacheCompanion data) {
+    return TtsCacheData(
+      id: data.id.present ? data.id.value : this.id,
+      cacheKey: data.cacheKey.present ? data.cacheKey.value : this.cacheKey,
+      textHash: data.textHash.present ? data.textHash.value : this.textHash,
+      sourceText: data.sourceText.present
+          ? data.sourceText.value
+          : this.sourceText,
+      engine: data.engine.present ? data.engine.value : this.engine,
+      voice: data.voice.present ? data.voice.value : this.voice,
+      languageCode: data.languageCode.present
+          ? data.languageCode.value
+          : this.languageCode,
+      speed: data.speed.present ? data.speed.value : this.speed,
+      format: data.format.present ? data.format.value : this.format,
+      filePath: data.filePath.present ? data.filePath.value : this.filePath,
+      fileSize: data.fileSize.present ? data.fileSize.value : this.fileSize,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      lastAccessedAt: data.lastAccessedAt.present
+          ? data.lastAccessedAt.value
+          : this.lastAccessedAt,
+      expiresAt: data.expiresAt.present ? data.expiresAt.value : this.expiresAt,
+      isPinned: data.isPinned.present ? data.isPinned.value : this.isPinned,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TtsCacheData(')
+          ..write('id: $id, ')
+          ..write('cacheKey: $cacheKey, ')
+          ..write('textHash: $textHash, ')
+          ..write('sourceText: $sourceText, ')
+          ..write('engine: $engine, ')
+          ..write('voice: $voice, ')
+          ..write('languageCode: $languageCode, ')
+          ..write('speed: $speed, ')
+          ..write('format: $format, ')
+          ..write('filePath: $filePath, ')
+          ..write('fileSize: $fileSize, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastAccessedAt: $lastAccessedAt, ')
+          ..write('expiresAt: $expiresAt, ')
+          ..write('isPinned: $isPinned')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    cacheKey,
+    textHash,
+    sourceText,
+    engine,
+    voice,
+    languageCode,
+    speed,
+    format,
+    filePath,
+    fileSize,
+    createdAt,
+    lastAccessedAt,
+    expiresAt,
+    isPinned,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TtsCacheData &&
+          other.id == this.id &&
+          other.cacheKey == this.cacheKey &&
+          other.textHash == this.textHash &&
+          other.sourceText == this.sourceText &&
+          other.engine == this.engine &&
+          other.voice == this.voice &&
+          other.languageCode == this.languageCode &&
+          other.speed == this.speed &&
+          other.format == this.format &&
+          other.filePath == this.filePath &&
+          other.fileSize == this.fileSize &&
+          other.createdAt == this.createdAt &&
+          other.lastAccessedAt == this.lastAccessedAt &&
+          other.expiresAt == this.expiresAt &&
+          other.isPinned == this.isPinned);
+}
+
+class TtsCacheCompanion extends UpdateCompanion<TtsCacheData> {
+  final Value<int> id;
+  final Value<String> cacheKey;
+  final Value<String> textHash;
+  final Value<String> sourceText;
+  final Value<String> engine;
+  final Value<String> voice;
+  final Value<String> languageCode;
+  final Value<double> speed;
+  final Value<String> format;
+  final Value<String> filePath;
+  final Value<int> fileSize;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> lastAccessedAt;
+  final Value<DateTime?> expiresAt;
+  final Value<bool> isPinned;
+  const TtsCacheCompanion({
+    this.id = const Value.absent(),
+    this.cacheKey = const Value.absent(),
+    this.textHash = const Value.absent(),
+    this.sourceText = const Value.absent(),
+    this.engine = const Value.absent(),
+    this.voice = const Value.absent(),
+    this.languageCode = const Value.absent(),
+    this.speed = const Value.absent(),
+    this.format = const Value.absent(),
+    this.filePath = const Value.absent(),
+    this.fileSize = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.lastAccessedAt = const Value.absent(),
+    this.expiresAt = const Value.absent(),
+    this.isPinned = const Value.absent(),
+  });
+  TtsCacheCompanion.insert({
+    this.id = const Value.absent(),
+    required String cacheKey,
+    required String textHash,
+    required String sourceText,
+    required String engine,
+    required String voice,
+    required String languageCode,
+    required double speed,
+    required String format,
+    required String filePath,
+    required int fileSize,
+    required DateTime createdAt,
+    required DateTime lastAccessedAt,
+    this.expiresAt = const Value.absent(),
+    this.isPinned = const Value.absent(),
+  }) : cacheKey = Value(cacheKey),
+       textHash = Value(textHash),
+       sourceText = Value(sourceText),
+       engine = Value(engine),
+       voice = Value(voice),
+       languageCode = Value(languageCode),
+       speed = Value(speed),
+       format = Value(format),
+       filePath = Value(filePath),
+       fileSize = Value(fileSize),
+       createdAt = Value(createdAt),
+       lastAccessedAt = Value(lastAccessedAt);
+  static Insertable<TtsCacheData> custom({
+    Expression<int>? id,
+    Expression<String>? cacheKey,
+    Expression<String>? textHash,
+    Expression<String>? sourceText,
+    Expression<String>? engine,
+    Expression<String>? voice,
+    Expression<String>? languageCode,
+    Expression<double>? speed,
+    Expression<String>? format,
+    Expression<String>? filePath,
+    Expression<int>? fileSize,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? lastAccessedAt,
+    Expression<DateTime>? expiresAt,
+    Expression<bool>? isPinned,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (cacheKey != null) 'cache_key': cacheKey,
+      if (textHash != null) 'text_hash': textHash,
+      if (sourceText != null) 'source_text': sourceText,
+      if (engine != null) 'engine': engine,
+      if (voice != null) 'voice': voice,
+      if (languageCode != null) 'language_code': languageCode,
+      if (speed != null) 'speed': speed,
+      if (format != null) 'format': format,
+      if (filePath != null) 'file_path': filePath,
+      if (fileSize != null) 'file_size': fileSize,
+      if (createdAt != null) 'created_at': createdAt,
+      if (lastAccessedAt != null) 'last_accessed_at': lastAccessedAt,
+      if (expiresAt != null) 'expires_at': expiresAt,
+      if (isPinned != null) 'is_pinned': isPinned,
+    });
+  }
+
+  TtsCacheCompanion copyWith({
+    Value<int>? id,
+    Value<String>? cacheKey,
+    Value<String>? textHash,
+    Value<String>? sourceText,
+    Value<String>? engine,
+    Value<String>? voice,
+    Value<String>? languageCode,
+    Value<double>? speed,
+    Value<String>? format,
+    Value<String>? filePath,
+    Value<int>? fileSize,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? lastAccessedAt,
+    Value<DateTime?>? expiresAt,
+    Value<bool>? isPinned,
+  }) {
+    return TtsCacheCompanion(
+      id: id ?? this.id,
+      cacheKey: cacheKey ?? this.cacheKey,
+      textHash: textHash ?? this.textHash,
+      sourceText: sourceText ?? this.sourceText,
+      engine: engine ?? this.engine,
+      voice: voice ?? this.voice,
+      languageCode: languageCode ?? this.languageCode,
+      speed: speed ?? this.speed,
+      format: format ?? this.format,
+      filePath: filePath ?? this.filePath,
+      fileSize: fileSize ?? this.fileSize,
+      createdAt: createdAt ?? this.createdAt,
+      lastAccessedAt: lastAccessedAt ?? this.lastAccessedAt,
+      expiresAt: expiresAt ?? this.expiresAt,
+      isPinned: isPinned ?? this.isPinned,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (cacheKey.present) {
+      map['cache_key'] = Variable<String>(cacheKey.value);
+    }
+    if (textHash.present) {
+      map['text_hash'] = Variable<String>(textHash.value);
+    }
+    if (sourceText.present) {
+      map['source_text'] = Variable<String>(sourceText.value);
+    }
+    if (engine.present) {
+      map['engine'] = Variable<String>(engine.value);
+    }
+    if (voice.present) {
+      map['voice'] = Variable<String>(voice.value);
+    }
+    if (languageCode.present) {
+      map['language_code'] = Variable<String>(languageCode.value);
+    }
+    if (speed.present) {
+      map['speed'] = Variable<double>(speed.value);
+    }
+    if (format.present) {
+      map['format'] = Variable<String>(format.value);
+    }
+    if (filePath.present) {
+      map['file_path'] = Variable<String>(filePath.value);
+    }
+    if (fileSize.present) {
+      map['file_size'] = Variable<int>(fileSize.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (lastAccessedAt.present) {
+      map['last_accessed_at'] = Variable<DateTime>(lastAccessedAt.value);
+    }
+    if (expiresAt.present) {
+      map['expires_at'] = Variable<DateTime>(expiresAt.value);
+    }
+    if (isPinned.present) {
+      map['is_pinned'] = Variable<bool>(isPinned.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TtsCacheCompanion(')
+          ..write('id: $id, ')
+          ..write('cacheKey: $cacheKey, ')
+          ..write('textHash: $textHash, ')
+          ..write('sourceText: $sourceText, ')
+          ..write('engine: $engine, ')
+          ..write('voice: $voice, ')
+          ..write('languageCode: $languageCode, ')
+          ..write('speed: $speed, ')
+          ..write('format: $format, ')
+          ..write('filePath: $filePath, ')
+          ..write('fileSize: $fileSize, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastAccessedAt: $lastAccessedAt, ')
+          ..write('expiresAt: $expiresAt, ')
+          ..write('isPinned: $isPinned')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -11001,6 +11881,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $DailyStudyRecordsTable(this);
   late final $DailyStageStudyRecordsTable dailyStageStudyRecords =
       $DailyStageStudyRecordsTable(this);
+  late final $TtsCacheTable ttsCache = $TtsCacheTable(this);
   late final AudioItemDao audioItemDao = AudioItemDao(this as AppDatabase);
   late final CollectionDao collectionDao = CollectionDao(this as AppDatabase);
   late final BookmarkDao bookmarkDao = BookmarkDao(this as AppDatabase);
@@ -11029,6 +11910,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final DailyStageStudyRecordDao dailyStageStudyRecordDao =
       DailyStageStudyRecordDao(this as AppDatabase);
+  late final TtsCacheDao ttsCacheDao = TtsCacheDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -11049,6 +11931,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     learnedWordForms,
     dailyStudyRecords,
     dailyStageStudyRecords,
+    ttsCache,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -18259,6 +19142,396 @@ typedef $$DailyStageStudyRecordsTableProcessedTableManager =
       DailyStageStudyRecord,
       PrefetchHooks Function()
     >;
+typedef $$TtsCacheTableCreateCompanionBuilder =
+    TtsCacheCompanion Function({
+      Value<int> id,
+      required String cacheKey,
+      required String textHash,
+      required String sourceText,
+      required String engine,
+      required String voice,
+      required String languageCode,
+      required double speed,
+      required String format,
+      required String filePath,
+      required int fileSize,
+      required DateTime createdAt,
+      required DateTime lastAccessedAt,
+      Value<DateTime?> expiresAt,
+      Value<bool> isPinned,
+    });
+typedef $$TtsCacheTableUpdateCompanionBuilder =
+    TtsCacheCompanion Function({
+      Value<int> id,
+      Value<String> cacheKey,
+      Value<String> textHash,
+      Value<String> sourceText,
+      Value<String> engine,
+      Value<String> voice,
+      Value<String> languageCode,
+      Value<double> speed,
+      Value<String> format,
+      Value<String> filePath,
+      Value<int> fileSize,
+      Value<DateTime> createdAt,
+      Value<DateTime> lastAccessedAt,
+      Value<DateTime?> expiresAt,
+      Value<bool> isPinned,
+    });
+
+class $$TtsCacheTableFilterComposer
+    extends Composer<_$AppDatabase, $TtsCacheTable> {
+  $$TtsCacheTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get cacheKey => $composableBuilder(
+    column: $table.cacheKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get textHash => $composableBuilder(
+    column: $table.textHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceText => $composableBuilder(
+    column: $table.sourceText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get engine => $composableBuilder(
+    column: $table.engine,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get voice => $composableBuilder(
+    column: $table.voice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get languageCode => $composableBuilder(
+    column: $table.languageCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get speed => $composableBuilder(
+    column: $table.speed,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get format => $composableBuilder(
+    column: $table.format,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get filePath => $composableBuilder(
+    column: $table.filePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get fileSize => $composableBuilder(
+    column: $table.fileSize,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastAccessedAt => $composableBuilder(
+    column: $table.lastAccessedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get expiresAt => $composableBuilder(
+    column: $table.expiresAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isPinned => $composableBuilder(
+    column: $table.isPinned,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TtsCacheTableOrderingComposer
+    extends Composer<_$AppDatabase, $TtsCacheTable> {
+  $$TtsCacheTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get cacheKey => $composableBuilder(
+    column: $table.cacheKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get textHash => $composableBuilder(
+    column: $table.textHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceText => $composableBuilder(
+    column: $table.sourceText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get engine => $composableBuilder(
+    column: $table.engine,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get voice => $composableBuilder(
+    column: $table.voice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get languageCode => $composableBuilder(
+    column: $table.languageCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get speed => $composableBuilder(
+    column: $table.speed,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get format => $composableBuilder(
+    column: $table.format,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get filePath => $composableBuilder(
+    column: $table.filePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get fileSize => $composableBuilder(
+    column: $table.fileSize,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastAccessedAt => $composableBuilder(
+    column: $table.lastAccessedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get expiresAt => $composableBuilder(
+    column: $table.expiresAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isPinned => $composableBuilder(
+    column: $table.isPinned,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TtsCacheTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TtsCacheTable> {
+  $$TtsCacheTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get cacheKey =>
+      $composableBuilder(column: $table.cacheKey, builder: (column) => column);
+
+  GeneratedColumn<String> get textHash =>
+      $composableBuilder(column: $table.textHash, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceText => $composableBuilder(
+    column: $table.sourceText,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get engine =>
+      $composableBuilder(column: $table.engine, builder: (column) => column);
+
+  GeneratedColumn<String> get voice =>
+      $composableBuilder(column: $table.voice, builder: (column) => column);
+
+  GeneratedColumn<String> get languageCode => $composableBuilder(
+    column: $table.languageCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get speed =>
+      $composableBuilder(column: $table.speed, builder: (column) => column);
+
+  GeneratedColumn<String> get format =>
+      $composableBuilder(column: $table.format, builder: (column) => column);
+
+  GeneratedColumn<String> get filePath =>
+      $composableBuilder(column: $table.filePath, builder: (column) => column);
+
+  GeneratedColumn<int> get fileSize =>
+      $composableBuilder(column: $table.fileSize, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastAccessedAt => $composableBuilder(
+    column: $table.lastAccessedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get expiresAt =>
+      $composableBuilder(column: $table.expiresAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get isPinned =>
+      $composableBuilder(column: $table.isPinned, builder: (column) => column);
+}
+
+class $$TtsCacheTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TtsCacheTable,
+          TtsCacheData,
+          $$TtsCacheTableFilterComposer,
+          $$TtsCacheTableOrderingComposer,
+          $$TtsCacheTableAnnotationComposer,
+          $$TtsCacheTableCreateCompanionBuilder,
+          $$TtsCacheTableUpdateCompanionBuilder,
+          (
+            TtsCacheData,
+            BaseReferences<_$AppDatabase, $TtsCacheTable, TtsCacheData>,
+          ),
+          TtsCacheData,
+          PrefetchHooks Function()
+        > {
+  $$TtsCacheTableTableManager(_$AppDatabase db, $TtsCacheTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TtsCacheTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TtsCacheTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TtsCacheTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> cacheKey = const Value.absent(),
+                Value<String> textHash = const Value.absent(),
+                Value<String> sourceText = const Value.absent(),
+                Value<String> engine = const Value.absent(),
+                Value<String> voice = const Value.absent(),
+                Value<String> languageCode = const Value.absent(),
+                Value<double> speed = const Value.absent(),
+                Value<String> format = const Value.absent(),
+                Value<String> filePath = const Value.absent(),
+                Value<int> fileSize = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> lastAccessedAt = const Value.absent(),
+                Value<DateTime?> expiresAt = const Value.absent(),
+                Value<bool> isPinned = const Value.absent(),
+              }) => TtsCacheCompanion(
+                id: id,
+                cacheKey: cacheKey,
+                textHash: textHash,
+                sourceText: sourceText,
+                engine: engine,
+                voice: voice,
+                languageCode: languageCode,
+                speed: speed,
+                format: format,
+                filePath: filePath,
+                fileSize: fileSize,
+                createdAt: createdAt,
+                lastAccessedAt: lastAccessedAt,
+                expiresAt: expiresAt,
+                isPinned: isPinned,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String cacheKey,
+                required String textHash,
+                required String sourceText,
+                required String engine,
+                required String voice,
+                required String languageCode,
+                required double speed,
+                required String format,
+                required String filePath,
+                required int fileSize,
+                required DateTime createdAt,
+                required DateTime lastAccessedAt,
+                Value<DateTime?> expiresAt = const Value.absent(),
+                Value<bool> isPinned = const Value.absent(),
+              }) => TtsCacheCompanion.insert(
+                id: id,
+                cacheKey: cacheKey,
+                textHash: textHash,
+                sourceText: sourceText,
+                engine: engine,
+                voice: voice,
+                languageCode: languageCode,
+                speed: speed,
+                format: format,
+                filePath: filePath,
+                fileSize: fileSize,
+                createdAt: createdAt,
+                lastAccessedAt: lastAccessedAt,
+                expiresAt: expiresAt,
+                isPinned: isPinned,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TtsCacheTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TtsCacheTable,
+      TtsCacheData,
+      $$TtsCacheTableFilterComposer,
+      $$TtsCacheTableOrderingComposer,
+      $$TtsCacheTableAnnotationComposer,
+      $$TtsCacheTableCreateCompanionBuilder,
+      $$TtsCacheTableUpdateCompanionBuilder,
+      (
+        TtsCacheData,
+        BaseReferences<_$AppDatabase, $TtsCacheTable, TtsCacheData>,
+      ),
+      TtsCacheData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -18295,4 +19568,6 @@ class $AppDatabaseManager {
         _db,
         _db.dailyStageStudyRecords,
       );
+  $$TtsCacheTableTableManager get ttsCache =>
+      $$TtsCacheTableTableManager(_db, _db.ttsCache);
 }

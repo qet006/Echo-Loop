@@ -2708,6 +2708,24 @@ abstract class AppLocalizations {
   /// **'Download failed. Tap to retry.'**
   String get speechModelDownloadFailed;
 
+  /// No description provided for @downloadErrorStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough storage. Free up space and retry.'**
+  String get downloadErrorStorage;
+
+  /// No description provided for @downloadErrorNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Network error. Check your connection and retry.'**
+  String get downloadErrorNetwork;
+
+  /// No description provided for @downloadErrorCorrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded file failed verification. Please retry.'**
+  String get downloadErrorCorrupted;
+
   /// No description provided for @deleteModel.
   ///
   /// In en, this message translates to:
@@ -3803,7 +3821,7 @@ abstract class AppLocalizations {
   /// No description provided for @clearCacheConfirm.
   ///
   /// In en, this message translates to:
-  /// **'This will clear all cached data such as AI translations and analyses. They will be re-fetched when needed. Continue?'**
+  /// **'This clears temporary cache to free up space. Your learning records and favorites are not affected, and data is regenerated when needed. Continue?'**
   String get clearCacheConfirm;
 
   /// No description provided for @clearCacheSuccess.
@@ -6787,6 +6805,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Audio URL'**
   String get podcastEnclosureUrl;
+
+  /// No description provided for @ttsSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Text-to-Speech'**
+  String get ttsSettings;
+
+  /// No description provided for @ttsSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the speech engine and accent used when reading words and example sentences aloud.'**
+  String get ttsSettingsDescription;
+
+  /// No description provided for @ttsEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech Engine'**
+  String get ttsEngine;
+
+  /// No description provided for @ttsEnginePlatform.
+  ///
+  /// In en, this message translates to:
+  /// **'System Speech'**
+  String get ttsEnginePlatform;
+
+  /// No description provided for @ttsEnginePlatformApple.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple Speech'**
+  String get ttsEnginePlatformApple;
+
+  /// No description provided for @ttsEnginePlatformDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Built into your device. Fast, no download, but average quality.'**
+  String get ttsEnginePlatformDescription;
+
+  /// No description provided for @ttsEngineEchoLoop.
+  ///
+  /// In en, this message translates to:
+  /// **'Echo Loop Speech (Advanced)'**
+  String get ttsEngineEchoLoop;
+
+  /// No description provided for @ttsEngineComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming soon'**
+  String get ttsEngineComingSoon;
+
+  /// No description provided for @ttsEngineEchoLoopDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Best sound quality. Needs a model download; recommended for high-performance devices.'**
+  String get ttsEngineEchoLoopDescription;
+
+  /// No description provided for @ttsEnginePiper.
+  ///
+  /// In en, this message translates to:
+  /// **'Echo Loop Speech (Balanced)'**
+  String get ttsEnginePiper;
+
+  /// No description provided for @ttsEnginePiperDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Natural, smooth sound. Needs a model download; recommended for mid-range devices.'**
+  String get ttsEnginePiperDescription;
+
+  /// No description provided for @ttsModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get ttsModel;
+
+  /// No description provided for @ttsModelHighQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'High quality'**
+  String get ttsModelHighQuality;
+
+  /// No description provided for @ttsModelHighQualityDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Best sound at acceptable speed. About 300 MB.'**
+  String get ttsModelHighQualityDescription;
+
+  /// No description provided for @ttsModelLite.
+  ///
+  /// In en, this message translates to:
+  /// **'Lightweight'**
+  String get ttsModelLite;
+
+  /// No description provided for @ttsModelLiteDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Small and memory-friendly for low-end devices, but slower. About 100 MB.'**
+  String get ttsModelLiteDescription;
+
+  /// No description provided for @ttsModelRecommended.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended'**
+  String get ttsModelRecommended;
+
+  /// No description provided for @ttsModelNotDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Not downloaded'**
+  String get ttsModelNotDownloaded;
+
+  /// No description provided for @ttsAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Accent'**
+  String get ttsAccent;
+
+  /// No description provided for @ttsAccentUs.
+  ///
+  /// In en, this message translates to:
+  /// **'American'**
+  String get ttsAccentUs;
+
+  /// No description provided for @ttsAccentUk.
+  ///
+  /// In en, this message translates to:
+  /// **'British'**
+  String get ttsAccentUk;
+
+  /// No description provided for @ttsAccentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'(Some devices don\'t distinguish American from British)'**
+  String get ttsAccentHint;
+
+  /// No description provided for @ttsVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice'**
+  String get ttsVoice;
+
+  /// No description provided for @ttsVoiceFemale.
+  ///
+  /// In en, this message translates to:
+  /// **'Female'**
+  String get ttsVoiceFemale;
+
+  /// No description provided for @ttsVoiceMale.
+  ///
+  /// In en, this message translates to:
+  /// **'Male'**
+  String get ttsVoiceMale;
+
+  /// No description provided for @ttsDeleteModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete model'**
+  String get ttsDeleteModel;
+
+  /// No description provided for @ttsDeleteModelConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the Echo Loop voice model? You can re-download it anytime.'**
+  String get ttsDeleteModelConfirm;
+
+  /// No description provided for @ttsCancelDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get ttsCancelDownload;
+
+  /// No description provided for @ttsDownloadedModelsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded Echo Loop models'**
+  String get ttsDownloadedModelsTitle;
+
+  /// No description provided for @ttsDownloadedModelsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Not in use · {size}'**
+  String ttsDownloadedModelsDesc(String size);
 
   /// No description provided for @dictionarySettings.
   ///

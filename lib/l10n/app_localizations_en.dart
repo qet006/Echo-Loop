@@ -1511,6 +1511,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get speechModelDownloadFailed => 'Download failed. Tap to retry.';
 
   @override
+  String get downloadErrorStorage =>
+      'Not enough storage. Free up space and retry.';
+
+  @override
+  String get downloadErrorNetwork =>
+      'Network error. Check your connection and retry.';
+
+  @override
+  String get downloadErrorCorrupted =>
+      'Downloaded file failed verification. Please retry.';
+
+  @override
   String deleteModel(String size) {
     return 'Delete Model ($size)';
   }
@@ -2139,7 +2151,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get clearCacheConfirm =>
-      'This will clear all cached data such as AI translations and analyses. They will be re-fetched when needed. Continue?';
+      'This clears temporary cache to free up space. Your learning records and favorites are not affected, and data is regenerated when needed. Continue?';
 
   @override
   String get clearCacheSuccess => 'Cache cleared';
@@ -3815,6 +3827,106 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get podcastEnclosureUrl => 'Audio URL';
+
+  @override
+  String get ttsSettings => 'Text-to-Speech';
+
+  @override
+  String get ttsSettingsDescription =>
+      'Choose the speech engine and accent used when reading words and example sentences aloud.';
+
+  @override
+  String get ttsEngine => 'Speech Engine';
+
+  @override
+  String get ttsEnginePlatform => 'System Speech';
+
+  @override
+  String get ttsEnginePlatformApple => 'Apple Speech';
+
+  @override
+  String get ttsEnginePlatformDescription =>
+      'Built into your device. Fast, no download, but average quality.';
+
+  @override
+  String get ttsEngineEchoLoop => 'Echo Loop Speech (Advanced)';
+
+  @override
+  String get ttsEngineComingSoon => 'Coming soon';
+
+  @override
+  String get ttsEngineEchoLoopDescription =>
+      'Best sound quality. Needs a model download; recommended for high-performance devices.';
+
+  @override
+  String get ttsEnginePiper => 'Echo Loop Speech (Balanced)';
+
+  @override
+  String get ttsEnginePiperDescription =>
+      'Natural, smooth sound. Needs a model download; recommended for mid-range devices.';
+
+  @override
+  String get ttsModel => 'Model';
+
+  @override
+  String get ttsModelHighQuality => 'High quality';
+
+  @override
+  String get ttsModelHighQualityDescription =>
+      'Best sound at acceptable speed. About 300 MB.';
+
+  @override
+  String get ttsModelLite => 'Lightweight';
+
+  @override
+  String get ttsModelLiteDescription =>
+      'Small and memory-friendly for low-end devices, but slower. About 100 MB.';
+
+  @override
+  String get ttsModelRecommended => 'Recommended';
+
+  @override
+  String get ttsModelNotDownloaded => 'Not downloaded';
+
+  @override
+  String get ttsAccent => 'Accent';
+
+  @override
+  String get ttsAccentUs => 'American';
+
+  @override
+  String get ttsAccentUk => 'British';
+
+  @override
+  String get ttsAccentHint =>
+      '(Some devices don\'t distinguish American from British)';
+
+  @override
+  String get ttsVoice => 'Voice';
+
+  @override
+  String get ttsVoiceFemale => 'Female';
+
+  @override
+  String get ttsVoiceMale => 'Male';
+
+  @override
+  String get ttsDeleteModel => 'Delete model';
+
+  @override
+  String get ttsDeleteModelConfirm =>
+      'Delete the Echo Loop voice model? You can re-download it anytime.';
+
+  @override
+  String get ttsCancelDownload => 'Cancel';
+
+  @override
+  String get ttsDownloadedModelsTitle => 'Downloaded Echo Loop models';
+
+  @override
+  String ttsDownloadedModelsDesc(String size) {
+    return 'Not in use · $size';
+  }
 
   @override
   String get dictionarySettings => 'Dictionary Settings';

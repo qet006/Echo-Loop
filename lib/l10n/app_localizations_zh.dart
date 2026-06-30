@@ -1460,6 +1460,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get speechModelDownloadFailed => '下载失败，点击重试。';
 
   @override
+  String get downloadErrorStorage => '存储空间不足，请清理后重试。';
+
+  @override
+  String get downloadErrorNetwork => '网络异常，请检查网络后重试。';
+
+  @override
+  String get downloadErrorCorrupted => '下载文件校验失败，请重试。';
+
+  @override
   String deleteModel(String size) {
     return '删除模型（$size）';
   }
@@ -2067,7 +2076,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get clearCache => '清除缓存';
 
   @override
-  String get clearCacheConfirm => '将清除所有缓存数据（如 AI 翻译和解析结果），需要时会重新获取。是否继续？';
+  String get clearCacheConfirm => '将清理临时缓存以释放空间，不影响学习记录和收藏，需要时自动重新生成。是否继续？';
 
   @override
   String get clearCacheSuccess => '缓存已清除';
@@ -3656,6 +3665,98 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get podcastEnclosureUrl => '音频链接';
+
+  @override
+  String get ttsSettings => '语音合成';
+
+  @override
+  String get ttsSettingsDescription => '选择朗读单词和例句时使用的语音引擎与口音。';
+
+  @override
+  String get ttsEngine => '语音引擎';
+
+  @override
+  String get ttsEnginePlatform => '系统语音';
+
+  @override
+  String get ttsEnginePlatformApple => 'Apple 语音';
+
+  @override
+  String get ttsEnginePlatformDescription => '设备自带，速度快、无需下载，但音质一般。';
+
+  @override
+  String get ttsEngineEchoLoop => 'Echo Loop 语音 (Advanced)';
+
+  @override
+  String get ttsEngineComingSoon => '即将推出';
+
+  @override
+  String get ttsEngineEchoLoopDescription => '音质最好，需下载模型，推荐高性能设备使用。';
+
+  @override
+  String get ttsEnginePiper => 'Echo Loop 语音 (Balanced)';
+
+  @override
+  String get ttsEnginePiperDescription => '音质自然流畅，需下载模型，推荐中等配置设备使用。';
+
+  @override
+  String get ttsModel => '模型';
+
+  @override
+  String get ttsModelHighQuality => '高质量';
+
+  @override
+  String get ttsModelHighQualityDescription => '音质最佳，速度可接受。约 300 MB。';
+
+  @override
+  String get ttsModelLite => '轻量';
+
+  @override
+  String get ttsModelLiteDescription => '体积小、速度慢，适合低端设备。约 100 MB。';
+
+  @override
+  String get ttsModelRecommended => '推荐';
+
+  @override
+  String get ttsModelNotDownloaded => '未下载';
+
+  @override
+  String get ttsAccent => '口音';
+
+  @override
+  String get ttsAccentUs => '美音';
+
+  @override
+  String get ttsAccentUk => '英音';
+
+  @override
+  String get ttsAccentHint => '（部分机型不区分美音和英音）';
+
+  @override
+  String get ttsVoice => '音色';
+
+  @override
+  String get ttsVoiceFemale => '女声';
+
+  @override
+  String get ttsVoiceMale => '男声';
+
+  @override
+  String get ttsDeleteModel => '删除模型';
+
+  @override
+  String get ttsDeleteModelConfirm => '删除 Echo Loop 语音模型？可随时重新下载。';
+
+  @override
+  String get ttsCancelDownload => '取消';
+
+  @override
+  String get ttsDownloadedModelsTitle => '已下载的 Echo Loop 模型';
+
+  @override
+  String ttsDownloadedModelsDesc(String size) {
+    return '未在使用 · 占用 $size';
+  }
 
   @override
   String get dictionarySettings => '词典设置';

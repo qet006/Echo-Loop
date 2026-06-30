@@ -1,0 +1,310 @@
+import 'dart:io' show FileSystemException, OSError;
+
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:echo_loop/providers/tts/kokoro_model_provider.dart';
+import 'package:echo_loop/services/download/download_failure.dart';
+import 'package:echo_loop/services/tts/kokoro_model_manager.dart';
+
+const _fp32 = KokoroModelVariant.fp32;
+
+/// 可编排行为的假管理器（不区分变体，按需被 family override 复用）。
+class _FakeManager extends KokoroModelManager {
+  _FakeManager({
+    this.shouldFail = false,
+    this.shouldCancel = false,
+    this.sizeAfterDownload = 1024,
+    this.failError,
+    bool downloaded = false,
+  }) : _downloaded = downloaded,
+       super(modelsRootResolver: () async => '/tmp/none');
+
+  bool shouldFail;
+  bool shouldCancel;
+  int sizeAfterDownload;
+
+  /// shouldFail 时抛出的异常（默认 StateError('boom')，供归类测试自定义）。
+  Object? failError;
+  bool _downloaded;
+  int downloadCount = 0;
+
+  @override
+  Future<String> downloadModel({
+    void Function(AsrModelDownloadProgress)? onProgress,
+    CancelToken? cancelToken,
+  }) async {
+    downloadCount++;
+    onProgress?.call(
+      const AsrModelDownloadProgress(
+        status: AsrModelDownloadStatus.downloading,
+        progress: 0.5,
+      ),
+    );
+    if (shouldCancel) {
+      throw DioException(
+        requestOptions: RequestOptions(path: '/'),
+        type: DioExceptionType.cancel,
+      );
+    }
+    if (shouldFail) {
+      throw failError ?? StateError('boom');
+    }
+    _downloaded = true;
+    return '/tmp/none/model';
+  }
+
+  @override
+  Future<int> modelLocalSize() async =>
+      _downloaded ? sizeAfterDownload : (shouldFail ? 10 : 0);
+
+  @override
+  Future<bool> isModelDownloaded() async => _downloaded;
+
+  @override
+  Future<void> deleteModel() async {
+    _downloaded = false;
+  }
+}
+
+ProviderContainer _container(
+  _FakeManager manager, {
+  KokoroModelsState? initial,
+}) {
+  return ProviderContainer(
+    overrides: [
+      kokoroModelManagerProvider.overrideWith((ref, variant) => manager),
+      if (initial != null)
+        initialKokoroModelStateProvider.overrideWithValue(initial),
+    ],
+  );
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  test('ensureDownloaded 成功 → ready + 进度 1.0 + 体积 + SP 标记', () async {
+    final c = _container(_FakeManager());
+    addTearDown(c.dispose);
+
+    await c.read(kokoroModelProvider.notifier).ensureDownloaded(_fp32);
+
+    final s = c.read(kokoroModelProvider).of(_fp32);
+    expect(s.isReady, isTrue);
+    expect(s.downloadProgress, 1.0);
+    expect(s.localSizeBytes, 1024);
+    expect(c.read(kokoroReadyProvider), isTrue);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('kokoro_model_downloaded_fp32'), isTrue);
+  });
+
+  test('ensureDownloaded 已就绪 → 不重复下载', () async {
+    final manager = _FakeManager();
+    final c = _container(
+      manager,
+      initial: const KokoroModelsState({
+        _fp32: KokoroModelState(
+          downloadStatus: AsrModelDownloadStatus.downloaded,
+          localSizeBytes: 1024,
+        ),
+      }),
+    );
+    addTearDown(c.dispose);
+
+    await c.read(kokoroModelProvider.notifier).ensureDownloaded(_fp32);
+    expect(manager.downloadCount, 0);
+  });
+
+  test('并发 ensureDownloaded（同帧重复触发）只下载一次', () async {
+    // 复现「进度条来回跳」：状态翻转为下载中须同步先于任何 await，否则两个并发
+    // 调用都漏过「未在下载」判定、各起一路下载、回调交错。
+    final manager = _FakeManager();
+    final c = _container(manager);
+    addTearDown(c.dispose);
+
+    final n = c.read(kokoroModelProvider.notifier);
+    final f1 = n.ensureDownloaded(_fp32);
+    final f2 = n.ensureDownloaded(_fp32);
+    await Future.wait([f1, f2]);
+
+    expect(manager.downloadCount, 1);
+    expect(c.read(kokoroModelProvider).of(_fp32).isReady, isTrue);
+  });
+
+  test('下载失败（未知原因）→ failed + downloadError=unknown', () async {
+    final c = _container(_FakeManager(shouldFail: true));
+    addTearDown(c.dispose);
+
+    await c.read(kokoroModelProvider.notifier).ensureDownloaded(_fp32);
+
+    final s = c.read(kokoroModelProvider).of(_fp32);
+    expect(s.downloadStatus, AsrModelDownloadStatus.failed);
+    expect(s.downloadError, DownloadFailureKind.unknown);
+    expect(s.isReady, isFalse);
+  });
+
+  test('存储空间不足（errno 28）→ downloadError=insufficientStorage', () async {
+    final c = _container(
+      _FakeManager(
+        shouldFail: true,
+        failError: const FileSystemException(
+          'writeFrom failed',
+          '/tmp/temp.tar',
+          OSError('No space left on device', 28),
+        ),
+      ),
+    );
+    addTearDown(c.dispose);
+
+    await c.read(kokoroModelProvider.notifier).ensureDownloaded(_fp32);
+
+    expect(
+      c.read(kokoroModelProvider).of(_fp32).downloadError,
+      DownloadFailureKind.insufficientStorage,
+    );
+  });
+
+  test('整包 SHA 不匹配 → downloadError=verification', () async {
+    final c = _container(
+      _FakeManager(
+        shouldFail: true,
+        failError: StateError('Kokoro archive SHA-256 mismatch: ...'),
+      ),
+    );
+    addTearDown(c.dispose);
+
+    await c.read(kokoroModelProvider.notifier).ensureDownloaded(_fp32);
+
+    expect(
+      c.read(kokoroModelProvider).of(_fp32).downloadError,
+      DownloadFailureKind.verification,
+    );
+  });
+
+  test('网络错误（非取消 DioException）→ downloadError=network', () async {
+    final c = _container(
+      _FakeManager(
+        shouldFail: true,
+        failError: DioException(
+          requestOptions: RequestOptions(path: '/'),
+          type: DioExceptionType.connectionTimeout,
+        ),
+      ),
+    );
+    addTearDown(c.dispose);
+
+    await c.read(kokoroModelProvider.notifier).ensureDownloaded(_fp32);
+
+    expect(
+      c.read(kokoroModelProvider).of(_fp32).downloadError,
+      DownloadFailureKind.network,
+    );
+  });
+
+  test('取消 → notDownloaded + 无错误', () async {
+    final c = _container(_FakeManager(shouldCancel: true));
+    addTearDown(c.dispose);
+
+    await c.read(kokoroModelProvider.notifier).ensureDownloaded(_fp32);
+
+    final s = c.read(kokoroModelProvider).of(_fp32);
+    expect(s.downloadStatus, AsrModelDownloadStatus.notDownloaded);
+    expect(s.downloadError, isNull);
+  });
+
+  test('retryDownload 清错误后成功', () async {
+    final manager = _FakeManager(shouldFail: true);
+    final c = _container(manager);
+    addTearDown(c.dispose);
+
+    await c.read(kokoroModelProvider.notifier).ensureDownloaded(_fp32);
+    expect(
+      c.read(kokoroModelProvider).of(_fp32).downloadStatus,
+      AsrModelDownloadStatus.failed,
+    );
+
+    manager.shouldFail = false;
+    await c.read(kokoroModelProvider.notifier).retryDownload(_fp32);
+    expect(c.read(kokoroModelProvider).of(_fp32).isReady, isTrue);
+    expect(c.read(kokoroModelProvider).of(_fp32).downloadError, isNull);
+  });
+
+  test('deleteModel → notDownloaded + 体积 0', () async {
+    final c = _container(_FakeManager());
+    addTearDown(c.dispose);
+
+    await c.read(kokoroModelProvider.notifier).ensureDownloaded(_fp32);
+    expect(c.read(kokoroModelProvider).of(_fp32).isReady, isTrue);
+
+    await c.read(kokoroModelProvider.notifier).deleteModel(_fp32);
+    final s = c.read(kokoroModelProvider).of(_fp32);
+    expect(s.downloadStatus, AsrModelDownloadStatus.notDownloaded);
+    expect(s.localSizeBytes, 0);
+  });
+
+  test('两个变体独立：删 int8 不影响 fp32', () async {
+    final c = _container(_FakeManager());
+    addTearDown(c.dispose);
+
+    final n = c.read(kokoroModelProvider.notifier);
+    await n.ensureDownloaded(_fp32);
+    await n.ensureDownloaded(KokoroModelVariant.int8);
+    expect(c.read(kokoroModelProvider).of(_fp32).isReady, isTrue);
+    expect(
+      c.read(kokoroModelProvider).of(KokoroModelVariant.int8).isReady,
+      isTrue,
+    );
+
+    await n.deleteModel(KokoroModelVariant.int8);
+    expect(c.read(kokoroModelProvider).of(_fp32).isReady, isTrue);
+    expect(
+      c.read(kokoroModelProvider).of(KokoroModelVariant.int8).isReady,
+      isFalse,
+    );
+  });
+
+  group('loadInitialKokoroModelState', () {
+    test('标记真 + 文件齐全 → downloaded', () async {
+      SharedPreferences.setMockInitialValues({
+        'kokoro_model_downloaded_fp32': true,
+      });
+      final prefs = await SharedPreferences.getInstance();
+      final manager = _FakeManager(downloaded: true, sizeAfterDownload: 5000);
+      final s = await loadInitialKokoroModelState(
+        prefs: prefs,
+        managerOf: (_) => manager,
+      );
+      expect(s.of(_fp32).downloadStatus, AsrModelDownloadStatus.downloaded);
+      expect(s.of(_fp32).localSizeBytes, 5000);
+    });
+
+    test('标记真但文件缺失（有残留）→ failed', () async {
+      SharedPreferences.setMockInitialValues({
+        'kokoro_model_downloaded_fp32': true,
+      });
+      final prefs = await SharedPreferences.getInstance();
+      // downloaded=false 但 shouldFail 让 modelLocalSize 返回 10（残留）。
+      final manager = _FakeManager(shouldFail: true);
+      final s = await loadInitialKokoroModelState(
+        prefs: prefs,
+        managerOf: (_) => manager,
+      );
+      expect(s.of(_fp32).downloadStatus, AsrModelDownloadStatus.failed);
+    });
+
+    test('无标记无文件 → notDownloaded', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final manager = _FakeManager();
+      final s = await loadInitialKokoroModelState(
+        prefs: prefs,
+        managerOf: (_) => manager,
+      );
+      expect(s.of(_fp32).downloadStatus, AsrModelDownloadStatus.notDownloaded);
+    });
+  });
+}

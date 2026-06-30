@@ -38,6 +38,12 @@ class AppTheme {
   /// 语义色：成功/完成（用于完成对话框的勾选徽章，清新绿）
   static const Color successColor = Color(0xFF2E9E5B);
 
+  /// 语义色：女声标签（国际通用粉/玫瑰，浅深色均可读）
+  static const Color femaleVoiceColor = Color(0xFFE0709F);
+
+  /// 语义色：男声标签（国际通用蓝，区别于品牌选中蓝，浅深色均可读）
+  static const Color maleVoiceColor = Color(0xFF4F8FE0);
+
   /// 语义色：成功/完成的浅色容器底（完成对话框英雄区色带，浅绿）
   static const Color successContainer = Color(0xFFE3F4E9);
 

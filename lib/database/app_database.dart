@@ -25,6 +25,7 @@ import 'tables/saved_sense_groups.dart';
 import 'tables/learned_word_forms.dart';
 import 'tables/daily_study_records.dart';
 import 'tables/daily_stage_study_records.dart';
+import 'tables/tts_cache.dart';
 import '../models/study_stage.dart';
 import 'daos/audio_item_dao.dart';
 import 'daos/collection_dao.dart';
@@ -39,6 +40,7 @@ import 'daos/saved_sense_group_dao.dart';
 import 'daos/learned_word_form_dao.dart';
 import 'daos/daily_study_record_dao.dart';
 import 'daos/daily_stage_study_record_dao.dart';
+import 'daos/tts_cache_dao.dart';
 
 part 'app_database.g.dart';
 
@@ -64,6 +66,7 @@ part 'app_database.g.dart';
     LearnedWordForms,
     DailyStudyRecords,
     DailyStageStudyRecords,
+    TtsCache,
   ],
   daos: [
     AudioItemDao,
@@ -79,13 +82,14 @@ part 'app_database.g.dart';
     LearnedWordFormDao,
     DailyStudyRecordDao,
     DailyStageStudyRecordDao,
+    TtsCacheDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   /// 当前 schema 版本（静态访问，用于导入前版本检查）
-  static const currentSchemaVersion = 42;
+  static const currentSchemaVersion = 44;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -104,6 +108,34 @@ class AppDatabase extends _$AppDatabase {
         await _ensurePodcastColumns();
       },
       onUpgrade: (Migrator m, int from, int to) async {
+        // v43→v44：tts_cache 新增 text 列（原始文本，便于调试）。
+        // TTS 仍在开发阶段、缓存可丢弃，直接重建表即可（无需保留旧数据）。
+        if (from >= 43 && from < 44) {
+          await m.deleteTable('tts_cache');
+          await m.createTable(ttsCache);
+          await customStatement('''
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_tts_cache_key
+            ON tts_cache(cache_key)
+          ''');
+          await customStatement('''
+            CREATE INDEX IF NOT EXISTS idx_tts_cache_lru
+            ON tts_cache(last_accessed_at)
+            WHERE is_pinned = 0
+          ''');
+        }
+        // v42→v43：新增 tts_cache 表（TTS 合成结果缓存索引）。
+        if (from < 43) {
+          await m.createTable(ttsCache);
+          await customStatement('''
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_tts_cache_key
+            ON tts_cache(cache_key)
+          ''');
+          await customStatement('''
+            CREATE INDEX IF NOT EXISTS idx_tts_cache_lru
+            ON tts_cache(last_accessed_at)
+            WHERE is_pinned = 0
+          ''');
+        }
         // v40→v41：audio_items 新增转码前原始音频 SHA，用作 AI 转录缓存 key。
         if (from < 41) {
           await _addColumnIfNotExists(
@@ -955,6 +987,17 @@ class AppDatabase extends _$AppDatabase {
     await customStatement('''
       CREATE INDEX IF NOT EXISTS idx_learned_word_forms_first_learned_at
       ON learned_word_forms(first_learned_at DESC)
+    ''');
+
+    // TTS 缓存按 key 唯一查找 + 按 LRU 淘汰
+    await customStatement('''
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_tts_cache_key
+      ON tts_cache(cache_key)
+    ''');
+    await customStatement('''
+      CREATE INDEX IF NOT EXISTS idx_tts_cache_lru
+      ON tts_cache(last_accessed_at)
+      WHERE is_pinned = 0
     ''');
 
     // 官方合集 remoteId 唯一（防并发 enroll 重复）

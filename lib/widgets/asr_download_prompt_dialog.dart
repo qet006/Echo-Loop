@@ -13,6 +13,8 @@ import '../database/enums.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/offline_asr_settings_provider.dart';
 import '../services/asr/asr_model_manager.dart';
+import '../services/download/download_failure.dart';
+import '../utils/download_failure_message.dart';
 
 /// 判断某个学习子阶段是否会进入依赖本地 ASR 的录音流程。
 bool requiresAsrBeforeEnteringSubStage(SubStageType subStage) {
@@ -236,10 +238,13 @@ class _DownloadProgressDialog extends ConsumerWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
-          if (isFailed && state.errorMessage != null) ...[
+          // 标题已是通用「下载失败」，仅当原因确定时再补一行具体指引（unknown 不重复）。
+          if (isFailed &&
+              state.downloadError != null &&
+              state.downloadError != DownloadFailureKind.unknown) ...[
             const SizedBox(height: 8),
             Text(
-              state.errorMessage!,
+              downloadFailureMessage(l10n, state.downloadError),
               style: const TextStyle(color: Colors.red),
             ),
           ],

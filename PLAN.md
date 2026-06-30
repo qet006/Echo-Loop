@@ -544,6 +544,43 @@ EchoLoopApp (main.dart)
 
 **影响**：删 `AudioEngine.setMediaSessionSuppressed` 及 handler 中 `_mediaSessionSuppressed` 相关分支；5 个前台任务改注入前台引擎、删 suppress/bind/保活/mixin、进任务改 stop 媒体引擎。
 
+### ADR-8: 统一 TTS 架构（可插拔引擎 + 合成→文件→缓存→播放管线）
+
+**决策**：把硬编码单例 `TtsService`（flutter_tts，固定 en-US/语速 0.45）重构为分层、可插拔的统一 TTS 架构。所有发音走同一条管线：`文本+参数 → cacheKey → 查缓存 → 命中直接播 / 未命中合成产文件并入库 → 播放文件`。
+
+**分层**：
+- **引擎抽象** `TtsEngine`（`lib/services/tts/tts_engine.dart`）：`initialize`/`applyConfig`/`synthesize`(产文件)/`speakLive`(实时兜底)/`stop`/`dispose`。本期实现 `PlatformTtsEngine`（flutter_tts，`synthesizeToFile` 产 wav/caf + §7.2 防竞态的 speakLive 兜底）；`KokoroTtsEngine` 占位（未来本地 82M 模型，接入只加一个实现 + 工厂分支，上层零改动）。
+- **缓存层** `TtsCacheStore` + Drift `tts_cache` 表（v43）：cacheKey=`sha256(textHash|engine|voice|speed|format)`，文件落 `getApplicationCacheDirectory()/tts_cache/`，过期/容量由 DB `expiresAt`/`lastAccessedAt`(LRU) 驱动（默认 10 天 / ~200MB），不靠目录或文件名。`isPinned` 列为未来长文永久缓存预留。
+- **播放层** `TtsPlayer`：独立裸 `just_audio` player，**不接 `audio_service`**（一次性短发音不上锁屏，规避 §7.7–7.13 锁屏竞态），session 守卫 + 确定性 await 完成（§7.6）。
+- **协调层** `TtsCoordinator`（纯 Dart 可测）：串管线 + generation 防竞态 + 引擎**惰性**创建（仅渲染发音按钮不触碰平台 TTS/数据库，首次 speak 才建引擎、连库）。
+- **门面** `ttsControllerProvider`：全应用唯一发音入口，监听 `ttsSettingsProvider`（引擎/口音，SharedPreferences）热重配；`speakingKey` 驱动发音按钮激活态。
+
+**为什么平台 TTS 也走「合成→文件」而非实时 speak**（用户 2026-06-28 拍板）：单词/例句短文本合成延迟可忽略；**前瞻需求**——未来给大段用户输入文本生成音频必须产文件+缓存复用。统一管线让平台 TTS 与 Kokoro 同路，缓存层现在就被真实使用和验证。平台 TTS 保留 `speakLive` 作 `synthesizeToFile` 失败（iOS 历史不稳）时的降级兜底。
+
+**口音**：美/英全局生效，`en-US`/`en-GB` 经 `setLanguage`（三平台最稳，不依赖 voice name）。Echo Loop 引擎本期 UI 置灰（设置层选中回退 platform 防御）。
+
+**消费点**：闪卡单词、收藏单词、词典单词发音迁到统一入口（删 `tts_service.dart`）；**新增**词典 AI 例句（词义/搭配/词族）点击发声。统一发音按钮 `SpeakButton`（连续点打断重播、错误静默复位）。
+
+**风险**：iOS `synthesizeToFile` 历史不稳 → speakLive 兜底 + 校验文件 size>0；iOS `AVAudioSession` 进程级共享，TTS 文件经 just_audio 播放与录音/学习引擎争用本机/CI 测不到，**闪卡录音+TTS、学习中点词发音需真机验证**（同 §7.12）。详见 CLAUDE.md §7.14。
+
+### ADR-9: Echo Loop TTS = sherpa-onnx 跑 Kokoro-82M（落地 ADR-8 的 Kokoro 占位）
+
+**决策**：把 ADR-8 预留的 `KokoroTtsEngine` 占位实现为可用引擎——复用已集成的 `sherpa_onnx` FFI（与 Whisper ASR 同一套原生引擎，零新增原生依赖）跑 **Kokoro-en-v0_19 int8** 本地神经网络合成。接入只新增引擎实现 + 工厂分支 + 下载状态机，ADR-8 的协调器/缓存/播放器零改动。
+
+**为什么用 sherpa 打包的 Kokoro 而非裸 onnx**：`sherpa_onnx` 的 `OfflineTts` 只能加载 sherpa 官方格式的 Kokoro（自带 `espeak-ng-data` 做 G2P）；thewh1teagle/kokoro-onnx 的裸 onnx 用另一套音素化（misaki/phonemizer），塞不进 sherpa FFI。故模型取自 k2-fsa/sherpa-onnx TTS 发布、量化 int8、重托管到 `cdn.echo-loop.top`（App 只从自家 CDN 下载，与 Whisper 一致）。
+
+**模型分发**：单 `tar.gz`（98 MB，因含 `espeak-ng-data` 目录树，区别于 Whisper 的逐文件清单）。`KokoroModelManager` 下载归档 → 校验整包 SHA-256 → `archive` 的 `extractFileToDisk` 流式解包 → 递归校验关键文件。下载失败按"整包重下"恢复（重试按钮），与 ASR 粒度一致。
+
+**音色/口音**：Kokoro 的美/英音 = 不同 speaker（`af_/am_`=美音、`bf_/bm_`=英音）。11 个发音人写进 `kokoro_voices.dart`（id→sid）。设置层加 `kokoroVoiceUs`/`kokoroVoiceUk`，美/英各记一个所选音色；`toSpeechConfig` 在 echoLoop 下带 `voiceName`（=音色 id），引擎解析为 `generate(sid:)`，缓存键天然按 engine+voiceId 分桶。
+
+**原生推理**：放常驻 worker isolate（镜像 `sherpa_onnx_engine.dart`），`OfflineTts.generate`+`writeWave` 在 worker 内执行回传 wav 路径，主线程无 jank。固定 `provider='cpu'`（可靠、规避 §7.4 NNAPI 崩溃路径；TTS 不用 VAD）。"原生合成"抽象为可注入 `KokoroNativeSynthesizer`，引擎逻辑（sid 解析/文件命名/降级）可纯单测。
+
+**生效门控**：选 Echo Loop 但模型未就绪时 `effectiveTtsEngine` 降级平台 TTS（发音不中断），就绪后控制器自动切回 echoLoop。`KokoroTtsEngine.speakLive` 返回 false（不抛），合成失败时共享管线优雅静默。
+
+**附带收益**：macOS 上 Kokoro 走 `generate` 能正确区分英/美音（集成测试验证美/英音音频不同），对照平台 TTS 在 macOS 的 `synthesizeToFile` 口音失效（§7.15）。
+
+**风险**：iOS `AVAudioSession` 进程级共享，TTS worker 推理 + just_audio 播放 + 录音器争用本机/CI 测不到，需真机验证；sherpa native abort 不可 catch（§7.4），CPU provider 已规避已知路径。详见 CLAUDE.md §7.16。
+
 ---
 
 ## 学习流程设计

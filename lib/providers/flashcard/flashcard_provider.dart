@@ -31,7 +31,7 @@ import '../../providers/audio_engine/foreground_audio_engine_provider.dart';
 import '../../services/app_logger.dart';
 import '../../services/dictionary_service.dart';
 import '../../services/study_time_service.dart';
-import '../../services/tts_service.dart';
+import '../tts/tts_controller_provider.dart';
 import '../../widgets/flashcard/flashcard_card.dart';
 import '../daily_study_time_provider.dart';
 import '../notification_permission_provider.dart';
@@ -330,7 +330,7 @@ class FlashcardNotifier extends _$FlashcardNotifier {
         playedOriginal = await _playPhraseAudio(item);
       }
       if (!playedOriginal) {
-        await TtsService.instance.speak(item.displayText);
+        await ref.read(ttsControllerProvider.notifier).speak(item.displayText);
       }
 
       _inputStopwatch.stop();
@@ -665,7 +665,7 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       playedOriginal = await _playPhraseAudio(item);
     }
     if (!playedOriginal) {
-      await TtsService.instance.speak(word);
+      await ref.read(ttsControllerProvider.notifier).speak(word);
     }
 
     _inputStopwatch.stop();
@@ -919,7 +919,7 @@ class FlashcardNotifier extends _$FlashcardNotifier {
 
   /// 停止所有播放（TTS + 音频引擎）
   Future<void> _stopAllPlayback() async {
-    await TtsService.instance.stop();
+    await ref.read(ttsControllerProvider.notifier).stop();
     await ref.read(foregroundAudioEngineProvider.notifier).stop();
   }
 

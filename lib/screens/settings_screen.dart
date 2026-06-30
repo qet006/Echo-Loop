@@ -9,7 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:path_provider/path_provider.dart' show getTemporaryDirectory;
+import 'package:path_provider/path_provider.dart'
+    show getTemporaryDirectory, getApplicationCacheDirectory;
 import '../database/app_database.dart';
 import '../database/providers.dart';
 import '../l10n/app_localizations.dart';
@@ -19,6 +20,8 @@ import '../providers/backup_provider.dart';
 import '../providers/dev_version_override_provider.dart';
 import '../providers/developer_options_provider.dart';
 import '../providers/offline_asr_settings_provider.dart';
+import '../providers/tts/tts_settings_provider.dart';
+import '../services/tts/tts_engine.dart';
 import '../providers/package_info_provider.dart';
 import '../providers/reminder_settings_provider.dart';
 import '../providers/sentence_ai_provider.dart';
@@ -36,6 +39,7 @@ import '../features/auth/screens/account_screen.dart';
 import '../router/app_router.dart';
 import '../features/onboarding_survey/providers/onboarding_survey_provider.dart';
 import '../services/app_network_image_cache.dart';
+import '../services/tts/tts_cache_store.dart';
 import '../services/backup/backup_manifest.dart';
 import '../services/backup/backup_service.dart';
 import '../services/dictionary_download_manager.dart';
@@ -52,6 +56,7 @@ import '../widgets/dictionary/dict_source_presentation.dart';
 import 'asr_settings_screen.dart';
 import 'asr_test_screen.dart';
 import 'dictionary_settings_screen.dart';
+import 'tts_settings_screen.dart';
 import 'learning_settings_screen.dart';
 import 'log_viewer_screen.dart';
 import 'playback_settings_screen.dart';
@@ -208,7 +213,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  /// 构建「学习」分组：提醒、播放、学习、语音识别四个入口合并到同一张卡片中。
+  /// 构建「学习」分组：提醒、学习、语音识别、语音合成、播放、词典等入口合并到同一张卡片中。
   Widget _buildStudySection(
     BuildContext context,
     WidgetRef ref,
@@ -276,6 +281,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
           ),
+        ListTile(
+          leading: _emojiIcon('🔊'),
+          title: Text(l10n.ttsSettings),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                ref.watch(ttsSettingsProvider).accent == TtsAccent.uk
+                    ? l10n.ttsAccentUk
+                    : l10n.ttsAccentUs,
+                style: TextStyle(color: colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const TtsSettingsScreen()),
+          ),
+        ),
         ListTile(
           leading: _emojiIcon('▶️'),
           title: Text(l10n.playbackSettings),
@@ -388,12 +413,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
     final waveformResult = await cleanupAllWaveforms();
 
+    // 6. 清 TTS 合成音频缓存（可再生的 transient 磁盘缓存，含后台预热产物）
+    final ttsFreed = await _clearTtsCache(ref);
+
     final totalFreed =
         result.freedBytes +
         imageFreed +
         dictFreed +
         orphanResult.freedBytes +
-        waveformResult.freedBytes;
+        waveformResult.freedBytes +
+        ttsFreed;
 
     if (!context.mounted) return;
     final String message;
@@ -434,6 +463,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       freed = 0;
     }
     return freed;
+  }
+
+  /// 清 TTS 合成音频缓存，返回释放字节数（best-effort）。
+  ///
+  /// TTS 缓存（`ApplicationCacheDirectory/tts_cache/`）是可再生的 transient 磁盘
+  /// 缓存——含发音按钮合成产物与语音合成设置页的后台预热产物，清掉后下次发音
+  /// 重新合成即可。仅清本 app 自建的 `tts_cache/` 子目录（删文件 + 删索引），
+  /// 不触碰系统 `Library/Caches` 根（见 §7.5）。
+  Future<int> _clearTtsCache(WidgetRef ref) async {
+    try {
+      final store = TtsCacheStore(
+        resolveDao: () => ref.read(ttsCacheDaoProvider),
+        resolveCacheDir: getApplicationCacheDirectory,
+      );
+      return await store.clearAll();
+    } catch (_) {
+      return 0;
+    }
   }
 
   /// 构建关于信息区域

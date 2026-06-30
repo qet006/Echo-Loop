@@ -13,6 +13,7 @@ import '../l10n/app_localizations.dart';
 import '../providers/offline_asr_settings_provider.dart';
 import '../services/asr/asr_model_manager.dart';
 import '../theme/app_theme.dart';
+import '../utils/download_failure_message.dart';
 
 /// 语音识别设置页。
 class AsrSettingsScreen extends ConsumerStatefulWidget {
@@ -256,7 +257,7 @@ class _AsrSettingsScreenState extends ConsumerState<AsrSettingsScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                state.errorMessage ?? l10n.speechModelDownloadFailed,
+                downloadFailureMessage(l10n, state.downloadError),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.error,
                 ),

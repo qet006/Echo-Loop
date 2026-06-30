@@ -8,6 +8,7 @@ import 'package:echo_loop/l10n/app_localizations.dart';
 import 'package:echo_loop/providers/offline_asr_settings_provider.dart';
 import 'package:echo_loop/services/asr/asr_model_manager.dart';
 import 'package:echo_loop/services/asr/offline_asr_engine.dart';
+import 'package:echo_loop/services/download/download_failure.dart';
 import 'package:echo_loop/widgets/asr_download_prompt_dialog.dart';
 
 import '../helpers/mock_providers.dart';
@@ -56,7 +57,7 @@ class _TestOfflineAsrSettingsNotifier extends OfflineAsrSettingsNotifier {
       enabled: true,
       downloadStatus: AsrModelDownloadStatus.downloading,
       downloadProgress: 0.6,
-      clearErrorMessage: true,
+      clearError: true,
     );
     Future.microtask(() {
       state = state.copyWith(
@@ -292,7 +293,7 @@ void main() {
           backend: AsrBackend.offline,
           enabled: true,
           downloadStatus: AsrModelDownloadStatus.failed,
-          errorMessage: 'failed',
+          downloadError: DownloadFailureKind.unknown,
           recommendedModel: recommendedModel,
         ),
       );
@@ -318,7 +319,7 @@ void main() {
           backend: AsrBackend.offline,
           enabled: true,
           downloadStatus: AsrModelDownloadStatus.failed,
-          errorMessage: 'failed',
+          downloadError: DownloadFailureKind.unknown,
           recommendedModel: recommendedModel,
         ),
       );
@@ -341,7 +342,7 @@ void main() {
           backend: AsrBackend.offline,
           enabled: true,
           downloadStatus: AsrModelDownloadStatus.failed,
-          errorMessage: 'failed',
+          downloadError: DownloadFailureKind.unknown,
           recommendedModel: recommendedModel,
         ),
       );
@@ -367,7 +368,7 @@ void main() {
           backend: AsrBackend.offline,
           enabled: true,
           downloadStatus: AsrModelDownloadStatus.failed,
-          errorMessage: 'failed',
+          downloadError: DownloadFailureKind.unknown,
           recommendedModel: recommendedModel,
         ),
       );

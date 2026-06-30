@@ -6,18 +6,22 @@ import 'package:echo_loop/widgets/common/shimmer_placeholder.dart';
 import 'package:echo_loop/widgets/dictionary/ai_dict_result_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _wrap(Widget child) => MaterialApp(
-  locale: const Locale('en'),
-  supportedLocales: const [Locale('en'), Locale('zh')],
-  localizationsDelegates: const [
-    AppLocalizations.delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-  ],
-  home: Scaffold(body: SingleChildScrollView(child: child)),
+// 例句行内含发音按钮（消费 ttsControllerProvider），需 ProviderScope 包裹。
+Widget _wrap(Widget child) => ProviderScope(
+  child: MaterialApp(
+    locale: const Locale('en'),
+    supportedLocales: const [Locale('en'), Locale('zh')],
+    localizationsDelegates: const [
+      AppLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    home: Scaffold(body: SingleChildScrollView(child: child)),
+  ),
 );
 
 DictionaryEntry _entry({

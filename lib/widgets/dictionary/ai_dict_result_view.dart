@@ -7,11 +7,13 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/dictionary/dictionary_entry.dart';
 import '../../models/dictionary/dictionary_lookup_result.dart';
 import '../../providers/dictionary/lookup_controller.dart';
+import '../../providers/tts/tts_controller_provider.dart';
 import '../../theme/app_theme.dart';
 import '../common/shimmer_placeholder.dart';
 import 'pos_tag.dart';
@@ -469,48 +471,79 @@ class _MeaningIndex extends StatelessWidget {
 ///
 /// 刻意压低视觉权重——不用色块填充、不用主色 accent，避免与释义争夺注意力。
 /// 英文用斜体小字（符合词典例句惯例），译文更淡，整体作为释义的支撑信息。
-class _ExampleView extends StatelessWidget {
+class _ExampleView extends ConsumerWidget {
   final ExampleSentence example;
   const _ExampleView({required this.example});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (example.sentence.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
+    // 英文与译文为一组：点击任意处都朗读英文句子。
+    // 朗读态（speakingKey == 本句）由协调器维护，保证同时只有一句在播；
+    // 平时不显喇叭，仅朗读期间显示，播完 speakingKey 复位即自动消失。
+    final isSpeaking = ref.watch(
+      ttsControllerProvider.select((s) => s.speakingKey == example.sentence),
+    );
     return Padding(
       padding: const EdgeInsets.only(top: 6, left: 2),
-      child: Container(
-        padding: const EdgeInsets.only(left: 10),
-        decoration: BoxDecoration(
-          border: Border(
-            left: BorderSide(color: theme.colorScheme.outlineVariant, width: 2),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              example.sentence,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontStyle: FontStyle.italic,
-                height: 1.4,
+      child: InkWell(
+        onTap: () =>
+            ref.read(ttsControllerProvider.notifier).speak(example.sentence),
+        borderRadius: BorderRadius.circular(4),
+        child: Container(
+          padding: const EdgeInsets.only(left: 10),
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
+                color: theme.colorScheme.outlineVariant,
+                width: 2,
               ),
             ),
-            if (example.translation.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  example.translation,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant.withValues(
-                      alpha: 0.75,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      example.sentence,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontStyle: FontStyle.italic,
+                        height: 1.4,
+                      ),
                     ),
-                    height: 1.4,
+                  ),
+                  // 仅朗读本句时显示喇叭，播完自动消失。
+                  if (isSpeaking)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6, top: 2),
+                      child: Icon(
+                        Icons.volume_up,
+                        size: 16,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                ],
+              ),
+              if (example.translation.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    example.translation,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.75,
+                      ),
+                      height: 1.4,
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

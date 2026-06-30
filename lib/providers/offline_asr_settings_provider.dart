@@ -16,6 +16,7 @@ import '../analytics/models/event_names.dart';
 import '../services/app_logger.dart';
 import '../services/asr/asr_model_manager.dart';
 import '../services/asr/offline_asr_engine.dart';
+import '../services/download/download_failure.dart';
 import '../utils/app_data_dir.dart';
 import 'asr_engine_provider.dart';
 
@@ -72,8 +73,11 @@ class OfflineAsrSettingsState {
   /// 模型本地占用空间（字节）。
   final int localSizeBytes;
 
-  /// 错误信息。
-  final String? errorMessage;
+  /// 失败时的归类原因（供 UI 显本地化文案）；非失败态为 null。
+  ///
+  /// 不再存原始异常字符串——用户只需知道「空间不足/网络/校验失败/通用失败」，
+  /// 原始异常由 provider 打日志（诊断用），不直接展示。
+  final DownloadFailureKind? downloadError;
 
   /// 引擎是否已就绪（模型已加载到内存）。
   final bool engineReady;
@@ -87,7 +91,7 @@ class OfflineAsrSettingsState {
     this.downloadStatus = AsrModelDownloadStatus.notDownloaded,
     this.downloadProgress = 0,
     this.localSizeBytes = 0,
-    this.errorMessage,
+    this.downloadError,
     this.engineReady = false,
     required this.recommendedModel,
   });
@@ -112,8 +116,8 @@ class OfflineAsrSettingsState {
     AsrModelDownloadStatus? downloadStatus,
     double? downloadProgress,
     int? localSizeBytes,
-    String? errorMessage,
-    bool clearErrorMessage = false,
+    DownloadFailureKind? downloadError,
+    bool clearError = false,
     bool? engineReady,
   }) {
     return OfflineAsrSettingsState(
@@ -122,9 +126,7 @@ class OfflineAsrSettingsState {
       downloadStatus: downloadStatus ?? this.downloadStatus,
       downloadProgress: downloadProgress ?? this.downloadProgress,
       localSizeBytes: localSizeBytes ?? this.localSizeBytes,
-      errorMessage: clearErrorMessage
-          ? null
-          : (errorMessage ?? this.errorMessage),
+      downloadError: clearError ? null : (downloadError ?? this.downloadError),
       engineReady: engineReady ?? this.engineReady,
       recommendedModel: recommendedModel,
     );
@@ -184,7 +186,7 @@ class OfflineAsrSettingsNotifier extends Notifier<OfflineAsrSettingsState> {
   Future<void> enable() async {
     // platform 后端无需下载，直接开启。
     if (state.backend == AsrBackend.platform) {
-      state = state.copyWith(enabled: true, clearErrorMessage: true);
+      state = state.copyWith(enabled: true, clearError: true);
       await _persistEnabled(true);
       ref.read(analyticsServiceProvider).track(Events.asrSettingChanged, {
         EventParams.asrEnabled: true,
@@ -205,7 +207,7 @@ class OfflineAsrSettingsNotifier extends Notifier<OfflineAsrSettingsState> {
         enabled: true,
         downloadStatus: AsrModelDownloadStatus.downloaded,
         localSizeBytes: localSize,
-        clearErrorMessage: true,
+        clearError: true,
       );
       await _persistEnabled(true);
       await _persistDownloadCompleted(modelId, true);
@@ -216,7 +218,7 @@ class OfflineAsrSettingsNotifier extends Notifier<OfflineAsrSettingsState> {
       // 引擎不在此处加载，进入录音页面时按需加载。
     } else {
       // 先标记 enabled，下载完成后引擎自动初始化。
-      state = state.copyWith(enabled: true, clearErrorMessage: true);
+      state = state.copyWith(enabled: true, clearError: true);
       await _persistEnabled(true);
       ref.read(analyticsServiceProvider).track(Events.asrSettingChanged, {
         EventParams.asrEnabled: true,
@@ -246,7 +248,7 @@ class OfflineAsrSettingsNotifier extends Notifier<OfflineAsrSettingsState> {
       ),
       downloadProgress: 0,
       localSizeBytes: localSize,
-      clearErrorMessage: true,
+      clearError: true,
     );
     await _persistEnabled(false);
     await _persistDownloadCompleted(state.recommendedModel.id, fullyDownloaded);
@@ -292,7 +294,7 @@ class OfflineAsrSettingsNotifier extends Notifier<OfflineAsrSettingsState> {
 
   /// 重试下载。
   Future<void> retryDownload() async {
-    state = state.copyWith(clearErrorMessage: true);
+    state = state.copyWith(clearError: true);
     await _downloadAndInitialize(state.recommendedModel.id);
   }
 
@@ -358,26 +360,22 @@ class OfflineAsrSettingsNotifier extends Notifier<OfflineAsrSettingsState> {
       await _persistDownloadCompleted(modelId, true);
 
       await _initializeEngine(modelId);
-    } on DioException catch (e) {
+    } catch (e) {
       _downloadCancelToken = null;
-      if (e.type == DioExceptionType.cancel) {
+      // 取消不是失败：恢复未下载态，不显错误。
+      if (e is DioException && e.type == DioExceptionType.cancel) {
         state = state.copyWith(
           downloadStatus: AsrModelDownloadStatus.notDownloaded,
           downloadProgress: 0,
         );
       } else {
+        // 原始异常打日志（诊断用），向用户只展示归类后的友好文案。
+        AppLogger.log('OfflineAsr', '✗ download failed ($modelId): $e');
         state = state.copyWith(
           downloadStatus: AsrModelDownloadStatus.failed,
-          errorMessage: e.message ?? 'Download failed',
+          downloadError: classifyDownloadFailure(e),
         );
       }
-      await _persistDownloadCompleted(modelId, false);
-    } catch (e) {
-      _downloadCancelToken = null;
-      state = state.copyWith(
-        downloadStatus: AsrModelDownloadStatus.failed,
-        errorMessage: '$e',
-      );
       await _persistDownloadCompleted(modelId, false);
     }
   }
@@ -427,10 +425,12 @@ class OfflineAsrSettingsNotifier extends Notifier<OfflineAsrSettingsState> {
       );
       state = state.copyWith(engineReady: true);
     } catch (e) {
+      // 引擎初始化失败不是下载失败，无确定归类 → 通用文案；原始异常打日志。
+      AppLogger.log('OfflineAsr', '✗ engine init failed ($modelId): $e');
       state = state.copyWith(
         engineReady: false,
         downloadStatus: AsrModelDownloadStatus.failed,
-        errorMessage: 'Engine initialization failed: $e',
+        downloadError: DownloadFailureKind.unknown,
       );
       await _persistDownloadCompleted(modelId, false);
     }
@@ -461,7 +461,7 @@ class OfflineAsrSettingsNotifier extends Notifier<OfflineAsrSettingsState> {
         backend: backend,
         downloadStatus: AsrModelDownloadStatus.notDownloaded,
         downloadProgress: 0,
-        clearErrorMessage: true,
+        clearError: true,
       );
     } else {
       state = state.copyWith(backend: backend);

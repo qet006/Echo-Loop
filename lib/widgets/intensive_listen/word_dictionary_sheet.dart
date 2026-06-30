@@ -11,14 +11,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/sign_in_required_dialog.dart';
 import '../../l10n/app_localizations.dart';
+import '../../models/dictionary/dict_speakable_texts.dart';
 import '../../models/dictionary/dictionary_lookup_result.dart';
 import '../../providers/dictionary/dictionary_registry.dart';
 import '../../providers/dictionary/lookup_controller.dart';
 import '../../providers/dictionary_provider.dart';
 import '../../providers/saved_word_provider.dart';
+import '../../providers/tts/tts_controller_provider.dart';
 import '../../services/dictionary/web_dictionary_source.dart';
-import '../../services/tts_service.dart';
 import '../../utils/text_normalize.dart';
+import '../tts/speak_button.dart';
 import '../../theme/app_theme.dart';
 import '../animated_bookmark_icon.dart';
 import '../common/text_context_menu.dart';
@@ -106,6 +108,10 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
   /// 监听的弹窗路由滑入动画（用于在滑入结束时刷新启用过渡）
   Animation<double>? _routeAnimation;
 
+  /// 统一 TTS 控制器（build 时缓存，供 [dispose] 取消词典预热——
+  /// `ConsumerState.dispose` 内不可用 `ref`，见 CLAUDE.md §7.14）。
+  TtsController? _ttsController;
+
   /// 网页源弹窗的当前高度（像素）。仅网页源使用：默认 2/3 屏高，
   /// 用户上拉拖拽指示条可放大、下拉可缩小（夹在 [_minSheetHeight] 与
   /// [_maxSheetHeight] 之间）。文本源不用此值（按内容自适应）。
@@ -155,6 +161,10 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
   @override
   void dispose() {
     _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+    // 弹窗关闭即停在途预热，避免离开后继续占用 CPU 合成用不到的例句。
+    _ttsController?.cancelTextsPrewarm();
+    // 弹窗关闭即停止正在朗读的单词/例句，避免离开后声音继续播到尾。
+    _ttsController?.stop();
     super.dispose();
   }
 
@@ -249,11 +259,24 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
     final state = ref.watch(controllerProvider);
     final notifier = ref.read(controllerProvider.notifier);
 
+    // 缓存 TTS 控制器供 dispose 取消预热（dispose 内不可用 ref，§7.14）。
+    _ttsController = ref.read(ttsControllerProvider.notifier);
+
     // 本地词典下载完成后，若当前选中本地源，自动重新查询
     ref.listen(dictionaryProvider, (prev, next) {
       if (next.status == DictionaryStatus.downloaded &&
           state.selectedSourceId == 'local') {
         notifier.retry();
+      }
+    });
+
+    // 查词结果到达（或切换数据源后命中已加载结果）即后台预热「单词 + 例句」，
+    // 用户点击发音时命中缓存秒播。仅在选中源的状态变为新的 LookupLoaded 时触发；
+    // 重复文本由协调器缓存/在途去重兜底，开销极小。
+    ref.listen(controllerProvider, (prev, next) {
+      final cur = next.current;
+      if (cur is LookupLoaded && !identical(prev?.current, cur)) {
+        _ttsController?.prewarmTexts(dictionarySpeakableTexts(cur.result));
       }
     });
 
@@ -454,14 +477,7 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
             ),
           ),
         ),
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          onPressed: () => TtsService.instance.speak(word),
-          icon: Icon(
-            Icons.volume_up,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
+        SpeakButton(text: word),
         AnimatedBookmarkIcon(
           isSaved: isSaved,
           onPressed: () => _toggleSave(lemma, isSaved),

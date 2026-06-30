@@ -32,15 +32,23 @@ import 'services/network_permission_trigger.dart';
 import 'services/user_id_service.dart';
 import 'firebase_options.dart';
 import 'providers/learning_settings_provider.dart';
+import 'providers/tts/kokoro_model_provider.dart';
+import 'providers/tts/piper_model_provider.dart';
+import 'providers/tts/tts_settings_provider.dart';
 import 'providers/intensive_listen_prefs_provider.dart';
 import 'providers/blind_listen_prefs_provider.dart';
 import 'providers/retell_prefs_provider.dart';
 import 'providers/difficult_practice_prefs_provider.dart';
 import 'providers/new_user_guide_provider.dart';
 import 'providers/offline_asr_settings_provider.dart';
+import 'package:path_provider/path_provider.dart';
 import 'services/asr/asr_model_manager.dart';
 import 'services/asr/offline_asr_engine.dart';
 import 'services/app_logger.dart';
+import 'services/tts/kokoro_model_manager.dart';
+import 'services/tts/piper_model_manager.dart';
+import 'services/tts/piper_voices.dart';
+import 'services/tts/tts_cache_store.dart';
 import 'utils/app_data_dir.dart';
 import 'services/speech_practice_platform.dart';
 import 'services/storage_migration_service.dart';
@@ -95,6 +103,10 @@ void main() async {
   final initialLearningSettings = LearningSettings.fromPrefsSync(prefs);
   // 清理历史 SP key（开发期数据卫生，幂等无副作用）。
   await cleanupLegacyLearningSettingsKeys(prefs);
+
+  // 语音合成设置（引擎/口音）同步预读：闪卡翻面等同步发音路径需立即拿到口音，
+  // 避免异步 hydrate 前先用默认美音发声。
+  final initialTtsSettings = TtsSettings.fromPrefsSync(prefs);
 
   // 各学习子阶段用户偏好(按槽位)同步预读:入口弹窗 / 播放器进入时需立即拿到记忆值。
   final initialIntensiveListenPrefs = intensiveListenPrefsFromPrefsSync(prefs);
@@ -192,6 +204,14 @@ void main() async {
   // 清理上次残留的录音临时文件（沙盒/tmp/ 中超过 60 秒的文件），不阻塞启动
   unawaited(cleanupRecordingTempFiles());
 
+  // 启动后延迟清理 TTS 合成缓存（过期 + 超量 LRU），不拖首屏。
+  Future.delayed(const Duration(seconds: 8), () {
+    TtsCacheStore(
+      resolveDao: () => database.ttsCacheDao,
+      resolveCacheDir: getApplicationCacheDirectory,
+    ).cleanup();
+  });
+
   // 词典由 dictionaryProvider 管理下载和打开，
   // 在 EchoLoopApp.initState 中 eagerly read 触发初始化。
 
@@ -223,6 +243,39 @@ void main() async {
     unawaited(modelManager.cleanupUnusedModels(recommendedAsrModel.id));
   }
 
+  // Echo Loop TTS（Kokoro）模型初始状态：用持久化标记 + 文件系统校验恢复，
+  // 使启动后若已选 Echo Loop 且模型就绪能立即生效（全平台，Web 除外）。
+  KokoroModelsState? initialKokoroModelState;
+  if (!kIsWeb) {
+    final managers = <KokoroModelVariant, KokoroModelManager>{
+      for (final v in KokoroModelVariant.values)
+        v: KokoroModelManager(spec: kokoroSpecOf(v)),
+    };
+    initialKokoroModelState = await loadInitialKokoroModelState(
+      prefs: prefs,
+      managerOf: (v) => managers[v]!,
+    );
+    for (final m in managers.values) {
+      m.dispose();
+    }
+  }
+
+  // Piper（Echo Loop TTS 平衡档）模型初始状态：每音色一个独立模型，用持久化标记 +
+  // 文件系统校验恢复各音色就绪态（全平台，Web 除外）。
+  PiperModelsState? initialPiperModelState;
+  if (!kIsWeb) {
+    final managers = <String, PiperModelManager>{
+      for (final v in piperVoices) v.id: PiperModelManager(voice: v),
+    };
+    initialPiperModelState = await loadInitialPiperModelState(
+      prefs: prefs,
+      managerOf: (id) => managers[id]!,
+    );
+    for (final m in managers.values) {
+      m.dispose();
+    }
+  }
+
   // 清理上次运行残留的官方合集音频下载 tmp 文件（异步）
   unawaited(cleanupOfficialDownloadTmp());
 
@@ -243,6 +296,7 @@ void main() async {
           initialLearningSettingsProvider.overrideWithValue(
             initialLearningSettings,
           ),
+          initialTtsSettingsProvider.overrideWithValue(initialTtsSettings),
           initialIntensiveListenPrefsProvider.overrideWithValue(
             initialIntensiveListenPrefs,
           ),
@@ -262,6 +316,14 @@ void main() async {
           if (initialOfflineAsrSettingsState != null)
             initialOfflineAsrSettingsStateProvider.overrideWithValue(
               initialOfflineAsrSettingsState,
+            ),
+          if (initialKokoroModelState != null)
+            initialKokoroModelStateProvider.overrideWithValue(
+              initialKokoroModelState,
+            ),
+          if (initialPiperModelState != null)
+            initialPiperModelStateProvider.overrideWithValue(
+              initialPiperModelState,
             ),
         ],
         child: const EchoLoopApp(),
