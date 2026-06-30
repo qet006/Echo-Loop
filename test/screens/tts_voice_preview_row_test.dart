@@ -42,6 +42,8 @@ class _FakeTtsController extends TtsController {
   Future<void> prewarmAccentPreviews() async {}
   @override
   void cancelVoicePreviewPrewarm() {}
+  @override
+  Future<void> stop() async {}
 }
 
 Widget _wrap(

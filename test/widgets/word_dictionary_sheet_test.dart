@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:echo_loop/features/onboarding_survey/providers/onboarding_survey_provider.dart';
 import 'package:echo_loop/l10n/app_localizations.dart';
+import 'package:echo_loop/providers/tts/tts_controller_provider.dart';
 import 'package:echo_loop/services/dictionary_service.dart';
 import 'package:echo_loop/theme/app_theme.dart';
 import 'package:echo_loop/widgets/intensive_listen/word_dictionary_sheet.dart';
@@ -20,6 +21,23 @@ import '../helpers/mock_providers.dart';
 
 /// 词典设置读取的 SharedPreferences（在 setUp 注入），供 [_buildTestPage] override
 late SharedPreferences _prefs;
+
+/// 桩 [TtsController]：弹窗内嵌发音按钮、查词完成会自动触发例句预热，
+/// 真实控制器会经平台 TTS 引擎/method channel 异步合成，在 widget 测试中
+/// 永不完成而拖住 pumpAndSettle（并发跑时确定性挂起）。这里把预热/发音/停止
+/// 全部置空，使本测试只验证弹窗 UI、不触碰真实 TTS 栈。
+class _StubTtsController extends TtsController {
+  @override
+  TtsControllerState build() => const TtsControllerState();
+  @override
+  Future<void> speak(String text, {String? key}) async {}
+  @override
+  Future<void> prewarmTexts(List<String> texts) async {}
+  @override
+  void cancelTextsPrewarm() {}
+  @override
+  Future<void> stop() async {}
+}
 
 /// 创建测试用内存词典数据库
 Database _createTestDb() {
@@ -50,6 +68,7 @@ Widget _buildTestPage(String word, {String? sentenceText}) {
       analyticsOverride(),
       dictionaryOverride(),
       sharedPreferencesProvider.overrideWithValue(_prefs),
+      ttsControllerProvider.overrideWith(_StubTtsController.new),
     ],
     child: MaterialApp(
       locale: const Locale('en'),
