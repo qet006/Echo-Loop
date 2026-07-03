@@ -31,6 +31,26 @@ class SentenceAiCacheDao extends DatabaseAccessor<AppDatabase>
     return row.result;
   }
 
+  /// 批量按哈希读取同类型缓存（只读，不更新 [lastAccessedAt]）
+  ///
+  /// 用于 PDF 导出等一次性聚合读取：把逐句 [getByHash]（每读一次还附带一条
+  /// UPDATE 写放大 + 一次串行往返）合并为单条 `WHERE textHash IN (...)` 查询。
+  /// 返回命中的 `哈希 → JSON` 映射，未命中的哈希不在结果中。
+  ///
+  /// 批量读取刻意**不**刷新访问时间：导出属于旁路读取，不应把整篇文档的
+  /// 缓存 TTL 全部重置。
+  Future<Map<String, String>> getManyByHash(
+    Iterable<String> hashes,
+    String type,
+  ) async {
+    final hashList = hashes.toSet().toList();
+    if (hashList.isEmpty) return const {};
+    final query = select(sentenceAiCache)
+      ..where((t) => t.textHash.isIn(hashList) & t.type.equals(type));
+    final rows = await query.get();
+    return {for (final row in rows) row.textHash: row.result};
+  }
+
   /// 插入或更新缓存
   ///
   /// 以 (textHash, type) 为唯一键，冲突时更新 result 和时间戳。

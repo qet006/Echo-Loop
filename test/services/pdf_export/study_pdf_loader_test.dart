@@ -45,7 +45,11 @@ void main() {
   });
 
   /// 插入测试音频（带字幕）
-  Future<void> insertAudio({String id = 'audio-1', String? srt = _testSrt}) {
+  Future<void> insertAudio({
+    String id = 'audio-1',
+    String? srt = _testSrt,
+    int totalDuration = 0,
+  }) {
     final now = DateTime.now();
     return db.audioItemDao.upsert(
       AudioItemsCompanion(
@@ -55,19 +59,26 @@ void main() {
         addedDate: Value(now),
         updatedAt: Value(now),
         transcriptSrt: Value(srt),
+        totalDuration: Value(totalDuration),
       ),
     );
   }
 
   /// 构建 loader（本地词典默认查不到）
+  ///
+  /// 测试仍用「单词查询」函数表达断言，这里包成 loader 需要的批量查询签名。
   StudyPdfLoader buildLoader({DictEntry? Function(String)? localDictLookup}) {
+    final single = localDictLookup ?? (_) => null;
     return StudyPdfLoader(
       audioItemDao: db.audioItemDao,
       bookmarkDao: db.bookmarkDao,
       savedWordDao: db.savedWordDao,
       savedSenseGroupDao: db.savedSenseGroupDao,
       aiCacheDao: db.sentenceAiCacheDao,
-      localDictLookup: localDictLookup ?? (_) => null,
+      localDictLookup: (words) => {
+        for (final w in words)
+          if (single(w) case final e?) w: e,
+      },
     );
   }
 
@@ -91,6 +102,18 @@ void main() {
         expect(s.grammar, isNull);
         expect(s.vocabNotes, isEmpty);
       }
+      // 元信息：音频未探测时长（0）→ 回退字幕末句结束时间 9s；
+      // 词数 = Hello world(2) + This is a test(4) + Goodbye now(2)
+      expect(doc.durationSeconds, 9);
+      expect(doc.wordCount, 8);
+    });
+
+    test('音频元数据有时长时优先于字幕末句结束时间', () async {
+      await insertAudio(totalDuration: 125);
+
+      final doc = await buildLoader().load('audio-1', targetLanguage: 'zh-CN');
+
+      expect(doc.durationSeconds, 125);
     });
 
     test('音频不存在 / 无字幕时抛 StateError', () async {
@@ -304,7 +327,228 @@ void main() {
       expect(all2[0].vocabNotes, isEmpty);
     });
 
-    test('收藏意群用 displayText 展示、phraseText 查询，词在前意群在后', () async {
+    test('AI 与本地词典同时命中时只用 AI 结果，不混入本地词典', () async {
+      await insertAudio();
+      await db.savedWordDao.saveWord(
+        word: 'test',
+        audioItemId: 'audio-1',
+        sentenceIndex: 1,
+        sentenceText: 'This is a test.',
+      );
+      await db.sentenceAiCacheDao.upsert(
+        hashText('test|zh-CN'),
+        'ai_dictionary',
+        jsonEncode({
+          'pronunciation': {'us': 'ai-us'},
+          'meanings': [
+            {
+              'partOfSpeech': 'n.',
+              'translation': ['AI 释义'],
+            },
+          ],
+        }),
+      );
+
+      final doc = await buildLoader(
+        localDictLookup: (word) => word == 'test'
+            ? const DictEntry(
+                word: 'test',
+                phonetic: 'local',
+                translation: 'n. 本地释义',
+              )
+            : null,
+      ).load('audio-1', targetLanguage: 'zh-CN');
+      final note = doc.paragraphs
+          .expand((p) => p)
+          .toList()[1]
+          .vocabNotes
+          .single;
+      expect(note.phonetic, 'ai-us');
+      expect(note.glosses.single.text, 'AI 释义');
+    });
+
+    test('收藏词按表面词形直查 AI 缓存命中（收藏即字幕中的词形）', () async {
+      // 新设计：收藏词存的就是字幕中的表面词形；AI 查词也按表面词形缓存，
+      // 故直接用收藏词本身查 AI 缓存即可命中，无需扫全句找变形。
+      await insertAudio(
+        id: 'audio-m',
+        srt: '''
+1
+00:00:00,000 --> 00:00:03,000
+He sends messages.
+''',
+      );
+      await db.savedWordDao.saveWord(
+        word: 'messages',
+        audioItemId: 'audio-m',
+        sentenceIndex: 0,
+        sentenceText: 'He sends messages.',
+      );
+      await db.sentenceAiCacheDao.upsert(
+        hashText('messages|zh-CN'),
+        'ai_dictionary',
+        jsonEncode({
+          'meanings': [
+            {
+              'partOfSpeech': 'n.',
+              'translation': ['消息'],
+            },
+          ],
+        }),
+      );
+
+      // 本地词典也有释义，但 AI 命中后不应使用本地释义
+      final doc = await buildLoader(
+        localDictLookup: (word) => word == 'messages'
+            ? const DictEntry(
+                word: 'messages',
+                phonetic: 'local',
+                translation: 'n. 本地释义',
+              )
+            : null,
+      ).load('audio-m', targetLanguage: 'zh-CN');
+      final note = doc.paragraphs.expand((p) => p).first.vocabNotes.single;
+      expect(note.glosses.single.text, '消息');
+    });
+
+    test('右栏词条按句中首次出现位置排序', () async {
+      await insertAudio(
+        id: 'audio-o',
+        srt: '''
+1
+00:00:00,000 --> 00:00:05,000
+Thank you for the birthday card and message. I received it.
+''',
+      );
+      // 按与出现顺序无关的顺序收藏
+      const sentence =
+          'Thank you for the birthday card and message. I received it.';
+      for (final w in ['i', 'message', 'you', 'birthday']) {
+        await db.savedWordDao.saveWord(
+          word: w,
+          audioItemId: 'audio-o',
+          sentenceIndex: 0,
+          sentenceText: sentence,
+        );
+      }
+
+      final doc = await buildLoader(
+        localDictLookup: (word) =>
+            DictEntry(word: word, phonetic: '', translation: '释义'),
+      ).load('audio-o', targetLanguage: 'zh-CN');
+      final notes = doc.paragraphs.expand((p) => p).first.vocabNotes;
+      expect(notes.map((n) => n.term).toList(), [
+        'you',
+        'birthday',
+        'message',
+        'i',
+      ]);
+    });
+
+    test('词条按全文档首现句归位/编号，不随收藏来源句', () async {
+      // 'to' 在末句收藏（sentenceIndex=2），但更早出现在第 2 句（index=1）；
+      // 'now' 也在末句收藏、末句才首现。期望：'to' 编号/归句都靠前（第 2 句
+      // 右栏），'now' 在末句右栏、编号在后。
+      await insertAudio(
+        id: 'audio-fo',
+        srt: '''
+1
+00:00:00,000 --> 00:00:03,000
+Hello world.
+
+2
+00:00:03,500 --> 00:00:06,000
+I want to go.
+
+3
+00:00:06,500 --> 00:00:09,000
+Come to me now.
+''',
+      );
+      await db.savedWordDao.saveWord(
+        word: 'to',
+        audioItemId: 'audio-fo',
+        sentenceIndex: 2,
+        sentenceText: 'Come to me now.',
+      );
+      await db.savedWordDao.saveWord(
+        word: 'now',
+        audioItemId: 'audio-fo',
+        sentenceIndex: 2,
+        sentenceText: 'Come to me now.',
+      );
+
+      final doc = await buildLoader(
+        localDictLookup: (word) =>
+            DictEntry(word: word, phonetic: '', translation: '释义'),
+      ).load('audio-fo', targetLanguage: 'zh-CN');
+      final all = doc.paragraphs.expand((p) => p).toList();
+      // 'to' 首现于第 2 句 → 归第 2 句右栏、编号 1
+      expect(all[1].vocabNotes.single.term, 'to');
+      expect(all[1].vocabNotes.single.number, 1);
+      // 'now' 首现于末句 → 归末句右栏、编号 2
+      expect(all[2].vocabNotes.single.term, 'now');
+      expect(all[2].vocabNotes.single.number, 2);
+    });
+
+    test('词条标号全局生效：同一收藏词在其他句子出现也有标记位', () async {
+      await insertAudio(
+        id: 'audio-g',
+        srt: '''
+1
+00:00:00,000 --> 00:00:03,000
+Thank you for the message.
+
+2
+00:00:03,500 --> 00:00:06,000
+That's so nice of you.
+''',
+      );
+      await db.savedWordDao.saveWord(
+        word: 'you',
+        audioItemId: 'audio-g',
+        sentenceIndex: 0,
+        sentenceText: 'Thank you for the message.',
+      );
+
+      final doc = await buildLoader(
+        localDictLookup: (word) => word == 'you'
+            ? const DictEntry(word: 'you', phonetic: '', translation: '你')
+            : null,
+      ).load('audio-g', targetLanguage: 'zh-CN');
+      final all = doc.paragraphs.expand((p) => p).toList();
+      // 来源句：词条标号 1，标记位在 'you' 末尾（6,9）
+      expect(all[0].vocabNotes.single.number, 1);
+      expect(all[0].vocabMarkers, [(9, 1)]);
+      // 非来源句：无词条（右栏空），但同词出现处也有同号标记位
+      expect(all[1].vocabNotes, isEmpty);
+      expect(all[1].vocabMarkers, [(21, 1)]);
+    });
+
+    test('词条 ranges 记录其在句中的命中区间', () async {
+      await insertAudio();
+      await db.savedWordDao.saveWord(
+        word: 'test',
+        audioItemId: 'audio-1',
+        sentenceIndex: 1,
+        sentenceText: 'This is a test.',
+      );
+
+      final doc = await buildLoader(
+        localDictLookup: (word) => word == 'test'
+            ? const DictEntry(word: 'test', phonetic: '', translation: '测试')
+            : null,
+      ).load('audio-1', targetLanguage: 'zh-CN');
+      final note = doc.paragraphs
+          .expand((p) => p)
+          .toList()[1]
+          .vocabNotes
+          .single;
+      // 'This is a test.' 中 test 位于 [10, 14)
+      expect(note.ranges, [(10, 14)]);
+    });
+
+    test('收藏意群用 displayText 展示、phraseText 查询，按出现位置排序', () async {
       await insertAudio();
       await db.savedWordDao.saveWord(
         word: 'world',
@@ -340,10 +584,11 @@ void main() {
       ).load('audio-1', targetLanguage: 'zh-CN');
       final notes = doc.paragraphs.expand((p) => p).toList()[0].vocabNotes;
       expect(notes.length, 2);
-      expect(notes[0].term, 'world');
-      expect(notes[1].term, 'Hello world');
-      expect(notes[1].glosses.single.pos, '');
-      expect(notes[1].glosses.single.text, '你好世界');
+      // 意群 'Hello world' 起点 0 早于词 'world' 起点 6 → 意群在前
+      expect(notes[0].term, 'Hello world');
+      expect(notes[1].term, 'world');
+      expect(notes[0].glosses.single.pos, '');
+      expect(notes[0].glosses.single.text, '你好世界');
     });
 
     test('收藏词/意群命中区间：全音频索引逐句匹配，与词典结果无关', () async {

@@ -991,7 +991,7 @@
   "timeAgoMinutes": "{minutes}分钟前",
   "timeAgoHours": "{hours}小时前",
 
-  "exportAudio": "导出",
+  "exportAudio": "导出音频",
   "exportAudioFile": "音频",
   "exportSubtitleFile": "字幕",
   "exportSelectFiles": "选择要导出的文件",
@@ -1003,6 +1003,15 @@
       "error": {"type": "String"}
     }
   },
+  "pdfMetaDuration": "时长 {duration}",
+  "pdfMetaSentences": "{count} 句",
+  "pdfMetaWords": "{count} 词",
+  "pdfAppendixTitle": "附录 · 句子解析",
+  "pdfPreviewTitle": "导出预览",
+  "pdfShare": "分享",
+  "pdfOptionTranslation": "译文",
+  "pdfOptionVocab": "单词释义",
+  "pdfOptionAnalysis": "句子讲解",
 
   "exportData": "导出数据",
   "exportDataSubtitle": "导出全部数据到 ZIP 文件",
@@ -1082,6 +1091,14 @@
   "dictionaryDownloading": "词典下载中...",
   "dictionaryDownloadFailed": "词典下载失败",
   "dictionaryNotDownloaded": "词典尚未下载",
+  "dictionaryBaseFormHint": "以下为原形「{lemma}」的查词结果",
+  "@dictionaryBaseFormHint": {
+    "placeholders": {
+      "lemma": {
+        "type": "String"
+      }
+    }
+  },
   "download": "下载",
   "retry": "重试",
   "guideNext": "下一步",

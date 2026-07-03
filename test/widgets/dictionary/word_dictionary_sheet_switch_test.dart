@@ -158,9 +158,9 @@ void main() {
     expect(local.calls, 1); // 仍只查过一次
   });
 
-  testWidgets('切到 AI 成功后，标题替换为 AI headword（区别于查询词）', (tester) async {
-    // 查询词 "geese" 在各源都不出现：标题始终用结果 headword。
-    // 切到 AI 后，标题为 AI 返回的 headword "goose"。
+  testWidgets('标题跨源恒为归一化表面词形，不用词形还原/headword 原形', (tester) async {
+    // 查询词 "geese"：本地源经词形还原命中原形（fake 返回 headword=run），
+    // AI 源返回权威 headword "goose"——两者标题都应保持用户所选表面词形 geese。
     final aiGoose = _FixedSource(
       'ai',
       AiDictResult(_aiEntry(headword: 'goose')),
@@ -168,12 +168,15 @@ void main() {
     await tester.pumpWidget(wrap(aiSource: aiGoose, word: 'geese'));
     await tester.pumpAndSettle();
 
-    // 查询词从不直接作标题（本地命中后显示本地 headword）
-    expect(find.text('geese'), findsNothing);
+    // 本地源：标题为表面词形 geese（不显示本地词干 run），并有原形回退提示
+    expect(find.text('geese'), findsOneWidget);
+    expect(find.text('run'), findsNothing);
+    expect(find.textContaining('base form'), findsOneWidget);
 
-    // 切到 AI：标题为 AI headword goose
+    // 切到 AI：标题仍为表面词形 geese，不替换成 AI headword goose
     await tester.tap(find.text('AI'));
     await tester.pumpAndSettle();
-    expect(find.text('goose'), findsOneWidget);
+    expect(find.text('geese'), findsOneWidget);
+    expect(find.text('goose'), findsNothing);
   });
 }

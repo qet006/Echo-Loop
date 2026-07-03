@@ -4415,7 +4415,7 @@ abstract class AppLocalizations {
   /// No description provided for @exportAudio.
   ///
   /// In en, this message translates to:
-  /// **'Export'**
+  /// **'Export Audio'**
   String get exportAudio;
 
   /// No description provided for @exportAudioFile.
@@ -4453,6 +4453,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to export PDF: {error}'**
   String pdfExportFailed(String error);
+
+  /// PDF title meta line: audio duration (duration is preformatted mm:ss)
+  ///
+  /// In en, this message translates to:
+  /// **'Duration {duration}'**
+  String pdfMetaDuration(String duration);
+
+  /// PDF title meta line: sentence count
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 sentence} other{{count} sentences}}'**
+  String pdfMetaSentences(int count);
+
+  /// PDF title meta line: word count
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 word} other{{count} words}}'**
+  String pdfMetaWords(int count);
+
+  /// No description provided for @pdfAppendixTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Appendix · Sentence Analysis'**
+  String get pdfAppendixTitle;
+
+  /// Title of the PDF export preview screen
+  ///
+  /// In en, this message translates to:
+  /// **'Export Preview'**
+  String get pdfPreviewTitle;
+
+  /// Share action on the PDF export preview screen
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get pdfShare;
+
+  /// PDF content option: include sentence translations
+  ///
+  /// In en, this message translates to:
+  /// **'Translation'**
+  String get pdfOptionTranslation;
+
+  /// PDF content option: include vocabulary notes
+  ///
+  /// In en, this message translates to:
+  /// **'Word Definitions'**
+  String get pdfOptionVocab;
+
+  /// PDF content option: include sentence analysis appendix
+  ///
+  /// In en, this message translates to:
+  /// **'Sentence Analysis'**
+  String get pdfOptionAnalysis;
 
   /// No description provided for @exportData.
   ///
@@ -4879,6 +4933,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dictionary not yet downloaded'**
   String get dictionaryNotDownloaded;
+
+  /// No description provided for @dictionaryBaseFormHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing results for base form “{lemma}”'**
+  String dictionaryBaseFormHint(String lemma);
 
   /// No description provided for @download.
   ///

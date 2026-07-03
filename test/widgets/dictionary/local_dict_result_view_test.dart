@@ -42,6 +42,7 @@ void main() {
     await tester.pumpWidget(
       _wrap(
         const LocalDictResultView(
+          word: 'run',
           state: LookupLoaded(
             LocalDictResult(
               DictEntry(
@@ -60,11 +61,33 @@ void main() {
     expect(find.text('跑'), findsOneWidget);
     expect(find.text('v.'), findsOneWidget);
     expect(find.text('CET4'), findsOneWidget);
+    // 表面词形（run）与命中词一致：不显示原形回退提示
+    expect(find.textContaining('base form'), findsNothing);
+  });
+
+  testWidgets('原形回退：表面词形与命中词不同时显示弱化提示', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        const LocalDictResultView(
+          word: 'running',
+          state: LookupLoaded(
+            LocalDictResult(
+              DictEntry(word: 'run', phonetic: 'rʌn', translation: 'v. 跑'),
+            ),
+          ),
+        ),
+      ),
+    );
+    // 释义仍是原形 run 的内容
+    expect(find.text('/rʌn/'), findsOneWidget);
+    // 弱化提示告知展示的是原形 run 的查词结果
+    expect(find.textContaining('run'), findsWidgets);
+    expect(find.textContaining('base form'), findsOneWidget);
   });
 
   testWidgets('未收录：显示提示', (tester) async {
     await tester.pumpWidget(
-      _wrap(const LocalDictResultView(state: LookupNotFound())),
+      _wrap(const LocalDictResultView(word: 'xyz', state: LookupNotFound())),
     );
     expect(find.text('Word not found in dictionary'), findsOneWidget);
   });

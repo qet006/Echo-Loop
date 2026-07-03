@@ -204,6 +204,9 @@ void main() async {
   // 清理上次残留的录音临时文件（沙盒/tmp/ 中超过 60 秒的文件），不阻塞启动
   unawaited(cleanupRecordingTempFiles());
 
+  // 清理超过 1 天的 PDF 分享临时目录（分享后不能立即删，见 temp_cleanup_service）
+  unawaited(cleanupStalePdfExportTemp());
+
   // 启动后延迟清理 TTS 合成缓存（过期 + 超量 LRU），不拖首屏。
   Future.delayed(const Duration(seconds: 8), () {
     TtsCacheStore(

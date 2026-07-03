@@ -30,7 +30,10 @@ class SavedWordList extends _$SavedWordList {
 
   /// 收藏单词
   ///
-  /// [word] 小写 lemmatized 形式。
+  /// [word] 为归一化后的**表面词形**（用户实际选中/查询的词），非词干/原形——
+  /// 正文收藏下划线按表面词形匹配（见 [SavedTextIndex]），保存原形会导致
+  /// 正文无法标记。词形还原仅是本地词典检索时的回退，不影响收藏内容；
+  /// 收藏列表展示释义时经 [DictionaryService.lookupAll] 的原形回退仍能命中。
   /// 可选提供来源音频和句子信息。
   Future<void> saveWord({
     required String word,

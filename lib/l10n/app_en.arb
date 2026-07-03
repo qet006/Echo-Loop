@@ -1339,7 +1339,7 @@
     }
   },
 
-  "exportAudio": "Export",
+  "exportAudio": "Export Audio",
   "exportAudioFile": "Audio",
   "exportSubtitleFile": "Subtitle",
   "exportSelectFiles": "Select files to export",
@@ -1350,6 +1350,48 @@
     "placeholders": {
       "error": {"type": "String"}
     }
+  },
+  "pdfMetaDuration": "Duration {duration}",
+  "@pdfMetaDuration": {
+    "description": "PDF title meta line: audio duration (duration is preformatted mm:ss)",
+    "placeholders": {
+      "duration": {"type": "String"}
+    }
+  },
+  "pdfMetaSentences": "{count, plural, =1{1 sentence} other{{count} sentences}}",
+  "@pdfMetaSentences": {
+    "description": "PDF title meta line: sentence count",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "pdfMetaWords": "{count, plural, =1{1 word} other{{count} words}}",
+  "@pdfMetaWords": {
+    "description": "PDF title meta line: word count",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "pdfAppendixTitle": "Appendix · Sentence Analysis",
+  "pdfPreviewTitle": "Export Preview",
+  "@pdfPreviewTitle": {
+    "description": "Title of the PDF export preview screen"
+  },
+  "pdfShare": "Share",
+  "@pdfShare": {
+    "description": "Share action on the PDF export preview screen"
+  },
+  "pdfOptionTranslation": "Translation",
+  "@pdfOptionTranslation": {
+    "description": "PDF content option: include sentence translations"
+  },
+  "pdfOptionVocab": "Word Definitions",
+  "@pdfOptionVocab": {
+    "description": "PDF content option: include vocabulary notes"
+  },
+  "pdfOptionAnalysis": "Sentence Analysis",
+  "@pdfOptionAnalysis": {
+    "description": "PDF content option: include sentence analysis appendix"
   },
 
   "exportData": "Export Data",
@@ -1478,6 +1520,14 @@
   "dictionaryDownloading": "Downloading dictionary...",
   "dictionaryDownloadFailed": "Dictionary download failed",
   "dictionaryNotDownloaded": "Dictionary not yet downloaded",
+  "dictionaryBaseFormHint": "Showing results for base form “{lemma}”",
+  "@dictionaryBaseFormHint": {
+    "placeholders": {
+      "lemma": {
+        "type": "String"
+      }
+    }
+  },
   "download": "Download",
   "retry": "Retry",
   "guideNext": "Next",

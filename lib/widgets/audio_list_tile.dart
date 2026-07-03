@@ -12,13 +12,12 @@ import '../models/audio_item.dart';
 import '../utils/time_format.dart';
 import '../models/learning_progress.dart';
 import '../models/tag.dart';
-import '../database/providers.dart';
-import '../utils/app_data_dir.dart';
 import '../providers/audio_library_provider.dart';
 import '../providers/collection_provider.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/tag_provider.dart';
 import '../l10n/app_localizations.dart';
+import '../utils/audio_item_actions.dart';
 import '../widgets/review/review_briefing_sheet.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
@@ -29,14 +28,7 @@ import '../features/official_collections/data/official_collection_api.dart';
 import 'guide_flow.dart';
 import 'learning_progress_icon.dart';
 import '../providers/transcription_task_provider.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:path/path.dart' as p;
-import '../services/audio_export_service.dart';
-import 'dialogs/export_audio_dialog.dart';
-import 'dialogs/export_pdf_runner.dart';
 import 'dialogs/text_input_dialog.dart';
-import 'manage_subtitles_sheet.dart';
 import '../features/audio_import/audio_import_models.dart';
 import '../features/audio_import/audio_import_provider.dart';
 import '../features/podcast/podcast_info_sheet.dart';
@@ -751,9 +743,7 @@ class AudioListTile extends ConsumerWidget {
           } else if (value == 'rename') {
             _showRenameDialog(context, ref);
           } else if (value == 'manageSubtitles') {
-            // 进字幕管理（AI 转录入口）前懒检测一次，让转录前拦截能拿到状态。
-            _maybeCheckContent(ref, audioItem);
-            _showManageSubtitlesSheet(context);
+            showManageSubtitlesSheet(context, ref, audioItem);
           } else if (value == 'editSubtitles') {
             context.push(
               AppRoutes.subtitleEditor(audioItem.id),
@@ -766,9 +756,9 @@ class AudioListTile extends ConsumerWidget {
           } else if (value == 'manageTags') {
             onManageTags?.call();
           } else if (value == 'export') {
-            _handleExport(context, ref);
+            exportAudioItem(context, ref, audioItem);
           } else if (value == 'exportPdf') {
-            unawaited(runStudyPdfExport(context, ref, _latestAudioItem(ref)));
+            context.push(AppRoutes.pdfPreview, extra: _latestAudioItem(ref));
           } else if (value == 'togglePause') {
             _handleTogglePause(context, ref, isPausedForMenu);
           } else if (value == 'resetProgress') {
@@ -821,20 +811,9 @@ class AudioListTile extends ConsumerWidget {
       return;
     }
     // 懒检测内容状态：用户实际打开音频时才检（仅未检测过的），避免启动全库扫描。
-    _maybeCheckContent(ref, currentItem);
+    maybeCheckAudioContent(ref, currentItem);
     if (!context.mounted) return;
     _pushPlan(context);
-  }
-
-  /// 懒检测音频内容有效性：仅对已就绪、尚未检测（contentStatus==null）的音频后台触发一次。
-  ///
-  /// 用户接触音频（打开学习 / 管理字幕）时才检测，把开销分摊到实际使用，
-  /// 避免启动时对全库逐个解码波形。检测完成后 provider 状态更新，列表项自动显示徽章。
-  void _maybeCheckContent(WidgetRef ref, AudioItem item) {
-    if (!item.isAudioReady || item.contentStatus != null) return;
-    unawaited(
-      ref.read(audioLibraryProvider.notifier).checkAudioContent(item.id),
-    );
   }
 
   /// 跳转 plan 页（合集上下文 vs 独立音频上下文）
@@ -970,15 +949,6 @@ class AudioListTile extends ConsumerWidget {
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  /// 打开管理字幕底部弹窗
-  void _showManageSubtitlesSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => ManageSubtitlesSheet(audioItem: audioItem),
-    );
-  }
-
   /// 切换暂停学习状态：
   /// - 暂停（false→true）：弹确认弹窗，用户确认后写库 + 调度跳过该音频
   /// - 恢复（true→false）：直接生效，无弹窗（非破坏性，可再次暂停）
@@ -1053,116 +1023,6 @@ class AudioListTile extends ConsumerWidget {
           context,
         ).showSnackBar(SnackBar(content: Text(l10n.resetLearningProgressDone)));
       }
-    }
-  }
-
-  /// 重命名音频对话框
-  /// 处理导出操作
-  Future<void> _handleExport(BuildContext context, WidgetRef ref) async {
-    final l10n = AppLocalizations.of(context)!;
-
-    // 1. 弹出导出选项对话框
-    final selection = await showExportAudioDialog(
-      context: context,
-      hasTranscript: audioItem.hasTranscript,
-    );
-    if (selection == null || !context.mounted) return;
-
-    try {
-      // 2. 解析文件绝对路径
-      final audioPath = await audioItem.getFullAudioPath();
-      if (audioPath == null) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(l10n.audioFileNotFound)));
-        }
-        return;
-      }
-      // 字幕内容存 DB 列：导出需要文件，故把列内容落临时 SRT 供打包。
-      // 旧行（transcriptPath 非 null）仍直接用遗留文件。
-      String? transcriptPath = await audioItem.getFullTranscriptPath();
-      File? tempTranscriptFile;
-      if (selection.includeTranscript && transcriptPath == null) {
-        final srt = await ref
-            .read(audioItemDaoProvider)
-            .getTranscriptSrt(audioItem.id);
-        if (srt != null && srt.isNotEmpty) {
-          final dataDir = await getAppDataDirectory();
-          final tmpDir = Directory(p.join(dataDir.path, 'tmp', 'export'));
-          await tmpDir.create(recursive: true);
-          tempTranscriptFile = File(
-            p.join(tmpDir.path, '${audioItem.id}_export.srt'),
-          );
-          await tempTranscriptFile.writeAsString(srt);
-          transcriptPath = tempTranscriptFile.path;
-        }
-      }
-
-      // 3. 调用导出服务生成临时文件
-      final service = AudioExportService();
-      final String exportPath;
-      try {
-        exportPath = await service.exportAudioItem(
-          displayName: audioItem.name,
-          audioPath: audioPath,
-          transcriptPath: transcriptPath,
-          includeAudio: selection.includeAudio,
-          includeTranscript: selection.includeTranscript,
-        );
-      } finally {
-        // 清理临时字幕文件（导出服务已把内容打包）
-        if (tempTranscriptFile != null) {
-          try {
-            await tempTranscriptFile.delete();
-          } catch (_) {}
-        }
-      }
-
-      if (!context.mounted) return;
-
-      // 4. 平台分发保存
-      if (Platform.isIOS || Platform.isAndroid) {
-        final box = context.findRenderObject() as RenderBox?;
-        await Share.shareXFiles(
-          [XFile(exportPath)],
-          sharePositionOrigin: box != null
-              ? box.localToGlobal(Offset.zero) & box.size
-              : Rect.zero,
-        );
-      } else {
-        final ext = p.extension(exportPath).replaceFirst('.', '');
-        final fileName = p.basename(exportPath);
-        final home = Platform.environment['HOME'];
-        final downloadsDir = home != null ? '$home/Downloads' : null;
-
-        final savePath = await FilePicker.platform.saveFile(
-          dialogTitle: l10n.exportAudio,
-          fileName: fileName,
-          initialDirectory: downloadsDir,
-          type: FileType.custom,
-          allowedExtensions: [ext],
-        );
-        if (savePath != null) {
-          await File(exportPath).copy(savePath);
-          if (context.mounted) {
-            final savedName = p.basename(savePath);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('${l10n.exportSuccess}: $savedName')),
-            );
-          }
-        }
-      }
-
-      // 5. 清理临时文件
-      try {
-        await File(exportPath).delete();
-      } catch (_) {}
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('${l10n.exportAudio}: $e')));
     }
   }
 

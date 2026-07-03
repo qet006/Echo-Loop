@@ -1,10 +1,13 @@
 /// 学习材料 PDF 导出门面
 ///
-/// 负责「读字体 → isolate 生成 PDF → 写临时文件」的编排：
-/// - 字体经 rootBundle 读取（只能在主 isolate），static 缓存避免二次导出重读 ~12MB；
-/// - PDF 生成（字体解析 + 子集化，数百 ms 级 CPU）放 `compute` isolate；
-/// - 产物写入 `pdf_export_<ts>` 临时目录（前缀已登记 temp_cleanup_service 白名单），
-///   调用方分享完成后负责删除。
+/// 拆成两个可独立复用的步骤（预览页按选项多次生成字节、仅分享时才落盘）：
+/// - [StudyPdfExportService.buildBytes]「读字体 → isolate 生成 PDF 字节」：
+///   字体经 rootBundle 读取（只能在主 isolate），static 缓存避免二次导出重读 ~12MB；
+///   PDF 生成（字体解析 + 子集化，数百 ms 级 CPU）放 `compute` isolate；
+/// - [StudyPdfExportService.writeTempPdf]「字节写临时文件」：
+///   产物写入 `pdf_export_<ts>` 临时目录（前缀已登记 temp_cleanup_service 白名单）。
+///   分享方**不可**在 `shareXFiles` 返回后立即删除——macOS 在用户点选
+///   AirDrop 时 Future 即 resolve、传输未开始；由清理服务统一回收。
 library;
 
 import 'dart:io';
@@ -15,6 +18,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../models/pdf_export/study_pdf_data.dart';
+import '../app_logger.dart';
 import '../audio_export_service.dart';
 import 'study_pdf_builder.dart';
 
@@ -27,10 +31,17 @@ class StudyPdfExportService {
   static Uint8List? _cjkRegular;
   static Uint8List? _appIconPng;
 
-  /// 生成 PDF 并写入临时目录，返回文件完整路径
+  /// 生成 PDF 字节（预览 / 下载 / 分享共用同一份产物）
   ///
-  /// 调用方（分享/保存完成后）负责清理临时文件。
-  Future<String> export(StudyPdfDocument document) async {
+  /// [labels] 为按当前 locale 组装好的 PDF 内文案（isolate 内拿不到 l10n）。
+  Future<Uint8List> buildBytes(
+    StudyPdfDocument document, {
+    required StudyPdfLabels labels,
+  }) async {
+    // 阶段耗时打点：total 为整个 buildBytes 墙钟耗时，sw 分「读字体」「PDF 生成」
+    final total = Stopwatch()..start();
+    final sw = Stopwatch()..start();
+    final fontsCached = _latinRegular != null;
     _latinRegular ??= await _loadAsset('assets/fonts/pdf/NotoSans-Regular.ttf');
     _latinBold ??= await _loadAsset('assets/fonts/pdf/NotoSans-Bold.ttf');
     _latinItalic ??= await _loadAsset('assets/fonts/pdf/NotoSans-Italic.ttf');
@@ -42,6 +53,13 @@ class StudyPdfExportService {
     } catch (_) {
       _appIconPng = null;
     }
+    AppLogger.log(
+      'PdfExport',
+      '读字体 ${sw.elapsedMilliseconds}ms (${fontsCached ? '缓存命中' : '首次读 assets'})',
+    );
+    sw
+      ..reset()
+      ..start();
 
     final now = DateTime.now();
     final request = StudyPdfBuildRequest(
@@ -53,11 +71,23 @@ class StudyPdfExportService {
       appIconPng: _appIconPng,
       exportDate:
           '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
+      labels: labels,
     );
 
     final bytes = await compute(buildStudyPdfBytes, request);
+    AppLogger.log(
+      'PdfExport',
+      'PDF 生成 ${sw.elapsedMilliseconds}ms (${bytes.length ~/ 1024}KB)',
+    );
+    AppLogger.log('PdfExport', '生成字节总耗时 ${total.elapsedMilliseconds}ms');
+    return bytes;
+  }
 
-    final safeName = AudioExportService().sanitizeFileName(document.title);
+  /// 把生成好的 PDF 字节写入临时目录（分享路径用），返回文件完整路径
+  ///
+  /// 文件名取净化后的 [title]。调用方分享完成后负责删除临时文件。
+  Future<String> writeTempPdf(Uint8List bytes, String title) async {
+    final safeName = AudioExportService().sanitizeFileName(title);
     final tempDir = await _createTempDir();
     final pdfPath = p.join(tempDir.path, '$safeName.pdf');
     await File(pdfPath).writeAsBytes(bytes);

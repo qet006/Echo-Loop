@@ -9,12 +9,13 @@
 
 **完成时间**: 2026-07-02
 
-把一篇学习材料（音频+字幕）导出为可打印的 PDF：左栏文章句子、右栏词汇笔记（收藏词/意群 + 音标 + 斜体词性 + 释义 bullet），翻译弱化为句下灰字，AI 解析集中在文末「附录 · 句子解析」（正文句末尾注标记 [n]）。学术论文风格（首版彩色底色块样式被用户否决后重设计）：无底色块、收藏句句末书签图标、收藏词橙色细下划线（与 App 内视觉语言一致）、首页标题居中 + ECHO LOOP 品牌、次页 running header。样式规则固定（自动样式），只导出已有缓存不发 AI 请求，入口在资源库/合集音频条目菜单。
+把一篇学习材料（音频+字幕）导出为可打印的 PDF：左栏文章句子、右栏词汇笔记（收藏词/意群 + 音标 + 斜体词性 + 释义 bullet；全文无词条时不分栏），翻译弱化为句下灰字，AI 解析集中在文末「附录 · 句子解析」（正文句末尾注标记 [n] 与附录条目内部链接互跳）。学术论文风格（首版彩色底色块样式被用户否决后重设计）：无底色块、收藏句句末书签图标、收藏词橙色细下划线 + 词后上标词条标号（全文档统一编号且**全局标记**——同一收藏词在任何句子出现都标同号；与右栏同号互跳，`vocab-{n}` 锚点）、附录字段标签灰底 badge + `` `引用片段` `` 灰底高亮、首页标题居中 + ECHO LOOP 品牌、次页 running header。样式规则固定（自动样式），只导出已有缓存不发 AI 请求（AI 词典严格优先于本地，含 lemma→表面词形兜底查缓存），入口在资源库/合集音频条目菜单。
 
 - **技术选型**：Dart `pdf` 包（^3.12.0）端上生成 + 既有 `Share.shareXFiles` 分享流；不引入 printing。字体必须内置 TrueType（系统 CJK 字体是 CFF/TTC，pdf 包解析不了），NotoSans Regular/Bold/Italic + NotoSansSC 共 ~12.3MB，生成时自动子集化
 - **分层**：`study_pdf_loader.dart`（数据聚合，DAO 注入可测）→ `study_pdf_data.dart`（纯模型，跨 isolate）→ `study_pdf_builder.dart`（compute isolate 渲染）→ `study_pdf_export_service.dart`（门面）→ `export_pdf_runner.dart`（UI 编排）
 - **关键约束**：MultiPage 只有顶层兄弟块之间可断页（句子行/附录字段必须拍平；翻译并入句子行左栏 Column，独立块会被右栏高度推出空隙）；`maxPages` 默认 20 需显式调大；收藏词/句按「索引+文本双重校验」归句防字幕重解析错位；收藏下划线区间复用 App 的 `SavedTextIndex`/`savedCharRanges` 纯逻辑保证语义一致
-- 测试：loader 14 + builder 6 + DAO 2 + widget 2；样例 PDF 渲染目检通过
+- **pdf 包渲染坑**（详见 TASKS.md 第四轮）：RichText 各 span 是独立断行单元（标号须与词合并为原子 WidgetSpan）；RichText 按 span 跟踪 fill color 而 `_WidgetSpan.paint` 不保存图形状态，内部改色会染色后续正文（用 `_PaintIsolate` 借 SingleChildWidget.paintChild 的 q/Q 包裹所有内嵌 WidgetSpan 子树）；WidgetSpan 底边落在行基线，内部文字须按 `-(内边距+字号×descent)` 下移对齐；`TextDecoration.underline` 画在 baseline 下 descent/2 处（写死不可调）会切过 descender——收藏词下划线改为逐词 Container 底边框自绘（画在字形框之下）
+- 测试：loader 18 + builder 8 + DAO 2 + widget 2；样例 PDF 渲染目检通过
 
 ---
 

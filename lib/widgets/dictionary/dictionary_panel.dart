@@ -16,7 +16,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/auth/sign_in_required_dialog.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/dictionary/dict_speakable_texts.dart';
-import '../../models/dictionary/dictionary_lookup_result.dart';
 import '../../providers/dictionary/dictionary_registry.dart';
 import '../../providers/dictionary/lookup_controller.dart';
 import '../../providers/dictionary_provider.dart';
@@ -191,29 +190,13 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
   /// （trim + 剥首尾标点[右撇号除外] + 小写 + 内部空白折叠）
   String get _normalizedWord => normalizeWord(widget.query.word);
 
-  /// 标题展示词：优先用当前结果的 headword（本地原形/AI 词头），否则用归一化词形
-  String _displayWord(DictionaryLookupState state) {
-    final cur = state.current;
-    if (cur is LookupLoaded) return cur.result.headword;
-    return _normalizedWord;
-  }
-
-  /// 收藏用 lemma：优先用本地词典返回的原形，否则用归一化词形
-  String _lemmaWord(DictionaryLookupState state) {
-    final local = state.bySource['local'];
-    if (local case LookupLoaded(result: final LocalDictResult r)) {
-      return r.entry.word.toLowerCase();
-    }
-    return _normalizedWord;
-  }
-
-  Future<void> _toggleSave(String lemma, bool currentlySaved) async {
+  Future<void> _toggleSave(String surfaceWord, bool currentlySaved) async {
     final notifier = ref.read(savedWordListProvider.notifier);
     if (currentlySaved) {
-      await notifier.removeWord(lemma);
+      await notifier.removeWord(surfaceWord);
     } else {
       await notifier.saveWord(
-        word: lemma,
+        word: surfaceWord,
         audioItemId: widget.query.audioItemId,
         sentenceIndex: widget.query.sentenceIndex,
         sentenceText: widget.query.sentenceText,
@@ -267,8 +250,6 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
       }
     });
 
-    final lemma = _lemmaWord(state);
-    final displayWord = _displayWord(state);
     final isWeb = _isWebSource(state.selectedSourceId);
     // AI 与网页源内容丰富，默认 3/5 屏高且可上拉放大；本地源内容短，按内容自适应。
     final isResizable =
@@ -300,14 +281,9 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // header（指示条 + 数据源行 + 标题行）：可拉伸源时整块可上下拖拽调整高度
-                _buildHeader(
-                  theme,
-                  state,
-                  notifier,
-                  displayWord,
-                  lemma,
-                  isResizable,
-                ),
+                // 标题、发音、收藏跨源恒用归一化表面词形 word（不用各源词形还原/
+                // headword 后的原形），保证正文所选词与展示/收藏一致。
+                _buildHeader(theme, state, notifier, word, isResizable),
                 const SizedBox(height: AppSpacing.s),
 
                 // 内容区：按选中源渲染。
@@ -374,8 +350,7 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
     ThemeData theme,
     DictionaryLookupState state,
     DictionaryLookupController notifier,
-    String displayWord,
-    String lemma,
+    String word,
     bool resizable,
   ) {
     final header = Column(
@@ -407,7 +382,7 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
         const SizedBox(height: 8),
 
         // 标题行：单词 + 发音 + 收藏 + 关闭（跨源恒定）
-        _buildTitleRow(theme, displayWord, lemma),
+        _buildTitleRow(theme, word),
       ],
     );
     if (!resizable) return header;
@@ -459,8 +434,13 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
   }
 
   /// 标题行：单词（可长按复制）+ TTS + 收藏 + 关闭
-  Widget _buildTitleRow(ThemeData theme, String word, String lemma) {
-    final isSaved = ref.watch(isWordSavedProvider(lemma)).valueOrNull ?? false;
+  ///
+  /// [word] 为归一化后的**表面词形**（用户所选词），标题展示、发音、收藏、
+  /// 「是否已收藏」判定跨源统一用它——各源的词形还原/headword 原形仅用于检索与
+  /// 内容展示，不占据标题，也不改变收藏内容（收藏的始终是表面词形，正文下划线
+  /// 才能匹配，见 [SavedTextIndex]）。
+  Widget _buildTitleRow(ThemeData theme, String word) {
+    final isSaved = ref.watch(isWordSavedProvider(word)).valueOrNull ?? false;
     return Row(
       children: [
         Expanded(
@@ -482,7 +462,7 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
         SpeakButton(text: word),
         AnimatedBookmarkIcon(
           isSaved: isSaved,
-          onPressed: () => _toggleSave(lemma, isSaved),
+          onPressed: () => _toggleSave(word, isSaved),
         ),
         IconButton(
           key: const Key('dict_panel_close'),

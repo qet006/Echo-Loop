@@ -41,8 +41,10 @@ import '../utils/blind_listen_duration_estimator.dart';
 import '../utils/paragraph_grouping.dart';
 import '../utils/playback_speed_default.dart';
 import '../utils/retell_duration_estimator.dart';
+import '../utils/audio_item_actions.dart';
 import '../utils/time_format.dart';
 import '../widgets/blind_listen_paragraph_sheet.dart';
+import '../widgets/common/app_popup_menu.dart';
 import '../widgets/common/audio_app_bar_title.dart';
 import '../widgets/intensive_listen/intensive_listen_briefing_sheet.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_briefing_sheet.dart';
@@ -455,6 +457,75 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
     } else {
       context.push(AppRoutes.audioPlayer(widget.audioItemId));
     }
+  }
+
+  /// 构建计划页顶栏「更多操作」菜单（随心听按钮右侧）。
+  ///
+  /// 承载对当前音频的重要操作：管理字幕、编辑字幕、导出音频、导出 PDF。
+  /// 与音频列表项菜单同源（复用 [showManageSubtitlesSheet]/[exportAudioItem]）。
+  /// 官方音频隐藏字幕/导出写操作，仅在有字幕时保留导出 PDF；无可用项时返回 null。
+  Widget? _buildPlanMenu(
+    BuildContext context,
+    AppLocalizations l10n,
+    AudioItem audioItem,
+  ) {
+    final isOfficial = audioItem.remoteAudioId != null;
+    final hasTranscript = audioItem.hasTranscript;
+
+    final items = <PopupMenuEntry<String>>[
+      if (!isOfficial)
+        appPopupMenuItem(
+          context,
+          value: 'manageSubtitles',
+          icon: const Icon(Icons.subtitles_outlined, size: 20),
+          label: l10n.manageSubtitles,
+        ),
+      if (!isOfficial && hasTranscript)
+        appPopupMenuItem(
+          context,
+          value: 'editSubtitles',
+          icon: const Icon(Icons.edit_note, size: 20),
+          label: l10n.editSubtitles,
+        ),
+      if (!isOfficial)
+        appPopupMenuItem(
+          context,
+          value: 'export',
+          icon: const Icon(Icons.ios_share, size: 20),
+          label: l10n.exportAudio,
+        ),
+      if (hasTranscript)
+        appPopupMenuItem(
+          context,
+          value: 'exportPdf',
+          icon: const Icon(Icons.picture_as_pdf_outlined, size: 20),
+          label: l10n.exportPdf,
+        ),
+    ];
+
+    if (items.isEmpty) return null;
+
+    return PopupMenuButton<String>(
+      key: const Key('learning_plan_more_menu'),
+      tooltip: MaterialLocalizations.of(context).showMenuTooltip,
+      icon: const Icon(Icons.more_vert),
+      itemBuilder: (_) => items,
+      onSelected: (value) {
+        switch (value) {
+          case 'manageSubtitles':
+            showManageSubtitlesSheet(context, ref, audioItem);
+          case 'editSubtitles':
+            context.push(
+              AppRoutes.subtitleEditor(audioItem.id),
+              extra: audioItem,
+            );
+          case 'export':
+            exportAudioItem(context, ref, audioItem);
+          case 'exportPdf':
+            context.push(AppRoutes.pdfPreview, extra: audioItem);
+        }
+      },
+    );
   }
 
   /// 处理"开始学习/继续学习"按钮点击
@@ -1350,6 +1421,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
                 ),
               ),
             ),
+            ?_buildPlanMenu(context, l10n, audioItem),
           ],
         ),
         body: Column(

@@ -99,6 +99,8 @@ dependencies:
   # PDF 导出：Dart 端生成结构化 PDF（学习材料导出 PDF，见 lib/services/pdf_export/）。
   # 注意：3.13.0 起要求 Dart >=3.12，当前 SDK 下固定解析到 3.12.0
   pdf: ^3.12.0
+  # PDF 预览：PdfPreview 组件把 PDF 栅格化在 App 内展示（导出预览页），与 pdf 同作者
+  printing: ^5.14.2
 
 dev_dependencies:
   flutter_test:

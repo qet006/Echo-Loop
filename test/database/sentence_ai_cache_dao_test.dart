@@ -133,6 +133,49 @@ void main() {
       expect(newResult, isNotNull);
     });
 
+    test('getManyByHash 批量返回命中项，未命中不在结果中', () async {
+      await db.sentenceAiCacheDao.upsert('h1', 'translation:zh-CN', '{"t":1}');
+      await db.sentenceAiCacheDao.upsert('h2', 'translation:zh-CN', '{"t":2}');
+      await db.sentenceAiCacheDao.upsert('h3', 'analysis:zh-CN', '{"a":3}');
+
+      final result = await db.sentenceAiCacheDao.getManyByHash(
+        ['h1', 'h2', 'h3', 'missing'],
+        'translation:zh-CN',
+      );
+
+      expect(result, {'h1': '{"t":1}', 'h2': '{"t":2}'});
+      expect(result.containsKey('h3'), isFalse); // 类型不符
+      expect(result.containsKey('missing'), isFalse);
+    });
+
+    test('getManyByHash 空哈希列表返回空 map', () async {
+      final result = await db.sentenceAiCacheDao.getManyByHash(
+        const [],
+        'translation:zh-CN',
+      );
+      expect(result, isEmpty);
+    });
+
+    test('getManyByHash 不刷新 lastAccessedAt（只读，避免写放大）', () async {
+      await db.sentenceAiCacheDao.upsert('r1', 'translation:zh-CN', '{"t":1}');
+      final pastEpoch =
+          DateTime.now()
+              .subtract(const Duration(days: 10))
+              .millisecondsSinceEpoch ~/
+          1000;
+      await db.customStatement(
+        "UPDATE sentence_ai_cache SET last_accessed_at = $pastEpoch WHERE text_hash = 'r1'",
+      );
+
+      await db.sentenceAiCacheDao.getManyByHash(['r1'], 'translation:zh-CN');
+
+      // 批量读取不应刷新访问时间：5 天阈值仍会删除这条 10 天前的记录
+      final deleted = await db.sentenceAiCacheDao.deleteOlderThan(
+        const Duration(days: 5),
+      );
+      expect(deleted, 1);
+    });
+
     test('getByHash 更新 lastAccessedAt', () async {
       await db.sentenceAiCacheDao.upsert(
         'abc',

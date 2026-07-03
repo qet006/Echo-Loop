@@ -212,12 +212,15 @@ void main() {
       expect(find.text('/test/'), findsOneWidget);
     });
 
-    testWidgets('词形还原 fallback（running → run）', (tester) async {
+    testWidgets('词形还原 fallback（running → run）：标题保留表面词形 + 原形提示', (tester) async {
       await _openSheet(tester, 'running');
 
-      // 应通过词形还原找到 run
-      expect(find.text('run'), findsOneWidget);
+      // 标题保留用户所选表面词形 running（不再显示词干 run）
+      expect(find.text('running'), findsWidgets);
+      // 释义仍通过词形还原命中原形 run
       expect(find.text('/rʌn/'), findsOneWidget);
+      // 弱化提示告知展示的是原形 run 的查词结果
+      expect(find.textContaining('base form'), findsOneWidget);
     });
 
     testWidgets('大小写不敏感（Abandon → abandon）', (tester) async {

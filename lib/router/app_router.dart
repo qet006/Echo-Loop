@@ -39,6 +39,7 @@ import '../screens/retell_player_screen.dart';
 import '../screens/review_difficult_practice_screen.dart';
 import '../screens/bookmark_review_screen.dart';
 import '../screens/sentence_detail_screen.dart';
+import '../screens/pdf_preview_screen.dart';
 import '../screens/flashcard_screen.dart';
 import '../screens/activity_calendar_screen.dart';
 import 'main_shell.dart';
@@ -125,6 +126,9 @@ abstract class AppRoutes {
 
   /// 句子详情页路径（通用）
   static const sentenceDetail = '/sentence-detail';
+
+  /// 学习材料 PDF 导出预览页路径
+  static const pdfPreview = '/pdf-preview';
 
   /// Flashcard 单词卡片复习页路径
   static const flashcard = '/flashcard';
@@ -370,6 +374,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final args = state.extra! as SentenceDetailArgs;
           return SentenceDetailScreen(args: args);
+        },
+      ),
+      // 学习材料 PDF 导出预览（全屏）
+      GoRoute(
+        path: '/pdf-preview',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final audioItem = state.extra! as AudioItem;
+          return PdfPreviewScreen(audioItem: audioItem);
         },
       ),
       // Flashcard 单词卡片复习（全屏）

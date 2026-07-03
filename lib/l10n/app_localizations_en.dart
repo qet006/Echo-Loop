@@ -2487,7 +2487,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get exportAudio => 'Export';
+  String get exportAudio => 'Export Audio';
 
   @override
   String get exportAudioFile => 'Audio';
@@ -2508,6 +2508,51 @@ class AppLocalizationsEn extends AppLocalizations {
   String pdfExportFailed(String error) {
     return 'Failed to export PDF: $error';
   }
+
+  @override
+  String pdfMetaDuration(String duration) {
+    return 'Duration $duration';
+  }
+
+  @override
+  String pdfMetaSentences(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sentences',
+      one: '1 sentence',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfMetaWords(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count words',
+      one: '1 word',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pdfAppendixTitle => 'Appendix · Sentence Analysis';
+
+  @override
+  String get pdfPreviewTitle => 'Export Preview';
+
+  @override
+  String get pdfShare => 'Share';
+
+  @override
+  String get pdfOptionTranslation => 'Translation';
+
+  @override
+  String get pdfOptionVocab => 'Word Definitions';
+
+  @override
+  String get pdfOptionAnalysis => 'Sentence Analysis';
 
   @override
   String get exportData => 'Export Data';
@@ -2749,6 +2794,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dictionaryNotDownloaded => 'Dictionary not yet downloaded';
+
+  @override
+  String dictionaryBaseFormHint(String lemma) {
+    return 'Showing results for base form “$lemma”';
+  }
 
   @override
   String get download => 'Download';

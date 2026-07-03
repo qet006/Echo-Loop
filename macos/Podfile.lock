@@ -168,6 +168,8 @@ PODS:
     - Flutter
     - FlutterMacOS
     - PostHog (< 4.0.0, >= 3.50.0)
+  - printing (1.0.0):
+    - FlutterMacOS
   - PromisesObjC (2.4.0)
   - share_plus (0.0.1):
     - FlutterMacOS
@@ -231,6 +233,7 @@ DEPENDENCIES:
   - package_info_plus (from `Flutter/ephemeral/.symlinks/plugins/package_info_plus/macos`)
   - path_provider_foundation (from `Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin`)
   - posthog_flutter (from `Flutter/ephemeral/.symlinks/plugins/posthog_flutter/darwin`)
+  - printing (from `Flutter/ephemeral/.symlinks/plugins/printing/macos`)
   - share_plus (from `Flutter/ephemeral/.symlinks/plugins/share_plus/macos`)
   - shared_preferences_foundation (from `Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin`)
   - sherpa_onnx_macos (from `Flutter/ephemeral/.symlinks/plugins/sherpa_onnx_macos/macos`)
@@ -299,6 +302,8 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin
   posthog_flutter:
     :path: Flutter/ephemeral/.symlinks/plugins/posthog_flutter/darwin
+  printing:
+    :path: Flutter/ephemeral/.symlinks/plugins/printing/macos
   share_plus:
     :path: Flutter/ephemeral/.symlinks/plugins/share_plus/macos
   shared_preferences_foundation:
@@ -351,6 +356,7 @@ SPEC CHECKSUMS:
   path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
   PostHog: 3973ef7c446a12c252920d57448c3ef793148f13
   posthog_flutter: 7d1eca9c14e96d1fb31cf35d75a32c31fbc776c5
+  printing: c4cf83c78fd684f9bc318e6aadc18972aa48f617
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   share_plus: 510bf0af1a42cd602274b4629920c9649c52f4cc
   shared_preferences_foundation: 9e1978ff2562383bd5676f64ec4e9aa8fa06a6f7

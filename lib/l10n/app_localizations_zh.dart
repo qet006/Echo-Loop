@@ -2397,7 +2397,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get exportAudio => '导出';
+  String get exportAudio => '导出音频';
 
   @override
   String get exportAudioFile => '音频';
@@ -2418,6 +2418,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String pdfExportFailed(String error) {
     return '导出 PDF 失败：$error';
   }
+
+  @override
+  String pdfMetaDuration(String duration) {
+    return '时长 $duration';
+  }
+
+  @override
+  String pdfMetaSentences(int count) {
+    return '$count 句';
+  }
+
+  @override
+  String pdfMetaWords(int count) {
+    return '$count 词';
+  }
+
+  @override
+  String get pdfAppendixTitle => '附录 · 句子解析';
+
+  @override
+  String get pdfPreviewTitle => '导出预览';
+
+  @override
+  String get pdfShare => '分享';
+
+  @override
+  String get pdfOptionTranslation => '译文';
+
+  @override
+  String get pdfOptionVocab => '单词释义';
+
+  @override
+  String get pdfOptionAnalysis => '句子讲解';
 
   @override
   String get exportData => '导出数据';
@@ -2652,6 +2685,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get dictionaryNotDownloaded => '词典尚未下载';
+
+  @override
+  String dictionaryBaseFormHint(String lemma) {
+    return '以下为原形「$lemma」的查词结果';
+  }
 
   @override
   String get download => '下载';

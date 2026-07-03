@@ -41,6 +41,28 @@ Future<CleanupResult> cleanupRecordingTempFiles({
   return _cleanupDirectory(nsTmpDir, minAge: minAge);
 }
 
+/// 启动时清理：删除 `Library/Caches` 中超过 [minAge] 的 `pdf_export_` 临时目录。
+///
+/// PDF 分享的临时文件不能在分享后立即删除（macOS 的 `shareXFiles` 在
+/// AirDrop 传输开始前就 resolve，见 pdf_preview_screen `_share`），
+/// 故由此处兜底回收。默认 1 天：远大于任何在途分享的时长，
+/// 不会删到正在传输的文件。
+Future<CleanupResult> cleanupStalePdfExportTemp({
+  Duration minAge = const Duration(days: 1),
+}) async {
+  try {
+    final cachesDir = await getTemporaryDirectory();
+    return _cleanupDirectory(
+      cachesDir,
+      minAge: minAge,
+      nameFilter: (path) =>
+          path.split(Platform.pathSeparator).last.startsWith('pdf_export_'),
+    );
+  } catch (_) {
+    return const CleanupResult(freedBytes: 0);
+  }
+}
+
 /// app 自建在 `Library/Caches` 下的导出/导入临时目录前缀白名单。
 ///
 /// 仅这些目录可在清缓存时删除，其余条目（系统 URLCache `Cache.db`、

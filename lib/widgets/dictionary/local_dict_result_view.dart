@@ -15,6 +15,7 @@ import '../../providers/dictionary/lookup_controller.dart';
 import '../../providers/dictionary_provider.dart';
 import '../../services/dictionary_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/text_normalize.dart';
 import 'pos_tag.dart';
 
 /// 本地词典结果视图
@@ -22,7 +23,14 @@ class LocalDictResultView extends ConsumerWidget {
   /// 当前源的查询态
   final SourceLookupState? state;
 
-  const LocalDictResultView({super.key, required this.state});
+  /// 归一化后的查询词（表面词形），用于判定本地词典是否经词形还原回退命中原形
+  final String word;
+
+  const LocalDictResultView({
+    super.key,
+    required this.state,
+    required this.word,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -36,7 +44,7 @@ class LocalDictResultView extends ConsumerWidget {
 
     final s = state;
     if (s case LookupLoaded(result: final LocalDictResult r)) {
-      return _buildContent(theme, r.entry);
+      return _buildContent(context, theme, r.entry);
     }
     if (s is LookupNotFound) {
       return _buildNotFound(context, theme);
@@ -110,17 +118,52 @@ class LocalDictResultView extends ConsumerWidget {
     );
   }
 
-  /// 词典内容：音标/星级/标签 + 释义
-  Widget _buildContent(ThemeData theme, DictEntry entry) {
+  /// 词典内容：（原形回退提示）+ 音标/星级/标签 + 释义
+  Widget _buildContent(BuildContext context, ThemeData theme, DictEntry entry) {
+    // 表面词形未直接收录、经词形还原命中原形时（entry.word 与查询词不同），
+    // 顶部加一条弱化提示，说明展示的是原形释义。收藏保存的仍是表面词形。
+    // 两侧同经 normalizeWord 归一，消除大小写/边缘标点等差异导致的误提示。
+    final isBaseFormFallback = normalizeWord(entry.word) != word;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (isBaseFormFallback) ...[
+          _buildBaseFormHint(context, theme, entry.word),
+          const SizedBox(height: AppSpacing.s),
+        ],
         _buildMetaLine(theme, entry),
         const SizedBox(height: AppSpacing.m),
         if (entry.translation != null && entry.translation!.isNotEmpty)
           _buildTranslation(theme, entry.translation!),
         const SizedBox(height: AppSpacing.s),
+      ],
+    );
+  }
+
+  /// 原形回退提示（弱化样式）：告知用户展示的是原形 [lemma] 的查词结果
+  Widget _buildBaseFormHint(
+    BuildContext context,
+    ThemeData theme,
+    String lemma,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(
+          Icons.info_outline_rounded,
+          size: 14,
+          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+        ),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            AppLocalizations.of(context)!.dictionaryBaseFormHint(lemma),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+            ),
+          ),
+        ),
       ],
     );
   }

@@ -260,6 +260,34 @@ void main() {
       expect(find.text('Player'), findsOneWidget);
     });
 
+    testWidgets('AppBar「更多」菜单：有字幕音频显示 4 项操作', (tester) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('learning_plan_more_menu')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Manage Subtitles'), findsOneWidget);
+      expect(find.text('Edit subtitles'), findsOneWidget);
+      expect(find.text('Export Audio'), findsOneWidget);
+      expect(find.text('Export PDF'), findsOneWidget);
+    });
+
+    testWidgets('AppBar「更多」菜单：无字幕音频隐藏编辑字幕/导出 PDF', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(audioItem: testAudioItemNoTranscript),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('learning_plan_more_menu')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Manage Subtitles'), findsOneWidget);
+      expect(find.text('Export Audio'), findsOneWidget);
+      expect(find.text('Edit subtitles'), findsNothing);
+      expect(find.text('Export PDF'), findsNothing);
+    });
+
     testWidgets('显示进度卡片（0%，未开始）', (tester) async {
       await tester.pumpWidget(createTestWidget());
       await tester.pumpAndSettle();

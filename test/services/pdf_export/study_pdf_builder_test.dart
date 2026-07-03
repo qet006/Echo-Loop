@@ -41,6 +41,15 @@ void main() {
       cjkRegular: cjkRegular,
       appIconPng: appIconPng,
       exportDate: '2026-07-02',
+      labels: StudyPdfLabels(
+        metaDuration: '时长 ${formatStudyPdfDuration(document.durationSeconds)}',
+        metaSentences: '${document.sentenceCount} 句',
+        metaWords: '${document.wordCount} 词',
+        appendixTitle: '附录 · 句子解析',
+        grammar: '语法',
+        vocabulary: '重点词汇',
+        listening: '听力提示',
+      ),
     );
   }
 
@@ -112,6 +121,57 @@ void main() {
 
     expect(_pageCount(without), 1);
     expect(_pageCount(with_), 2);
+  });
+
+  test('尾注/词条锚点与内部链接写入 PDF（note-n / sent-n / vocab-n）', () async {
+    final doc = StudyPdfDocument(
+      title: 'Anchors',
+      paragraphs: [
+        [
+          const StudyPdfSentence(
+            index: 3,
+            text: 'A sentence with a message inside.',
+            grammar: '语法解析，引用 `a message` 片段。',
+            savedRanges: [(18, 25)],
+            vocabNotes: [
+              StudyPdfVocabNote(
+                number: 1,
+                term: 'message',
+                glosses: [StudyPdfGloss(pos: 'n.', text: '消息')],
+                ranges: [(18, 25)],
+              ),
+            ],
+            vocabMarkers: [(25, 1)],
+          ),
+        ],
+      ],
+    );
+
+    final bytes = await buildStudyPdfBytes(buildRequest(doc));
+    final raw = String.fromCharCodes(bytes);
+    // 命名目的地（锚点）与链接注解共用名字：出现 ≥2 次说明两端都写入
+    expect('note-1'.allMatches(raw).length, greaterThanOrEqualTo(2));
+    expect('sent-3'.allMatches(raw).length, greaterThanOrEqualTo(2));
+    expect('vocab-1'.allMatches(raw).length, greaterThanOrEqualTo(2));
+  });
+
+  test('全文无词汇旁注时不分栏（正常生成，无 vocab 锚点）', () async {
+    final doc = StudyPdfDocument(
+      title: 'Single Column',
+      paragraphs: [
+        [
+          const StudyPdfSentence(
+            index: 0,
+            text: 'A plain sentence without any vocabulary notes.',
+            translation: '一个没有词汇笔记的句子。',
+          ),
+        ],
+      ],
+    );
+
+    final bytes = await buildStudyPdfBytes(buildRequest(doc));
+    expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+    expect(String.fromCharCodes(bytes).contains('vocab-'), false);
   });
 
   test('500 句长文不抛异常（maxPages 生效）', () async {
@@ -186,6 +246,15 @@ void main() {
         latinItalic: latinItalic,
         cjkRegular: cjkRegular,
         exportDate: '2026-07-02',
+        labels: const StudyPdfLabels(
+          metaDuration: '时长 00:00',
+          metaSentences: '1 句',
+          metaWords: '2 词',
+          appendixTitle: '附录 · 句子解析',
+          grammar: '语法',
+          vocabulary: '重点词汇',
+          listening: '听力提示',
+        ),
       ),
     );
     expect(String.fromCharCodes(bytes.take(5)), '%PDF-');

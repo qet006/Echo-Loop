@@ -44,7 +44,7 @@ class DictionaryResultView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     switch (sourceId) {
       case 'local':
-        return LocalDictResultView(state: state);
+        return LocalDictResultView(state: state, word: word);
       case 'ai':
         return AiDictResultView(
           state: state,
@@ -63,9 +63,12 @@ class DictionaryResultView extends ConsumerWidget {
 
   /// sealed 结果穷尽分发（新增源安全网）
   Widget _loadedFallback(DictionaryLookupResult result) => switch (result) {
-    LocalDictResult() => LocalDictResultView(state: state),
-    AiDictResult() =>
-      AiDictResultView(state: state, onRetry: onRetry, onSignIn: onSignIn),
+    LocalDictResult() => LocalDictResultView(state: state, word: word),
+    AiDictResult() => AiDictResultView(
+      state: state,
+      onRetry: onRetry,
+      onSignIn: onSignIn,
+    ),
     // key by sourceId：切源时重建为全新 native view，杜绝旧页残留（标准做法）
     WebDictResult(:final sourceId, :final url) => WebDictionaryView(
       key: ValueKey('web_$sourceId'),

@@ -3,6 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:echo_loop/services/temp_cleanup_service.dart';
 
+/// 设置目录修改时间（Directory 无 setLastModifiedSync，借助系统 touch）
+void setDirMtime(Directory dir, DateTime time) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  final ts =
+      '${time.year}${two(time.month)}${two(time.day)}'
+      '${two(time.hour)}${two(time.minute)}';
+  Process.runSync('touch', ['-m', '-t', ts, dir.path]);
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -125,6 +134,16 @@ void main() {
       expect(audioExportDir.existsSync(), false);
     });
 
+    test('Library/Caches 删除 pdf_export_ 临时目录', () async {
+      final pdfDir = Directory('${fakeCacheDir.path}/pdf_export_123')
+        ..createSync();
+      File('${pdfDir.path}/a.pdf').writeAsBytesSync(List.filled(800, 0));
+
+      await cleanupAllTempFiles();
+
+      expect(pdfDir.existsSync(), false);
+    });
+
     test('Library/Caches 保护系统 URLCache 与框架缓存', () async {
       // 系统 URLCache：<bundleId>/Cache.db* 及散落的 Cache.db 文件
       final cacheDbFile = File('${fakeCacheDir.path}/Cache.db');
@@ -153,6 +172,48 @@ void main() {
       expect(urlCacheDir.existsSync(), true);
       expect(imageCacheDir.existsSync(), true);
       expect(otherCache.existsSync(), true);
+    });
+  });
+
+  group('cleanupStalePdfExportTemp', () {
+    test('删除超过 minAge 的 pdf_export_ 目录', () async {
+      final staleDir = Directory('${fakeCacheDir.path}/pdf_export_1')
+        ..createSync();
+      File('${staleDir.path}/a.pdf').writeAsBytesSync(List.filled(1000, 0));
+      setDirMtime(staleDir, DateTime.now().subtract(const Duration(days: 2)));
+
+      final result = await cleanupStalePdfExportTemp();
+
+      expect(result.freedBytes, 1000);
+      expect(staleDir.existsSync(), false);
+    });
+
+    test('保留不足 minAge 的 pdf_export_ 目录（可能正在 AirDrop）', () async {
+      final freshDir = Directory('${fakeCacheDir.path}/pdf_export_2')
+        ..createSync();
+      File('${freshDir.path}/b.pdf').writeAsBytesSync(List.filled(500, 0));
+
+      final result = await cleanupStalePdfExportTemp();
+
+      expect(result.freedBytes, 0);
+      expect(freshDir.existsSync(), true);
+    });
+
+    test('不触碰其他前缀与系统缓存（即使很旧）', () async {
+      final audioDir = Directory('${fakeCacheDir.path}/audio_export_7')
+        ..createSync();
+      File('${audioDir.path}/a.m4a').writeAsBytesSync(List.filled(200, 0));
+      setDirMtime(audioDir, DateTime.now().subtract(const Duration(days: 3)));
+      final cacheDbFile = File('${fakeCacheDir.path}/Cache.db');
+      cacheDbFile.writeAsBytesSync(List.filled(1000, 0));
+      cacheDbFile.setLastModifiedSync(
+        DateTime.now().subtract(const Duration(days: 3)),
+      );
+
+      await cleanupStalePdfExportTemp();
+
+      expect(audioDir.existsSync(), true);
+      expect(cacheDbFile.existsSync(), true);
     });
   });
 }

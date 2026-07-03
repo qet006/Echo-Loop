@@ -1,7 +1,87 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-02（PDF 导出样式重设计）
+> 最后更新：2026-07-03（学习计划页顶栏「更多」菜单）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：学习计划页顶栏「更多」菜单（管理字幕/编辑字幕/导出音频/导出 PDF）
+
+计划页此前无法对当前音频做管理操作（只能回列表长按菜单）。在 AppBar「随心听」按钮右侧新增三点「更多」菜单，聚合 4 项重要操作。
+
+- [x] **共享操作抽取**：把音频列表项菜单里较复杂的「管理字幕 / 导出音频」逻辑（含临时 SRT 落盘、平台分发保存、内容懒检测）抽到 `lib/utils/audio_item_actions.dart`（`showManageSubtitlesSheet` / `exportAudioItem` / `maybeCheckAudioContent`），`audio_list_tile` 与计划页共用，消除 ~100 行重复。
+- [x] **计划页顶栏菜单**：`learning_plan_screen.dart` 新增 `_buildPlanMenu`（`learning_plan_more_menu`），随心听右侧渲染。项：管理字幕、编辑字幕（需字幕）、导出音频、导出 PDF（需字幕）；官方音频隐藏字幕/导出写操作，无可用项时整菜单不渲染（null-aware element `?`）。
+- [x] **测试**：`learning_plan_screen_test.dart` 加 2 例（有字幕显示 4 项 / 无字幕隐藏编辑字幕+导出 PDF）。
+- [x] **验证**：`flutter analyze` 改动文件 0 问题；`learning_plan_screen_test`（53 例）+ `audio_list_tile_test` 全过。
+
+  **完成时间**: 2026-07-03
+
+## 已完成：词典收藏改用表面词形 + 词组不做词形还原 + 数据库预热
+
+收藏词此前存的是词形还原后的原形（lemma），但正文收藏下划线按用户实际点击/查询的表面词形匹配（见 `SavedTextIndex`），存原形会导致正文无法标记。同时词典面板标题/发音/收藏跨源展示曾被切换为各源 headword（本地原形、AI headword），不同源标题不一致。
+
+- [x] **收藏改存表面词形**：`saveWord` 语义变更为存归一化表面词形；`DictionaryPanel` 标题/TTS/收藏跨源统一用 `_normalizedWord`，不再用本地词典原形或 AI headword 作标题。
+- [x] **本地词典原形回退提示**：`LocalDictResultView` 在命中词（`entry.word`）与查询表面词形不同（经词形还原回退）时，顶部加弱化提示「以下为原形「xxx」的查词结果」（`dictionaryBaseFormHint`，en/zh 均已翻译）。
+- [x] **词组不做词形还原**：`DictionaryService.lookup`/`lookupAll` 对含空格的归一化词（词组）跳过词形还原 fallback，仅做精确匹配——本地库只收单词，对词组还原无意义。
+- [x] **数据库页缓存预热**：新增 `DictionaryService.warmUpDatabase()`，用一组常见词走 NOCASE 索引批量查询把 B-tree 页带入 SQLite page cache；`DictionaryProvider._scheduleWarmUp`（原 `_scheduleLemmatizerWarmUp`）延迟 2s 依次预热数据库 + 词形还原器。
+- [x] **诊断日志**：`DictionaryService` 预热与 lookupAll 词形还原 fallback 路径补 `AppLogger` 打点，便于后续排查命中率。
+- [x] **测试**：`dictionary_service_test.dart` 补数据库预热 + 词组不还原用例；`dictionary_panel_content_test.dart`/`local_dict_result_view_test.dart`/`word_dictionary_sheet_switch_test.dart` 同步改为断言标题恒为表面词形 + 原形回退提示。
+- [x] **验证**：`flutter analyze` 改动文件 0 问题；相关测试全过（45 例）。
+
+  **完成时间**: 2026-07-03
+
+## 已完成：PDF 导出性能优化（批量查询 + isolate 组装）
+
+真机反馈进 PDF 预览页首屏慢、含较多收藏词的音频尤其明显。逐词/逐句串行 DB 往返是主因，改为批量查询 + isolate 组装消除。
+
+- [x] **词典基础设施**：`DictionaryService.openDatabase` 补建 `word` 列 NOCASE 索引（`CREATE INDEX IF NOT EXISTS`，幂等，避免每次全表扫描）；新增 `warmUpLemmatizer()`，由 `DictionaryProvider` 在词典打开后延迟 2s 空闲触发，避开首次查词/导出的关键路径。
+- [x] **批量哈希查询**：`SentenceAiCacheDao.getManyByHash`（单条 `WHERE textHash IN (...)`，只读不刷新 `lastAccessedAt`），把 `study_pdf_loader.dart` 里逐词/逐句 `getByHash` 的 O(N) 串行往返收敛为常数次查询。
+- [x] **PDF loader 重构**：词条候选先纯内存收集（`_VocabCandidate`），AI 缓存 + 本地词典各一次性批量查（`lookupAll`）；分词/命中区间/标号/段落分组/词数统计整体移入 `compute` isolate（`_assembleStudyPdfDocument`），不占主 isolate；字幕解析同样移入 isolate。
+- [x] **预览页体感优化**：`_loadAndGenerate` 推迟到进场转场动画结束再启动，避免加载抢占主 isolate 导致转场掉帧；`PdfPreview.build` 回调按字节身份缓存稳定引用，避免父级重建触发重复栅格化（printing 5.14.3 重复栅格化在 dispose 竞态下会抛 `RangeError`）。
+- [x] **耗时打点**：`AppLogger` 记录读字体/字幕解析/词典批量查/翻译解析批量读/逐句组装/PDF 生成/端到端总耗时各阶段，便于后续真机排查。
+- [x] **测试**：`sentence_ai_cache_dao_test.dart` 新增 3 例（批量命中/空列表/不刷新访问时间）；`dictionary_service_test.dart` 新增 NOCASE 索引补建 + 预热用例；`study_pdf_loader_test.dart` 适配批量查询签名，收藏词兜底逻辑测试同步更新为「按表面词形直查」。
+- [x] **验证**：`flutter analyze` 改动文件 0 问题；相关测试全过。
+
+  **完成时间**: 2026-07-03
+
+## 已完成：PDF 导出预览页（pdf + printing PdfPreview，内容选项可勾选）
+
+导出流程从「进度弹窗 → 直接弹系统分享/另存为」改为业界标准预览流：点「导出 PDF」进全屏预览页，顶栏三个动作——下载（另存为）、分享（系统面板）、菜单（3 个可勾选内容项：译文 / 单词释义 / 句子讲解，默认全选），切换选项后预览快速刷新。生成逻辑仅一份，预览/下载/分享共用同一 `Uint8List`。
+
+- [x] **依赖**：新增 `printing: ^5.14.2`（与 `pdf` 同作者；`PdfPreview` 栅格化预览，自带工具栏全关、动作在自家 AppBar）。
+- [x] **选项模型 + 纯过滤**（`lib/models/pdf_export/study_pdf_options.dart`）：`StudyPdfExportOptions`（3 bool + bitmask 缓存 key）+ `applyStudyPdfOptions`——关译文清 `translation`、关释义清 `vocabNotes/vocabMarkers`（收藏词下划线保留）、关讲解清 `grammar/vocabulary/listening`；builder 现有逻辑天然收敛（无笔记→单栏、无解析→无尾注/附录）；全开返回原引用免拷贝。
+- [x] **服务拆分**（`study_pdf_export_service.dart`）：`export` 拆为 `buildBytes`（读字体→compute 生成字节）+ `writeTempPdf`（分享时才落盘临时文件）。
+- [x] **预览页**（`lib/screens/pdf_preview_screen.dart`）：文档 `StudyPdfLoader.load` 只加载一次，选项变化走纯过滤 + 重新生成；字节按选项组合缓存（≤8 种）重复切换秒回；generation token 防竞态；错误态 + 重试。下载 = `FilePicker.saveFile`（移动端 bytes 直写、桌面端返回路径后自写），分享 = 写临时文件 → `Share.shareXFiles`（iPad/macOS 传 sharePositionOrigin）→ 删除。loader/exportService/previewBuilder 构造注入（widget 测试绕开 `PdfPreview` method channel）。
+- [x] **路由 + 触发**：`AppRoutes.pdfPreview = '/pdf-preview'` 顶层全屏路由（不与 `/collections` 前缀重叠，符合 §7.17）；`audio_list_tile` 菜单改 `context.push(extra: audioItem)`；删除 `export_pdf_runner.dart`（labels 组装迁入预览页）。
+- [x] **l10n**：新增 `pdfPreviewTitle/pdfShare/pdfOptionTranslation/pdfOptionVocab/pdfOptionAnalysis`（en/zh）；复用 `download/retry/exportSuccess/pdfExportFailed`。
+- [x] **测试**：`study_pdf_options_test.dart` 8 例（bitmask/相等性/三类内容独立剔除/原文档不变/全开引用相等）+ `pdf_preview_screen_test.dart` 5 例（动作可用/菜单默认全选/切换选项重新生成+缓存命中不重复生成/文档只加载一次/失败重试）。
+- [x] **验证**：`flutter analyze` 改动文件 0 问题；`flutter test` 全量 3582 passed。
+- [ ] **真机验证待办**：真机进预览页切换三个选项检查预览刷新（无译文/单栏/无附录），下载走系统「存储到文件」、分享面板正常；macOS 另存为正常。
+
+  **完成时间**: 2026-07-03
+
+## 已完成：PDF 导出格式优化（用户反馈第四轮：链接导航 + 词条标号 + 附录徽章）
+
+真机导出后 7+2 条反馈逐项落地：
+
+- [x] **无词汇旁注不分栏**：全文一个词条都没有时正文占满整行（`_buildBlocks` 统计 `vocabNumbers.isEmpty` → `_sentenceBlocks(twoColumn: false)` 不再渲染右栏 Row）。
+- [x] **书签图标放大**：6.5×8.5 → 9×11.5。
+- [x] **尾注 [n] 内部链接**：正文句末 `[n]` ↔ 附录条目互跳——`pw.Anchor`（`sent-{index}` / `note-{n}`）+ `TextSpan.annotation: pw.AnnotationLink`；附录条目句子原文加粗。
+- [x] **音标斜体**：右栏词条音标加 `FontStyle.italic`。
+- [x] **AI 词典严格优先**：有 AI 查词结果就不混本地词典。根因是键错位——收藏词存 lemma（`message`），App 内 AI 查词按用户点击的表面词形缓存（`messages`）→ lemma 直查未命中落到本地。loader 加表面词形兜底：句中 token 经本地词典还原 lemma 相同者逐个查 AI 缓存（`_surfaceFormsOf`）；AI 命中后即使义项为空也不再落本地。
+- [x] **附录条目格式**：语法/词汇/听力标签改灰底圆角 badge（WidgetSpan Container，三段边界一眼可辨）；解析正文里的 `` `引用片段` `` 转灰底高亮块（>48 字符退化为无底色粗体防内联组件撑破版面）；条目句子加粗。
+- [x] **词条标号 + 导航**：loader 按「句序 → 句内出现序」给词条分配全文档统一标号 1..m（`StudyPdfVocabNote.number`），正文命中词后加上标小号蓝色标号（`you¹`，尾注标准位置）、右栏词条同号（`¹ you`）并挂 `vocab-{n}` 锚点互跳；右栏词条按句中首次出现位置排序（带原索引稳定比较，`List.sort` 非稳定）。
+- [x] **（第五轮反馈）标号全局生效**：同一收藏词在**任何**句子出现都标同号（与橙色下划线全局语义一致，不限于收藏来源句）——loader 用全文档已编号词条逐句算 `StudyPdfSentence.vocabMarkers`（(命中区间末尾, 标号) 列表），builder 只消费不再自行编号。
+- [x] **（渲染反馈）标号不拆行**：标号与所属词合并为原子 WidgetSpan 内嵌 RichText（pdf 包 RichText 各 span 是独立断行单元，标号单独成 span 会被折到下行错挂到下个词）。
+- [x] **（渲染反馈）badge/高亮块基线对齐**：pdf 包 WidgetSpan 底边落在行基线上，内部文字被抬高——统一按 `-(下内边距 + 字号×NotoSans descent 0.293)` 下移（badge -3.0 / 高亮 -3.3 / 词标号单元 -字号×0.293），对照页目检确认。
+- [x] **（坑）WidgetSpan 泄漏画布 fill color**：pdf 包 RichText 按 span 跟踪 fill color，而 `_WidgetSpan.paint` 直接调 `widget.paint` 不保存图形状态 → 内部改色泄漏，后续正文全被染色。解法：`_PaintIsolate`（SingleChildWidget 子类，`paintChild` 自带 saveContext/restoreContext = PDF q/Q）包裹所有内嵌进 RichText 的 WidgetSpan 子树（词标号单元 / badge / 高亮块 / 书签图标）。
+- [x] **（第六轮反馈）收藏词下划线自绘**：pdf 包 `TextDecoration.underline` 画在 baseline 下 descent/2 处（`text.dart` 写死不可调），切过 g/y 等 descender 且延伸到标号下。改为收藏段逐词渲染 `_savedWordSpan`——Container 底边框画在字形框之下 1.1pt（`_savedUnderlineGap`），线只在词下、标号不划线。
+- [x] **（第六轮反馈）行内元素视觉居中**：书签图标 baseline -3.0（原底边落在基线上整体偏高）、正文 `[n]` baseline +0.6、附录 `[n]` 缩为 8.5pt（方括号字形上下超出字母，同字号显得偏大偏高）。
+- [x] **（第六轮反馈）附录音标斜体**：`_textWithPhonetics` 按 `/.../ ` 模式（限拉丁+IPA 字符集）把解析正文里的音标转斜体，与右栏音标一致；`_looksLikePhonetic` 过滤 and/or 类普通斜杠用法（无非 ASCII 音标字符且长/含空格则不斜体）。
+- [x] **测试**：builder 8 例（新增锚点/链接写入、单栏无 vocab 锚点）+ loader 18 例（AI 严格优先、表面词形兜底、ranges、按出现位置排序、跨句全局标记）全过；样例 PDF 渲染 PNG 目检通过。
+- [x] **（第七轮反馈）标题下元信息行**：日期行扩为「日期 · 时长 mm:ss · N 句 · N 词」（时长带「时长」前缀——紧跟日期的裸 mm:ss 会被误读成导出时刻）（`StudyPdfDocument.durationSeconds/wordCount`）——时长优先取音频元数据 `totalDuration`、未探测（0）时回退字幕末句结束时间，格式 mm:ss（≥1h 为 h:mm:ss）；词数按 App 统一分词器统计全文 isWord token；时长未知/词数 0 时省略对应项。loader 测试 +2（时长回退与优先级、词数），样张目检通过。
+- [x] **（第七轮反馈）PDF 内文案 i18n**：PDF 内硬编码中文（元信息行「时长/句/词」、附录标题、语法/词汇/听力徽章）全部走 ARB——新增 `pdfMetaDuration/pdfMetaSentences/pdfMetaWords/pdfAppendixTitle`（en 用 ICU 复数），徽章复用 App 内 AI 解析面板的 `aiGrammar/aiVocabulary/aiListening`。builder 在 compute isolate 内拿不到 l10n，新增 `StudyPdfLabels`（纯字符串、跨 isolate）由 runner 按当前 locale 组装经 `StudyPdfBuildRequest.labels` 传入；`formatStudyPdfDuration` 移到 model 层（locale 无关）。
+- [x] **（第七轮反馈）标号点击跳转核查**：解析真实导出 PDF 内部对象验证 `vocab-{n}` 链接/锚点数据完全正确（dest 页码与 Y 坐标精确指向右栏词条行）；「跳到文档开头」是 macOS Preview 已知限制——内部跳转只跳目标页、忽略页内坐标，同页跳转表现为滚回页首。Chrome/Adobe Reader 定位正确，PDF 端无解，不改代码。
+
+  **完成时间**: 2026-07-02
 
 ## 已完成：PDF 导出样式重设计（学术论文风格，用户反馈第二轮）
 

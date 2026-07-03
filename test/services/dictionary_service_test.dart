@@ -3,8 +3,11 @@
 /// 使用内存 SQLite 数据库验证精确匹配和词形还原 fallback 逻辑。
 library;
 
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:echo_loop/services/dictionary_service.dart';
+import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
 /// 创建内存数据库并插入测试数据
@@ -55,6 +58,54 @@ void main() {
       final emptyService = DictionaryService.withDatabase(_createTestDb());
       emptyService.close();
       expect(emptyService.isAvailable, isFalse);
+    });
+  });
+
+  group('openDatabase 补建 NOCASE 索引 + 预热', () {
+    test('打开文件库时补建 idx_words_word_nocase，大小写不敏感查询命中', () async {
+      final dir = await Directory.systemTemp.createTemp('dict_test');
+      final path = p.join(dir.path, 'dict.db');
+      // 预置一个无索引的 words 表文件库（headword 含大写）
+      final seed = sqlite3.open(path);
+      seed.execute(
+        'CREATE TABLE words (word TEXT, phonetic TEXT NOT NULL, '
+        'translation TEXT, collins INTEGER DEFAULT 0, tag TEXT)',
+      );
+      seed.execute(
+        "INSERT INTO words (word, phonetic, translation) "
+        "VALUES ('Message', 'ˈmesɪdʒ', 'n. 消息')",
+      );
+      seed.dispose();
+
+      final svc = DictionaryService.instance;
+      svc.openDatabase(path);
+      addTearDown(svc.close);
+
+      // 索引已补建
+      final checker = sqlite3.open(path, mode: OpenMode.readOnly);
+      final idx = checker.select(
+        "SELECT name FROM sqlite_master WHERE type='index' "
+        "AND name='idx_words_word_nocase'",
+      );
+      checker.dispose();
+      expect(idx, isNotEmpty);
+
+      // NOCASE 查询命中（输入小写，headword 大写）
+      expect(svc.lookup('message')?.word, 'Message');
+
+      // 预热词形还原器不抛异常
+      svc.warmUpLemmatizer();
+      // 预热数据库页缓存不抛异常，且不影响后续查询
+      svc.warmUpDatabase();
+      expect(svc.lookup('message')?.word, 'Message');
+
+      await dir.delete(recursive: true);
+    });
+
+    test('warmUpDatabase 在数据库未就绪时安全 no-op', () {
+      final closedService = DictionaryService.withDatabase(_createTestDb());
+      closedService.close();
+      expect(closedService.warmUpDatabase, returnsNormally);
     });
   });
 
@@ -186,6 +237,28 @@ void main() {
       expect(results['professors']!.word, 'professor');
       expect(results['running'], isNotNull);
       expect(results['running']!.word, 'run');
+    });
+
+    test('词组（含空格）不做词形还原，未收录即不命中', () {
+      // "going to" 是词组，本地库只收单词，不应被拆词还原到 go
+      final results = service.lookupAll(['going to']);
+      expect(results.containsKey('going to'), isFalse);
+    });
+  });
+
+  group('词组不做词形还原', () {
+    test('lookup 词组精确未命中直接返回 null（不还原到 go）', () {
+      expect(service.lookup('going to'), isNull);
+    });
+
+    test('lookup 词组精确命中仍正常返回', () {
+      // 若本地库恰好收录该词组，精确匹配照常命中
+      db.execute(
+        "INSERT INTO words (word, phonetic, translation) "
+        "VALUES ('give up', 'ɡɪv ʌp', 'v. 放弃')",
+      );
+      final entry = service.lookup('give up');
+      expect(entry?.word, 'give up');
     });
   });
 }

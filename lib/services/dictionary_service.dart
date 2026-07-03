@@ -10,6 +10,7 @@ import 'package:sqlite3/sqlite3.dart';
 
 import '../models/dict_entry.dart';
 import '../utils/text_normalize.dart';
+import 'app_logger.dart';
 
 /// 词典服务单例
 class DictionaryService {
@@ -42,9 +43,70 @@ class DictionaryService {
   ///
   /// 由 [DictionaryProvider] 在词典下载完成后调用。
   /// 如果之前已打开其他数据库，会先关闭。
+  ///
+  /// 首次打开时补建 `word` 列的 **NOCASE 索引**：查询用
+  /// `WHERE word = ? COLLATE NOCASE` / `word COLLATE NOCASE IN (...)`，
+  /// 若无 NOCASE 索引则每次都全表扫描（770k 行 ~百 ms/次），补索引后变索引查找。
+  /// `CREATE INDEX IF NOT EXISTS` 幂等：仅首次构建耗时，之后启动即时。
+  /// 为能建索引改用读写模式打开；失败（只读介质等）退化为全表扫描，不致命。
   void openDatabase(String dbPath) {
     _db?.dispose();
-    _db = sqlite3.open(dbPath, mode: OpenMode.readOnly);
+    final db = sqlite3.open(dbPath);
+    try {
+      db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_words_word_nocase '
+        'ON words(word COLLATE NOCASE)',
+      );
+    } catch (_) {
+      // 建索引失败不致命，仍可查询（退化为全表扫描）
+    }
+    _db = db;
+  }
+
+  /// 预热词形还原器
+  ///
+  /// 首次 `lemmas()` 调用会同步加载词法数据（~1s CPU）。查词/导出遇到
+  /// 词典未精确收录的词就会触发它——放到启动空闲期预热，避免这 ~1s
+  /// 冷加载落在用户等待的关键路径上。幂等、可安全多次调用。
+  void warmUpLemmatizer() {
+    final sw = Stopwatch()..start();
+    try {
+      final lemmas = _lemmatizer.lemmas('warmup');
+      AppLogger.log(
+        'DictWarmUp',
+        '词形还原器预热 ${sw.elapsedMilliseconds}ms (探测词 warmup → ${lemmas.length} lemma)',
+      );
+    } catch (e) {
+      // 预热失败不致命，首次真实查询时再冷加载
+      AppLogger.log('DictWarmUp', '词形还原器预热失败 ${sw.elapsedMilliseconds}ms: $e');
+    }
+  }
+
+  /// 预热词典数据库页缓存
+  ///
+  /// [openDatabase] 只 `open` + 建索引，不读 `words` 行数据；首次批量查词
+  /// （如 PDF 导出）要冷加载 B-tree 索引页/数据页（770k 行，~百 ms）。
+  /// 启动空闲期跑一条走 NOCASE 索引的批量查询，把索引页与部分数据页带进
+  /// SQLite page cache，使首次真实查词命中热缓存。幂等、可安全多次调用。
+  void warmUpDatabase() {
+    if (_db == null) {
+      AppLogger.log('DictWarmUp', '数据库预热跳过：DB 未就绪');
+      return;
+    }
+    final sw = Stopwatch()..start();
+    try {
+      // 用一组常见词走 `word COLLATE NOCASE IN (...)`，与真实批量查词同路径。
+      const probeWords = ['the', 'be', 'have', 'do', 'say', 'word'];
+      final found = _queryWords(probeWords);
+      AppLogger.log(
+        'DictWarmUp',
+        '数据库页预热 ${sw.elapsedMilliseconds}ms '
+            '(探测 ${probeWords.length} 词，命中 ${found.length})',
+      );
+    } catch (e) {
+      // 预热失败不致命，首次真实查询时再冷加载
+      AppLogger.log('DictWarmUp', '数据库预热失败 ${sw.elapsedMilliseconds}ms: $e');
+    }
   }
 
   /// 关闭当前数据库连接
@@ -68,6 +130,9 @@ class DictionaryService {
     final exact = _queryWord(lower);
     if (exact != null) return exact;
 
+    // 词组（含空格）不做词形还原：本地库只收单词，还原无意义
+    if (_isPhrase(lower)) return null;
+
     // 词形还原 fallback：获取所有可能的原形，逐个查询
     final lemmas = _lemmatizer.lemmas(lower);
     for (final lemma in lemmas) {
@@ -82,6 +147,9 @@ class DictionaryService {
   }
 
   String _normalizeLookupWord(String word) => normalizeWord(word);
+
+  /// 是否为词组（归一化后含空格）。本地库只收单词，词组不做词形还原。
+  bool _isPhrase(String normalized) => normalized.contains(' ');
 
   /// 直接查询数据库
   DictEntry? _queryWord(String word) {
@@ -128,23 +196,40 @@ class DictionaryService {
       }
     }
 
-    // 3. 对未命中的词做词形还原 fallback（逐个查询）
-    final missed = allNormalized.where((w) => !found.containsKey(w)).toList();
+    // 3. 对未命中的**单词**做词形还原 fallback（逐个查询）。
+    //    词组（含空格）不做词形还原：本地库只收单词，对词组还原无意义
+    //    （如 "going to"），当前仅需高亮，查词等以后有词组库再说。
+    final missed = allNormalized
+        .where((w) => !found.containsKey(w) && !_isPhrase(w))
+        .toList();
+    if (missed.isNotEmpty) {
+      AppLogger.log(
+        'DictLookup',
+        '精确未命中，触发词形还原 fallback: ${missed.join(', ')}',
+      );
+    }
     for (final lower in missed) {
       final lemmas = _lemmatizer.lemmas(lower);
       DictEntry? entry;
+      String? resolvedForm;
       for (final lemma in lemmas) {
         for (final form in lemma.lemmas) {
           if (form == lower) continue;
           entry = _queryWord(form);
-          if (entry != null) break;
+          if (entry != null) {
+            resolvedForm = form;
+            break;
+          }
         }
         if (entry != null) break;
       }
       if (entry != null) {
+        AppLogger.log('DictLookup', '  "$lower" → 原形 "$resolvedForm" 命中');
         for (final original in normalizedToOriginals[lower]!) {
           result[original] = entry;
         }
+      } else {
+        AppLogger.log('DictLookup', '  "$lower" 词形还原后仍未命中');
       }
     }
     return result;

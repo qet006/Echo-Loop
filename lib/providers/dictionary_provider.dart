@@ -107,6 +107,7 @@ class Dictionary extends _$Dictionary {
       // 本地已有，直接打开
       final path = await _manager.dictionaryPath(nativeLanguage);
       DictionaryService.instance.openDatabase(path);
+      _scheduleWarmUp();
       AppLogger.log('Dict', 'opened local dictionary lang=$nativeLanguage');
       state = state.copyWith(
         status: DictionaryStatus.downloaded,
@@ -148,6 +149,7 @@ class Dictionary extends _$Dictionary {
 
       // 下载完成，打开数据库
       DictionaryService.instance.openDatabase(path);
+      _scheduleWarmUp();
       AppLogger.log('Dict', 'download complete lang=$nativeLanguage');
       state = state.copyWith(
         status: DictionaryStatus.downloaded,
@@ -194,6 +196,7 @@ class Dictionary extends _$Dictionary {
       // 重新打开数据库
       DictionaryService.instance.close();
       DictionaryService.instance.openDatabase(path);
+      _scheduleWarmUp();
       AppLogger.log('Dict', 'update complete lang=$nativeLanguage');
     } catch (e) {
       // 更新失败不影响当前已有词典的使用
@@ -202,6 +205,20 @@ class Dictionary extends _$Dictionary {
         'update check failed lang=$nativeLanguage error=$e',
       );
     }
+  }
+
+  /// 词典打开后，启动空闲期预热
+  ///
+  /// 预热两项冷成本，避免落在首次查词/PDF 导出等关键路径上：
+  /// - 数据库页缓存：`openDatabase` 不读行数据，首次批量查词要冷加载 B-tree 页；
+  /// - 词形还原器：首次 `lemmas()` 有 ~1s 同步冷加载。
+  /// 延迟 2s 让启动流程先跑完；先预热 DB（快）再预热词形还原器（~1s CPU）。
+  void _scheduleWarmUp() {
+    Future.delayed(const Duration(seconds: 2), () {
+      DictionaryService.instance
+        ..warmUpDatabase()
+        ..warmUpLemmatizer();
+    });
   }
 
   /// 重试下载（下载失败后调用）
