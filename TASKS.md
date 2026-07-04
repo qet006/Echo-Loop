@@ -1,7 +1,36 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-03（官方/播客音频「删除音频」）
+> 最后更新：2026-07-04（AI 词典多词表达新 Prompt 展示对齐）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：AI 词典多词表达新 Prompt 展示对齐
+
+后端 `POST /api/v2/ai/dictionary` 的多词表达 prompt 已精简为 `originalExpression / naturalness / category / pronunciationTips / meanings / similarExpressions / background / learnerTips`；前端同步收敛模型、缓存、展示和测试。
+
+- [x] **联合模型**：`MultiWordDictionaryEntry` 改为镜像 app 前端新 schema；前端不保留 `thinking` / `frequency`，展示与空态只看 learner-facing 字段；旧缓存缺 `queryType` 仍按单词解析，新缓存可用 `originalExpression` 识别多词。
+- [x] **缓存隔离**：`AiDictionarySource` L2 cache type 升级为 `ai_dictionary_v2`，避开旧多词 prompt 结构缓存。
+- [x] **UI**：多词结果保留 `category` 顶部元信息，主要内容区按 `meanings → naturalness → pronunciationTips → similarExpressions → background → learnerTips` 展示非空字段；词典面板长词组标题自动缩小为单行完整显示，不折行、不溢出、不省略；单词结果视图不变。
+- [x] **TTS**：多词表达的 `meanings[].examples` 与 `similarExpressions[].sentence` 纳入词典面板预热顺序。
+- [x] **l10n**：替换旧多词分节文案为新字段标签，并刷新生成文件。
+- [x] **测试**：更新模型解析、L2/L3 缓存、UI 渲染和 TTS 提取用例。
+- [x] **验证**：`flutter analyze` 改动相关 11 个 Dart 文件 0 问题；`flutter test test/models/dictionary/dictionary_entry_test.dart test/models/dictionary/dict_speakable_texts_test.dart test/services/dictionary/ai_dictionary_source_test.dart test/widgets/dictionary/ai_dict_result_view_test.dart` 全过（46 例）。补充验证：`flutter analyze lib/widgets/dictionary/dictionary_panel.dart lib/widgets/dictionary/ai_multi_word_result_view.dart test/widgets/dictionary/dictionary_panel_test.dart test/widgets/dictionary/ai_dict_result_view_test.dart` 0 问题；`flutter test test/widgets/dictionary/dictionary_panel_test.dart test/widgets/dictionary/ai_dict_result_view_test.dart` 全过（23 例）。
+
+  **完成时间**: 2026-07-04
+
+## 已完成：在线词典新增语境/发音/词源源
+
+在线词典源继续沿用 `kWebDictConfigs` 配置驱动机制，新增 6 个网页源：
+
+- [x] **OZDIC**：新增 `ozdic` 源，使用内置 WebView 打开搭配词典词条页，可在词典切换器与设置页启用/禁用。
+- [x] **PlayPhrase**：新增 `playPhrase` 源，使用内置 WebView 打开 `playphrase.me` 搜索页，可在词典切换器与设置页启用/禁用。
+- [x] **YouGlish**：新增 `youglish` 源，使用内置 WebView 打开 YouGlish 英语发音页，可在词典切换器与设置页启用/禁用。
+- [x] **Forvo**：新增 `forvo` 源，使用内置 WebView 打开 Forvo 英语发音页，可在词典切换器与设置页启用/禁用。
+- [x] **WordReference**：新增 `wordReference` 源，使用内置 WebView 打开 WordReference 英英词典页，可在词典切换器与设置页启用/禁用。
+- [x] **Etymonline**：新增 `etymonline` 源，使用内置 WebView 打开词源搜索页，可在词典切换器与设置页启用/禁用。
+- [x] **测试**：更新 `web_dictionary_source_test.dart`，确认 14 个网页源 id 完整且唯一，并覆盖新增源的通用 lookup/URL 编码契约。
+- [x] **验证**：`flutter analyze` 改动文件 0 问题；`flutter test test/services/dictionary/web_dictionary_source_test.dart` 全过。
+
+  **完成时间**: 2026-07-03
 
 ## 已完成：官方/播客音频「删除音频」
 

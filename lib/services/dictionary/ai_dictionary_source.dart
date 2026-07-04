@@ -1,7 +1,7 @@
 /// AI 词典数据源
 ///
 /// 对接后端 `POST /api/v2/ai/dictionary`（需登录态），三级缓存查找：
-/// L1 内存 → L2 SQLite（`sentence_ai_cache` type `ai_dictionary`）→ L3 API。
+/// L1 内存 → L2 SQLite（`sentence_ai_cache` type `ai_dictionary_v2`）→ L3 API。
 /// 并发请求同一词复用同一 Future，避免重复调用。不可禁用、需联网。
 ///
 /// **后台单请求语义**：AI 调用烧 token、耗时数秒，故请求一经发起就跑到底——
@@ -28,13 +28,15 @@ class AiDictionarySource implements DictionarySource {
   final ValueGetter<SentenceAiApiClient> _apiClient;
 
   /// L1 内存缓存（key 含 targetLanguage）
-  final Map<String, DictionaryEntry> _memCache = {};
+  final Map<String, AiDictionaryEntry> _memCache = {};
 
   /// 在途请求（并发去重）
-  final Map<String, Future<DictionaryEntry>> _pending = {};
+  final Map<String, Future<AiDictionaryEntry>> _pending = {};
 
-  /// SQLite 缓存 type 列，与句子翻译/解析（`translation`/`analysis`）隔离
-  static const _cacheType = 'ai_dictionary';
+  /// SQLite 缓存 type 列，与句子翻译/解析（`translation`/`analysis`）隔离。
+  ///
+  /// v2 避开旧多词 prompt 的缓存结构，防止旧 JSON 被新模型解析为空结果。
+  static const _cacheType = 'ai_dictionary_v2';
 
   /// 缺省目标语言
   static const _defaultLanguage = 'zh-CN';
@@ -108,7 +110,7 @@ class AiDictionarySource implements DictionarySource {
   /// L2 + L3 查找
   ///
   /// 不接受 CancelToken：请求一经发起即跑到底并落缓存（后台单请求语义）。
-  Future<DictionaryEntry> _fetch({
+  Future<AiDictionaryEntry> _fetch({
     required String key,
     required String word,
     required String accessToken,
@@ -123,7 +125,7 @@ class AiDictionarySource implements DictionarySource {
       try {
         final decoded = jsonDecode(cached);
         if (decoded is Map<String, dynamic>) {
-          final entry = DictionaryEntry.fromJson(decoded);
+          final entry = AiDictionaryEntry.fromJson(decoded);
           _memCache[key] = entry;
           return entry;
         }
@@ -133,7 +135,7 @@ class AiDictionarySource implements DictionarySource {
     }
 
     // L3 API（null = 后端无 analysis，视作空条目）
-    final DictionaryEntry entry;
+    final AiDictionaryEntry entry;
     try {
       entry =
           await apiClient.lookupDictionary(
@@ -164,7 +166,7 @@ class AiDictionarySource implements DictionarySource {
   }
 
   /// 空条目（后端无结果时的占位，视图层据 isEmpty 显示空态）
-  DictionaryEntry _emptyEntry(String word) => DictionaryEntry(
+  AiDictionaryEntry _emptyEntry(String word) => DictionaryEntry(
     headword: word,
     pronunciation: const Pronunciation(uk: '', us: ''),
     meanings: const [],

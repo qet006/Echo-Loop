@@ -4079,5 +4079,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dictAiEtymology => 'Etymology';
 
   @override
-  String get dictAiTips => 'Tips';
+  String get dictAiTips => 'Learning Tips';
+
+  @override
+  String get dictAiMultiNaturalness => 'Naturalness';
+
+  @override
+  String get dictAiMultiPronunciationTips => 'Pronunciation';
+
+  @override
+  String get dictAiMultiSimilarExpressions => 'Similar Expressions';
+
+  @override
+  String get dictAiMultiBackground => 'Background Knowledge';
 }

@@ -7229,8 +7229,32 @@ abstract class AppLocalizations {
   /// No description provided for @dictAiTips.
   ///
   /// In en, this message translates to:
-  /// **'Tips'**
+  /// **'Learning Tips'**
   String get dictAiTips;
+
+  /// No description provided for @dictAiMultiNaturalness.
+  ///
+  /// In en, this message translates to:
+  /// **'Naturalness'**
+  String get dictAiMultiNaturalness;
+
+  /// No description provided for @dictAiMultiPronunciationTips.
+  ///
+  /// In en, this message translates to:
+  /// **'Pronunciation'**
+  String get dictAiMultiPronunciationTips;
+
+  /// No description provided for @dictAiMultiSimilarExpressions.
+  ///
+  /// In en, this message translates to:
+  /// **'Similar Expressions'**
+  String get dictAiMultiSimilarExpressions;
+
+  /// No description provided for @dictAiMultiBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Background Knowledge'**
+  String get dictAiMultiBackground;
 }
 
 class _AppLocalizationsDelegate

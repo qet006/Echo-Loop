@@ -1557,5 +1557,9 @@
   "dictAiWordFamily": "词族",
   "dictAiForms": "词形变化",
   "dictAiEtymology": "词源",
-  "dictAiTips": "提示"
+  "dictAiTips": "学习提示",
+  "dictAiMultiNaturalness": "自然性",
+  "dictAiMultiPronunciationTips": "发音提示",
+  "dictAiMultiSimilarExpressions": "相似表达",
+  "dictAiMultiBackground": "背景知识"
 }

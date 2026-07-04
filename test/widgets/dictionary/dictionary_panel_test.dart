@@ -194,6 +194,25 @@ void main() {
     expect(find.byKey(const Key('dict_sheet_sizer')), findsNothing);
   });
 
+  testWidgets('长词组标题保持单行完整显示，不使用省略号', (tester) async {
+    await tester.pumpWidget(wrap());
+    const phrase = 'a very long multi word expression for testing';
+    hostKey.currentState!.show(const DictionaryPanelQuery(word: phrase));
+    await tester.pumpAndSettle();
+
+    final titleText = tester.widget<Text>(find.text(phrase).first);
+    expect(titleText.maxLines, 1);
+    expect(titleText.softWrap, isFalse);
+    expect(titleText.overflow, TextOverflow.visible);
+
+    final fittedBox = find.ancestor(
+      of: find.text(phrase).first,
+      matching: find.byType(FittedBox),
+    );
+    expect(fittedBox, findsOneWidget);
+    expect(tester.widget<FittedBox>(fittedBox).fit, BoxFit.scaleDown);
+  });
+
   testWidgets('activeOwnerOf：show 传入 owner 后子树可见，关闭后为 null', (tester) async {
     final owner = Object();
     await tester.pumpWidget(wrap());

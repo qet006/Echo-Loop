@@ -6,6 +6,7 @@
 library;
 
 import 'dictionary_lookup_result.dart';
+import 'dictionary_entry.dart';
 
 /// 提取 [result] 中所有可发音英文文本，按弹窗显示顺序：
 /// 单词标题 → 各义项例句 → 常见搭配例句 → 词族例句。
@@ -18,19 +19,30 @@ List<String> dictionarySpeakableTexts(DictionaryLookupResult result) {
   // 单词标题（跨源恒有，标题行 SpeakButton 发此文本）。
   texts.add(result.headword);
 
-  // 仅 AI 源带例句，且各例句均为 _ExampleView 的点击发音目标。
+  // AI 单词源带例句，且各例句均为 _ExampleView 的点击发音目标。
   if (result is AiDictResult) {
-    final entry = result.entry;
-    for (final meaning in entry.meanings) {
-      for (final ex in meaning.examples) {
-        texts.add(ex.sentence);
-      }
-    }
-    for (final expr in entry.commonExpressions) {
-      texts.add(expr.example.sentence);
-    }
-    for (final item in entry.wordFamily) {
-      texts.add(item.example.sentence);
+    switch (result.entry) {
+      case final DictionaryEntry entry:
+        for (final meaning in entry.meanings) {
+          for (final ex in meaning.examples) {
+            texts.add(ex.sentence);
+          }
+        }
+        for (final expr in entry.commonExpressions) {
+          texts.add(expr.example.sentence);
+        }
+        for (final item in entry.wordFamily) {
+          texts.add(item.example.sentence);
+        }
+      case final MultiWordDictionaryEntry entry:
+        for (final meaning in entry.meanings) {
+          for (final ex in meaning.examples) {
+            texts.add(ex.sentence);
+          }
+        }
+        for (final expr in entry.similarExpressions) {
+          texts.add(expr.sentence);
+        }
     }
   }
 

@@ -89,7 +89,7 @@ class SentenceAiApiClient {
   /// 调用后端 `POST /api/v2/ai/dictionary`（需登录态），返回结构化词典条目。
   /// [targetLanguage] 为 BCP 47 代码（如 'zh-CN'），不传则由后端决定默认值。
   /// 响应缺少 `analysis` 字段时返回 null。
-  Future<DictionaryEntry?> lookupDictionary(
+  Future<AiDictionaryEntry?> lookupDictionary(
     String word, {
     required String accessToken,
     String? targetLanguage,
@@ -106,7 +106,7 @@ class SentenceAiApiClient {
     );
     final analysis = response.data?['analysis'];
     if (analysis is! Map<String, dynamic>) return null;
-    return DictionaryEntry.fromJson(analysis);
+    return AiDictionaryEntry.fromJson(analysis);
   }
 
   /// 拆分意群

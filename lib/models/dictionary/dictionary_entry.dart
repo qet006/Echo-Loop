@@ -18,9 +18,49 @@ List<String> _strList(Object? raw) {
 Map<String, dynamic> _map(Object? raw) =>
     raw is Map<String, dynamic> ? raw : const {};
 
+/// AI 词典条目类型
+enum AiDictionaryQueryType {
+  /// 单词词典释义
+  singleWord,
+
+  /// 多词表达分析
+  multiWord,
+}
+
+/// AI 词典结果联合类型。
+///
+/// 后端 `analysis.queryType` 区分单词与多词表达。旧缓存没有 `queryType`，
+/// 默认按单词条目解析，保证历史缓存仍可读取。
+sealed class AiDictionaryEntry {
+  /// 查询类型
+  AiDictionaryQueryType get queryType;
+
+  /// 词头 / 表达本体
+  String get headword;
+
+  /// 是否无可展示内容
+  bool get isEmpty;
+
+  /// 序列化为后端 `analysis` 同构 JSON
+  Map<String, dynamic> toJson();
+
+  /// 从后端 `analysis` 对象反序列化（防御性）
+  factory AiDictionaryEntry.fromJson(Map<String, dynamic> json) {
+    if (json['queryType'] == 'multi_word' ||
+        json.containsKey('originalExpression')) {
+      return MultiWordDictionaryEntry.fromJson(json);
+    }
+    return DictionaryEntry.fromJson(json);
+  }
+}
+
 /// AI 词典完整条目
-class DictionaryEntry {
+class DictionaryEntry implements AiDictionaryEntry {
+  @override
+  AiDictionaryQueryType get queryType => AiDictionaryQueryType.singleWord;
+
   /// 词典词头（原形）
+  @override
   final String headword;
 
   /// 英美音标
@@ -94,7 +134,9 @@ class DictionaryEntry {
   }
 
   /// 序列化（用于本地 SQLite 缓存存储，保持与后端 `analysis` 同构）
+  @override
   Map<String, dynamic> toJson() => {
+    'queryType': 'single_word',
     'headword': headword,
     'pronunciation': pronunciation.toJson(),
     'meanings': meanings.map((m) => m.toJson()).toList(),
@@ -106,6 +148,7 @@ class DictionaryEntry {
   };
 
   /// 是否无任何可展示内容（用于空态判断）
+  @override
   bool get isEmpty =>
       meanings.isEmpty &&
       commonExpressions.isEmpty &&
@@ -306,4 +349,178 @@ class WordForm {
       WordForm(form: _str(json['form']), label: _str(json['label']));
 
   Map<String, dynamic> toJson() => {'form': form, 'label': label};
+}
+
+/// AI 多词表达分析条目
+class MultiWordDictionaryEntry implements AiDictionaryEntry {
+  @override
+  AiDictionaryQueryType get queryType => AiDictionaryQueryType.multiWord;
+
+  /// 表达本体
+  final String originalExpression;
+
+  /// 表达不自然、错误或受限时的纠正说明；自然时为空。
+  final String naturalness;
+
+  /// 表达类别（短语动词、搭配、习语、术语等）。
+  final String category;
+
+  /// 发音提示（连读、弱读、重音等），每条一项，无明显提示时为空列表。
+  final List<String> pronunciationTips;
+
+  /// 各含义与对应场景用法。
+  final List<MultiWordMeaning> meanings;
+
+  /// 相近、替代或易混表达。
+  final List<SimilarExpression> similarExpressions;
+
+  /// 补充背景。
+  final String background;
+
+  /// 学习者提示
+  final List<String> learnerTips;
+
+  @override
+  String get headword => originalExpression;
+
+  const MultiWordDictionaryEntry({
+    required this.originalExpression,
+    required this.naturalness,
+    required this.category,
+    required this.pronunciationTips,
+    required this.meanings,
+    required this.similarExpressions,
+    required this.background,
+    required this.learnerTips,
+  });
+
+  factory MultiWordDictionaryEntry.fromJson(Map<String, dynamic> json) {
+    final meanings = json['meanings'];
+    final similarExpressions = json['similarExpressions'];
+    return MultiWordDictionaryEntry(
+      originalExpression: _str(json['originalExpression']).isNotEmpty
+          ? _str(json['originalExpression'])
+          : _str(json['headword']),
+      naturalness: _str(json['naturalness']),
+      category: _str(json['category']),
+      pronunciationTips: _strList(json['pronunciationTips']),
+      meanings: meanings is List
+          ? meanings
+                .whereType<Map<String, dynamic>>()
+                .map(MultiWordMeaning.fromJson)
+                .toList(growable: false)
+          : const [],
+      similarExpressions: similarExpressions is List
+          ? similarExpressions
+                .whereType<Map<String, dynamic>>()
+                .map(SimilarExpression.fromJson)
+                .toList(growable: false)
+          : const [],
+      background: _str(json['background']),
+      learnerTips: _strList(json['learnerTips']),
+    );
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'queryType': 'multi_word',
+    'originalExpression': originalExpression,
+    'naturalness': naturalness,
+    'category': category,
+    'pronunciationTips': pronunciationTips,
+    'meanings': meanings.map((m) => m.toJson()).toList(),
+    'similarExpressions': similarExpressions.map((e) => e.toJson()).toList(),
+    'background': background,
+    'learnerTips': learnerTips,
+  };
+
+  @override
+  bool get isEmpty =>
+      naturalness.isEmpty &&
+      category.isEmpty &&
+      pronunciationTips.isEmpty &&
+      meanings.isEmpty &&
+      similarExpressions.isEmpty &&
+      background.isEmpty &&
+      learnerTips.isEmpty;
+}
+
+/// 多词表达义项
+class MultiWordMeaning {
+  /// 学习者友好的释义
+  final String definition;
+
+  /// 目标语言自然对译
+  final List<String> translation;
+
+  /// 语气、含义或场景说明
+  final String usageNote;
+
+  /// 例句
+  final List<ExampleSentence> examples;
+
+  const MultiWordMeaning({
+    required this.definition,
+    required this.translation,
+    required this.usageNote,
+    required this.examples,
+  });
+
+  factory MultiWordMeaning.fromJson(Map<String, dynamic> json) {
+    final examples = json['examples'];
+    return MultiWordMeaning(
+      definition: _str(json['definition']),
+      translation: _strList(json['translation']),
+      usageNote: _str(json['usageNote']),
+      examples: examples is List
+          ? examples
+                .whereType<Map<String, dynamic>>()
+                .map(ExampleSentence.fromJson)
+                .toList(growable: false)
+          : const [],
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'definition': definition,
+    'translation': translation,
+    'usageNote': usageNote,
+    'examples': examples.map((e) => e.toJson()).toList(),
+  };
+
+  bool get isEmpty =>
+      definition.isEmpty &&
+      translation.isEmpty &&
+      usageNote.isEmpty &&
+      examples.isEmpty;
+}
+
+/// 相近、替代或易混表达
+class SimilarExpression {
+  final String expression;
+  final String difference;
+  final String sentence;
+  final String translation;
+
+  const SimilarExpression({
+    required this.expression,
+    required this.difference,
+    required this.sentence,
+    required this.translation,
+  });
+
+  factory SimilarExpression.fromJson(Map<String, dynamic> json) =>
+      SimilarExpression(
+        expression: _str(json['expression']),
+        difference: _str(json['difference']),
+        sentence: _str(json['sentence']),
+        translation: _str(json['translation']),
+      );
+
+  Map<String, dynamic> toJson() => {
+    'expression': expression,
+    'difference': difference,
+    'sentence': sentence,
+    'translation': translation,
+  };
 }

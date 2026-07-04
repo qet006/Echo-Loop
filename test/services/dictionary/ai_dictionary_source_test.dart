@@ -26,6 +26,25 @@ DictionaryEntry _entry(String headword) => DictionaryEntry(
   learnerTips: const [],
 );
 
+MultiWordDictionaryEntry _multiEntry(String headword) =>
+    MultiWordDictionaryEntry(
+      originalExpression: headword,
+      naturalness: '',
+      category: '术语',
+      pronunciationTips: const [],
+      meanings: const [
+        MultiWordMeaning(
+          definition: '机器学习。',
+          translation: ['机器学习'],
+          usageNote: '基于数据训练模型的方法。',
+          examples: [],
+        ),
+      ],
+      similarExpressions: const [],
+      background: '',
+      learnerTips: const [],
+    );
+
 void main() {
   late MockCacheDao dao;
   late MockApiClient api;
@@ -59,7 +78,7 @@ void main() {
 
   test('L3 API 命中 → 返回结果并写 L1+L2', () async {
     when(
-      () => dao.getByHash(any(), 'ai_dictionary'),
+      () => dao.getByHash(any(), 'ai_dictionary_v2'),
     ).thenAnswer((_) async => null);
     when(
       () => api.lookupDictionary(
@@ -70,20 +89,20 @@ void main() {
       ),
     ).thenAnswer((_) async => _entry(word));
     when(
-      () => dao.upsert(any(), 'ai_dictionary', any()),
+      () => dao.upsert(any(), 'ai_dictionary_v2', any()),
     ).thenAnswer((_) async {});
 
     final result = await source.lookup(tokenReq);
 
     expect(result, isA<AiDictResult>());
     expect((result! as AiDictResult).entry.headword, word);
-    verify(() => dao.upsert(any(), 'ai_dictionary', any())).called(1);
+    verify(() => dao.upsert(any(), 'ai_dictionary_v2', any())).called(1);
   });
 
   test('request.word（已归一化）原样发往后端', () async {
     // 归一化由 controller 统一完成；源拿到的已是清洗结果，原样透传
     when(
-      () => dao.getByHash(any(), 'ai_dictionary'),
+      () => dao.getByHash(any(), 'ai_dictionary_v2'),
     ).thenAnswer((_) async => null);
     when(
       () => api.lookupDictionary(
@@ -94,7 +113,7 @@ void main() {
       ),
     ).thenAnswer((_) async => _entry('run'));
     when(
-      () => dao.upsert(any(), 'ai_dictionary', any()),
+      () => dao.upsert(any(), 'ai_dictionary_v2', any()),
     ).thenAnswer((_) async {});
 
     await source.lookup(tokenReq);
@@ -111,7 +130,7 @@ void main() {
 
   test('L1 内存命中 → 第二次不再调 API', () async {
     when(
-      () => dao.getByHash(any(), 'ai_dictionary'),
+      () => dao.getByHash(any(), 'ai_dictionary_v2'),
     ).thenAnswer((_) async => null);
     when(
       () => api.lookupDictionary(
@@ -122,7 +141,7 @@ void main() {
       ),
     ).thenAnswer((_) async => _entry(word));
     when(
-      () => dao.upsert(any(), 'ai_dictionary', any()),
+      () => dao.upsert(any(), 'ai_dictionary_v2', any()),
     ).thenAnswer((_) async {});
 
     await source.lookup(tokenReq);
@@ -140,7 +159,7 @@ void main() {
 
   test('clearMemoryCache 后重查不再命中 L1（回到 L2/L3）', () async {
     when(
-      () => dao.getByHash(any(), 'ai_dictionary'),
+      () => dao.getByHash(any(), 'ai_dictionary_v2'),
     ).thenAnswer((_) async => null);
     when(
       () => api.lookupDictionary(
@@ -150,7 +169,7 @@ void main() {
       ),
     ).thenAnswer((_) async => _entry(word));
     when(
-      () => dao.upsert(any(), 'ai_dictionary', any()),
+      () => dao.upsert(any(), 'ai_dictionary_v2', any()),
     ).thenAnswer((_) async {});
 
     await source.lookup(tokenReq); // 写入 L1
@@ -168,7 +187,7 @@ void main() {
 
   test('L2 SQLite 命中 → 不调 API', () async {
     when(
-      () => dao.getByHash(any(), 'ai_dictionary'),
+      () => dao.getByHash(any(), 'ai_dictionary_v2'),
     ).thenAnswer((_) async => jsonEncode(_entry(word).toJson()));
 
     final result = await source.lookup(tokenReq);
@@ -184,9 +203,35 @@ void main() {
     );
   });
 
+  test('L2 SQLite 命中多词表达 → 解析为 MultiWordDictionaryEntry', () async {
+    when(() => dao.getByHash(any(), 'ai_dictionary_v2')).thenAnswer(
+      (_) async => jsonEncode(_multiEntry('machine learning').toJson()),
+    );
+
+    final result = await source.lookup(
+      const DictionaryLookupRequest(
+        word: 'machine learning',
+        accessToken: 'tok',
+        targetLanguage: 'zh-CN',
+      ),
+    );
+
+    final entry = (result! as AiDictResult).entry;
+    expect(entry, isA<MultiWordDictionaryEntry>());
+    expect(entry.headword, 'machine learning');
+    verifyNever(
+      () => api.lookupDictionary(
+        any(),
+        accessToken: any(named: 'accessToken'),
+        targetLanguage: any(named: 'targetLanguage'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    );
+  });
+
   test('后台单请求：忽略调用方 cancelToken（不转发给 API）', () async {
     when(
-      () => dao.getByHash(any(), 'ai_dictionary'),
+      () => dao.getByHash(any(), 'ai_dictionary_v2'),
     ).thenAnswer((_) async => null);
     when(
       () => api.lookupDictionary(
@@ -196,7 +241,7 @@ void main() {
       ),
     ).thenAnswer((_) async => _entry(word));
     when(
-      () => dao.upsert(any(), 'ai_dictionary', any()),
+      () => dao.upsert(any(), 'ai_dictionary_v2', any()),
     ).thenAnswer((_) async {});
 
     // 即便传入一个已取消的 token，请求仍正常完成（AI 忽略它）
@@ -217,7 +262,7 @@ void main() {
   test('并发同词复用在途请求 → 只调一次 API', () async {
     final completer = Completer<DictionaryEntry?>();
     when(
-      () => dao.getByHash(any(), 'ai_dictionary'),
+      () => dao.getByHash(any(), 'ai_dictionary_v2'),
     ).thenAnswer((_) async => null);
     when(
       () => api.lookupDictionary(
@@ -227,7 +272,7 @@ void main() {
       ),
     ).thenAnswer((_) => completer.future);
     when(
-      () => dao.upsert(any(), 'ai_dictionary', any()),
+      () => dao.upsert(any(), 'ai_dictionary_v2', any()),
     ).thenAnswer((_) async {});
 
     final f1 = source.lookup(tokenReq);
@@ -247,43 +292,48 @@ void main() {
     ).called(1);
   });
 
-  test('后端 400 + code=phrase_too_long → 抛 DictionaryPhraseTooLongException 且不落缓存', () async {
-    when(
-      () => dao.getByHash(any(), 'ai_dictionary'),
-    ).thenAnswer((_) async => null);
-    when(
-      () => api.lookupDictionary(
-        any(),
-        accessToken: any(named: 'accessToken'),
-        targetLanguage: any(named: 'targetLanguage'),
-        cancelToken: any(named: 'cancelToken'),
-      ),
-    ).thenThrow(
-      DioException(
-        requestOptions: RequestOptions(path: '/api/v2/ai/dictionary'),
-        response: Response(
-          requestOptions: RequestOptions(path: '/api/v2/ai/dictionary'),
-          statusCode: 400,
-          data: {'error': 'too long', 'code': 'phrase_too_long'},
+  test(
+    '后端 400 + code=phrase_too_long → 抛 DictionaryPhraseTooLongException 且不落缓存',
+    () async {
+      when(
+        () => dao.getByHash(any(), 'ai_dictionary_v2'),
+      ).thenAnswer((_) async => null);
+      when(
+        () => api.lookupDictionary(
+          any(),
+          accessToken: any(named: 'accessToken'),
+          targetLanguage: any(named: 'targetLanguage'),
+          cancelToken: any(named: 'cancelToken'),
         ),
-      ),
-    );
+      ).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/v2/ai/dictionary'),
+          response: Response(
+            requestOptions: RequestOptions(path: '/api/v2/ai/dictionary'),
+            statusCode: 400,
+            data: {'error': 'too long', 'code': 'phrase_too_long'},
+          ),
+        ),
+      );
 
-    await expectLater(
-      source.lookup(const DictionaryLookupRequest(
-        word: 'a b c d e f g h i',
-        accessToken: 'tok',
-        targetLanguage: 'zh-CN',
-      )),
-      throwsA(isA<DictionaryPhraseTooLongException>()),
-    );
-    // 异常在 upsert 之前抛出，不写缓存
-    verifyNever(() => dao.upsert(any(), 'ai_dictionary', any()));
-  });
+      await expectLater(
+        source.lookup(
+          const DictionaryLookupRequest(
+            word: 'a b c d e f g h i',
+            accessToken: 'tok',
+            targetLanguage: 'zh-CN',
+          ),
+        ),
+        throwsA(isA<DictionaryPhraseTooLongException>()),
+      );
+      // 异常在 upsert 之前抛出，不写缓存
+      verifyNever(() => dao.upsert(any(), 'ai_dictionary_v2', any()));
+    },
+  );
 
   test('其它 DioException（如 400 无 code）原样冒泡，不转词组过长', () async {
     when(
-      () => dao.getByHash(any(), 'ai_dictionary'),
+      () => dao.getByHash(any(), 'ai_dictionary_v2'),
     ).thenAnswer((_) async => null);
     when(
       () => api.lookupDictionary(
@@ -303,15 +353,12 @@ void main() {
       ),
     );
 
-    await expectLater(
-      source.lookup(tokenReq),
-      throwsA(isA<DioException>()),
-    );
+    await expectLater(source.lookup(tokenReq), throwsA(isA<DioException>()));
   });
 
   test('API 返回 null → 空条目（isEmpty），仍为 AiDictResult', () async {
     when(
-      () => dao.getByHash(any(), 'ai_dictionary'),
+      () => dao.getByHash(any(), 'ai_dictionary_v2'),
     ).thenAnswer((_) async => null);
     when(
       () => api.lookupDictionary(
@@ -322,12 +369,42 @@ void main() {
       ),
     ).thenAnswer((_) async => null);
     when(
-      () => dao.upsert(any(), 'ai_dictionary', any()),
+      () => dao.upsert(any(), 'ai_dictionary_v2', any()),
     ).thenAnswer((_) async {});
 
     final result = await source.lookup(tokenReq);
 
     expect(result, isA<AiDictResult>());
     expect((result! as AiDictResult).entry.isEmpty, isTrue);
+  });
+
+  test('L3 API 返回多词表达 → 返回并写缓存', () async {
+    when(
+      () => dao.getByHash(any(), 'ai_dictionary_v2'),
+    ).thenAnswer((_) async => null);
+    when(
+      () => api.lookupDictionary(
+        'machine learning',
+        accessToken: any(named: 'accessToken'),
+        targetLanguage: any(named: 'targetLanguage'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer((_) async => _multiEntry('machine learning'));
+    when(
+      () => dao.upsert(any(), 'ai_dictionary_v2', any()),
+    ).thenAnswer((_) async {});
+
+    final result = await source.lookup(
+      const DictionaryLookupRequest(
+        word: 'machine learning',
+        accessToken: 'tok',
+        targetLanguage: 'zh-CN',
+      ),
+    );
+
+    final entry = (result! as AiDictResult).entry;
+    expect(entry, isA<MultiWordDictionaryEntry>());
+    expect(entry.headword, 'machine learning');
+    verify(() => dao.upsert(any(), 'ai_dictionary_v2', any())).called(1);
   });
 }

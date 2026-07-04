@@ -3893,5 +3893,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get dictAiEtymology => '词源';
 
   @override
-  String get dictAiTips => '提示';
+  String get dictAiTips => '学习提示';
+
+  @override
+  String get dictAiMultiNaturalness => '自然性';
+
+  @override
+  String get dictAiMultiPronunciationTips => '发音提示';
+
+  @override
+  String get dictAiMultiSimilarExpressions => '相似表达';
+
+  @override
+  String get dictAiMultiBackground => '背景知识';
 }

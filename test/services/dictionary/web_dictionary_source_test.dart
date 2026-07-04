@@ -12,7 +12,7 @@ void main() {
     expect(ids.toSet().length, ids.length, reason: 'id 必须唯一');
   });
 
-  test('已确认的 8 个网页源都在、Macmillan/欧陆 不在', () {
+  test('已确认的 14 个网页源都在、Macmillan/欧陆 不在', () {
     final ids = kWebDictConfigs.map((c) => c.id).toSet();
     expect(ids, {
       'cambridge',
@@ -22,6 +22,12 @@ void main() {
       'collins',
       'vocabulary',
       'wiktionary',
+      'ozdic',
+      'playPhrase',
+      'youglish',
+      'forvo',
+      'wordReference',
+      'etymonline',
       'youdao',
     });
     expect(ids.contains('macmillan'), isFalse);

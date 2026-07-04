@@ -10,19 +10,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // 例句行内含发音按钮（消费 ttsControllerProvider），需 ProviderScope 包裹。
-Widget _wrap(Widget child) => ProviderScope(
-  child: MaterialApp(
-    locale: const Locale('en'),
-    supportedLocales: const [Locale('en'), Locale('zh')],
-    localizationsDelegates: const [
-      AppLocalizations.delegate,
-      GlobalMaterialLocalizations.delegate,
-      GlobalWidgetsLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
-    ],
-    home: Scaffold(body: SingleChildScrollView(child: child)),
-  ),
-);
+Widget _wrap(Widget child, {Locale locale = const Locale('en')}) =>
+    ProviderScope(
+      child: MaterialApp(
+        locale: locale,
+        supportedLocales: const [Locale('en'), Locale('zh')],
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: Scaffold(body: SingleChildScrollView(child: child)),
+      ),
+    );
 
 DictionaryEntry _entry({
   List<WordMeaning>? meanings,
@@ -53,6 +54,36 @@ DictionaryEntry _entry({
   forms: forms ?? const [],
   etymology: '',
   learnerTips: learnerTips ?? const [],
+);
+
+MultiWordDictionaryEntry _multiEntry() => MultiWordDictionaryEntry(
+  originalExpression: 'machine learning',
+  naturalness: '这是自然表达。',
+  category: '术语',
+  pronunciationTips: const ['重音通常落在 learning。'],
+  meanings: const [
+    MultiWordMeaning(
+      definition: '让计算机从数据中学习模式的方法。',
+      translation: ['机器学习'],
+      usageNote: '常见于技术和商业语境。',
+      examples: [
+        ExampleSentence(
+          sentence: 'Machine learning improves recommendations.',
+          translation: '机器学习改善推荐。',
+        ),
+      ],
+    ),
+  ],
+  similarExpressions: const [
+    SimilarExpression(
+      expression: 'deep learning',
+      difference: '深度学习是机器学习子领域。',
+      sentence: 'Deep learning powers image recognition.',
+      translation: '深度学习支持图像识别。',
+    ),
+  ],
+  background: '人工智能核心术语。',
+  learnerTips: const ['通常作不可数名词短语使用。'],
 );
 
 void main() {
@@ -252,6 +283,66 @@ void main() {
     expect(find.text('提示二'), findsOneWidget);
   });
 
+  testWidgets('多词表达渲染自然性/含义/发音/相似表达/背景', (tester) async {
+    await tester.pumpWidget(
+      _wrap(view(LookupLoaded(AiDictResult(_multiEntry())))),
+    );
+
+    expect(find.text('机器学习'), findsWidgets);
+    expect(find.text('让计算机从数据中学习模式的方法。'), findsOneWidget);
+    expect(find.text('术语'), findsOneWidget);
+    expect(find.text('这是自然表达。'), findsOneWidget);
+    expect(
+      find.textContaining('常见于技术和商业语境。', findRichText: true),
+      findsOneWidget,
+    );
+    expect(find.text('重音通常落在 learning。'), findsOneWidget);
+    expect(
+      find.text('Machine learning improves recommendations.'),
+      findsOneWidget,
+    );
+    expect(find.text('deep learning'), findsOneWidget);
+    expect(
+      find.text('Deep learning powers image recognition.'),
+      findsOneWidget,
+    );
+    expect(find.text('人工智能核心术语。'), findsOneWidget);
+    expect(find.text('通常作不可数名词短语使用。'), findsOneWidget);
+  });
+
+  testWidgets('多词表达按 schema 展示顺序渲染非空字段', (tester) async {
+    await tester.pumpWidget(
+      _wrap(view(LookupLoaded(AiDictResult(_multiEntry())))),
+    );
+
+    double topOf(String text) => tester.getTopLeft(find.text(text)).dy;
+
+    final meaningsTop = topOf('机器学习');
+    final naturalnessTop = topOf('这是自然表达。');
+    final pronunciationTop = topOf('重音通常落在 learning。');
+    final similarTop = topOf('deep learning');
+    final backgroundTop = topOf('人工智能核心术语。');
+    final learnerTipsTop = topOf('通常作不可数名词短语使用。');
+
+    expect(meaningsTop, lessThan(naturalnessTop));
+    expect(naturalnessTop, lessThan(pronunciationTop));
+    expect(pronunciationTop, lessThan(similarTop));
+    expect(similarTop, lessThan(backgroundTop));
+    expect(backgroundTop, lessThan(learnerTipsTop));
+  });
+
+  testWidgets('多词表达中文分节标题显示为背景知识和学习提示', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        view(LookupLoaded(AiDictResult(_multiEntry()))),
+        locale: const Locale('zh'),
+      ),
+    );
+
+    expect(find.text('背景知识'), findsOneWidget);
+    expect(find.text('学习提示'), findsOneWidget);
+  });
+
   testWidgets('空结果显示 aiNoAnalysis', (tester) async {
     const empty = DictionaryEntry(
       headword: 'run',
@@ -285,8 +376,10 @@ void main() {
 
   testWidgets('词组过长显示提示且无重试按钮', (tester) async {
     await tester.pumpWidget(_wrap(view(const LookupPhraseTooLong())));
-    expect(find.text('The phrase is too long. Select up to 8 words.'),
-        findsOneWidget);
+    expect(
+      find.text('The phrase is too long. Select up to 8 words.'),
+      findsOneWidget,
+    );
     expect(find.text('Retry'), findsNothing);
   });
 }

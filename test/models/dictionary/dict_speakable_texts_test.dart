@@ -24,6 +24,36 @@ DictionaryEntry _entry({
   learnerTips: const [],
 );
 
+MultiWordDictionaryEntry _multiEntry() => MultiWordDictionaryEntry(
+  originalExpression: 'machine learning',
+  naturalness: '',
+  category: '术语',
+  pronunciationTips: const [],
+  meanings: const [
+    MultiWordMeaning(
+      definition: '让计算机从数据中学习模式的方法。',
+      translation: ['机器学习'],
+      usageNote: '',
+      examples: [
+        ExampleSentence(
+          sentence: 'Machine learning improves recommendations.',
+          translation: '机器学习改善推荐。',
+        ),
+      ],
+    ),
+  ],
+  similarExpressions: const [
+    SimilarExpression(
+      expression: 'deep learning',
+      difference: '深度学习是机器学习子领域。',
+      sentence: 'Deep learning powers image recognition.',
+      translation: '深度学习支持图像识别。',
+    ),
+  ],
+  background: '',
+  learnerTips: const [],
+);
+
 WordMeaning _meaning(List<ExampleSentence> examples) => WordMeaning(
   partOfSpeech: 'v.',
   translation: const [],
@@ -121,6 +151,16 @@ void main() {
         ),
       );
       expect(dictionarySpeakableTexts(result), ['see', 'I see.']);
+    });
+
+    test('AI 多词表达提取 headword + 义项例句 + 相似表达例句', () {
+      final result = AiDictResult(_multiEntry());
+
+      expect(dictionarySpeakableTexts(result), [
+        'machine learning',
+        'Machine learning improves recommendations.',
+        'Deep learning powers image recognition.',
+      ]);
     });
   });
 }

@@ -189,4 +189,101 @@ void main() {
       expect(entry.isEmpty, isFalse);
     });
   });
+
+  group('AiDictionaryEntry.fromJson', () {
+    test('queryType=multi_word 解析新多词表达结构', () {
+      final entry = AiDictionaryEntry.fromJson({
+        'queryType': 'multi_word',
+        'originalExpression': 'pretty busy',
+        'naturalness': '',
+        'category': '搭配',
+        'pronunciationTips': ['pretty 可弱读。'],
+        'meanings': [
+          {
+            'definition': '挺忙的；有不少事情要做。',
+            'translation': ['挺忙的'],
+            'usageNote': '语气比 very busy 更委婉。',
+            'examples': [
+              {
+                'sentence': 'I’m pretty busy this afternoon.',
+                'translation': '我今天下午挺忙的。',
+              },
+            ],
+          },
+        ],
+        'similarExpressions': [
+          {
+            'expression': 'very busy',
+            'difference': '语气更强。',
+            'sentence': 'I’m very busy this week.',
+            'translation': '我这周非常忙。',
+          },
+        ],
+        'background': '',
+        'learnerTips': ['通常作不可数名词短语使用。'],
+      });
+
+      expect(entry, isA<MultiWordDictionaryEntry>());
+      final multi = entry as MultiWordDictionaryEntry;
+      expect(multi.queryType, AiDictionaryQueryType.multiWord);
+      expect(multi.headword, 'pretty busy');
+      expect(multi.category, '搭配');
+      expect(multi.pronunciationTips, ['pretty 可弱读。']);
+      expect(multi.meanings.first.translation, ['挺忙的']);
+      expect(multi.meanings.first.usageNote, '语气比 very busy 更委婉。');
+      expect(
+        multi.meanings.first.examples.first.sentence,
+        'I’m pretty busy this afternoon.',
+      );
+      expect(multi.similarExpressions.first.expression, 'very busy');
+      expect(
+        multi.similarExpressions.first.sentence,
+        'I’m very busy this week.',
+      );
+      expect(multi.learnerTips, ['通常作不可数名词短语使用。']);
+      expect(multi.isEmpty, isFalse);
+    });
+
+    test('originalExpression 可识别多词表达，兼容 queryType 缺失的新缓存', () {
+      final entry = AiDictionaryEntry.fromJson({
+        'originalExpression': 'pretty busy',
+        'category': '搭配',
+      });
+
+      expect(entry, isA<MultiWordDictionaryEntry>());
+      expect(entry.headword, 'pretty busy');
+    });
+
+    test('旧缓存缺 queryType 默认解析为单词', () {
+      final entry = AiDictionaryEntry.fromJson({
+        'headword': 'run',
+        'meanings': [
+          {'partOfSpeech': 'v.', 'definition': 'move fast'},
+        ],
+      });
+
+      expect(entry, isA<DictionaryEntry>());
+      expect(entry.queryType, AiDictionaryQueryType.singleWord);
+    });
+
+    test('多词表达字段缺失/类型不符防御性回退', () {
+      final entry =
+          AiDictionaryEntry.fromJson({
+                'queryType': 'multi_word',
+                'originalExpression': 123,
+                'meanings': 'bad',
+                'similarExpressions': [
+                  {'expression': 'very busy'},
+                  'bad',
+                ],
+              })
+              as MultiWordDictionaryEntry;
+
+      expect(entry.headword, '');
+      expect(entry.meanings, isEmpty);
+      expect(entry.similarExpressions, hasLength(1));
+      expect(entry.similarExpressions.first.expression, 'very busy');
+      expect(entry.similarExpressions.first.difference, '');
+    });
+  });
 }

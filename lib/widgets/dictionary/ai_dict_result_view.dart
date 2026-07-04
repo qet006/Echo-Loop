@@ -16,6 +16,7 @@ import '../../providers/dictionary/lookup_controller.dart';
 import '../../providers/tts/tts_controller_provider.dart';
 import '../../theme/app_theme.dart';
 import '../common/shimmer_placeholder.dart';
+import 'ai_multi_word_result_view.dart';
 import 'pos_tag.dart';
 
 /// AI 词典结果视图
@@ -41,7 +42,12 @@ class AiDictResultView extends StatelessWidget {
     final s = state;
     if (s case LookupLoaded(result: final AiDictResult r)) {
       if (r.entry.isEmpty) return _empty(context);
-      return _AiEntryContent(entry: r.entry);
+      return switch (r.entry) {
+        final DictionaryEntry entry => _AiEntryContent(entry: entry),
+        final MultiWordDictionaryEntry entry => AiMultiWordResultView(
+          entry: entry,
+        ),
+      };
     }
     if (s is LookupAuthRequired) return _authRequired(context);
     if (s is LookupPhraseTooLong) return _phraseTooLong(context);

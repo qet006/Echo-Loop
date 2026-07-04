@@ -27,10 +27,10 @@ final class LocalDictResult extends DictionaryLookupResult {
   String get headword => entry.word;
 }
 
-/// AI 词典结果（包装后端 v2 [DictionaryEntry]）
+/// AI 词典结果（包装后端 v2 [AiDictionaryEntry]）
 final class AiDictResult extends DictionaryLookupResult {
   /// AI 词典条目
-  final DictionaryEntry entry;
+  final AiDictionaryEntry entry;
 
   const AiDictResult(this.entry);
 

@@ -1,7 +1,8 @@
 /// 配置驱动的网页型词典源
 ///
 /// 网页词典（Cambridge / Oxford / Longman / Merriam-Webster / Collins /
-/// Vocabulary.com / Wiktionary / 有道）本质相同——不抓取/解析 HTML，只按词构造 URL，
+/// Vocabulary.com / Wiktionary / OZDIC / PlayPhrase / YouGlish / Forvo /
+/// WordReference / Etymonline / 有道）本质相同——不抓取/解析 HTML，只按词构造 URL，
 /// 交给内置 WebView 显示。差异仅在 URL 模板与品牌展示，故抽象为一份 [WebDictConfig]
 /// 配置 + 一个通用 [WebDictionarySource]：新增一个网页词典只需往 [kWebDictConfigs]
 /// 加一行配置。
@@ -137,6 +138,48 @@ const List<WebDictConfig> kWebDictConfigs = [
     buildUrl: _wiktionaryUrl,
   ),
   WebDictConfig(
+    id: 'ozdic',
+    displayName: 'OZDIC',
+    icon: Icons.hub_rounded,
+    color: Color(0xFF00897B), // 搭配词典主打词间关系，用青绿色区分
+    buildUrl: _ozdicUrl,
+  ),
+  WebDictConfig(
+    id: 'playPhrase',
+    displayName: 'PlayPhrase',
+    icon: Icons.movie_filter_rounded,
+    color: Color(0xFF6D4C41), // 影院语料场景，用暖棕与传统词典区分
+    buildUrl: _playPhraseUrl,
+  ),
+  WebDictConfig(
+    id: 'youglish',
+    displayName: 'YouGlish',
+    icon: Icons.ondemand_video_rounded,
+    color: Color(0xFFFF0000), // YouTube 系视频语料红
+    buildUrl: _youglishUrl,
+  ),
+  WebDictConfig(
+    id: 'forvo',
+    displayName: 'Forvo',
+    icon: Icons.record_voice_over_rounded,
+    color: Color(0xFF2E7D32), // 发音社区语料，用稳定绿色表示语音来源
+    buildUrl: _forvoUrl,
+  ),
+  WebDictConfig(
+    id: 'wordReference',
+    displayName: 'WordReference',
+    icon: Icons.forum_rounded,
+    color: Color(0xFF0D47A1), // 站点常见深蓝识别色
+    buildUrl: _wordReferenceUrl,
+  ),
+  WebDictConfig(
+    id: 'etymonline',
+    displayName: 'Etymonline',
+    icon: Icons.history_edu_rounded,
+    color: Color(0xFF795548), // 词源资料场景，用低饱和棕色区分
+    buildUrl: _etymonlineUrl,
+  ),
+  WebDictConfig(
     id: 'youdao',
     displayName: '有道',
     icon: Icons.translate_rounded,
@@ -157,4 +200,11 @@ String _collinsUrl(String w) =>
     'https://www.collinsdictionary.com/dictionary/english/$w';
 String _vocabularyUrl(String w) => 'https://www.vocabulary.com/dictionary/$w';
 String _wiktionaryUrl(String w) => 'https://en.m.wiktionary.org/wiki/$w';
+String _ozdicUrl(String w) => 'https://ozdic.com/word/$w';
+String _playPhraseUrl(String w) => 'https://www.playphrase.me/#/search?q=$w';
+String _youglishUrl(String w) => 'https://youglish.com/pronounce/$w/english';
+String _forvoUrl(String w) => 'https://forvo.com/word/$w/#en';
+String _wordReferenceUrl(String w) =>
+    'https://www.wordreference.com/definition/$w';
+String _etymonlineUrl(String w) => 'https://www.etymonline.com/search?q=$w';
 String _youdaoUrl(String w) => 'https://m.youdao.com/dict?le=eng&q=$w';

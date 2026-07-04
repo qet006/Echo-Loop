@@ -449,12 +449,19 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
                 TextContextMenu.show(context, d.globalPosition, word),
             onSecondaryTapDown: (d) =>
                 TextContextMenu.show(context, d.globalPosition, word),
-            child: Text(
-              word,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: theme.colorScheme.onSurface,
-                letterSpacing: -0.3,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                word,
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.visible,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onSurface,
+                  letterSpacing: 0,
+                ),
               ),
             ),
           ),

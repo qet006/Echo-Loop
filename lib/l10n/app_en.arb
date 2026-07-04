@@ -1994,5 +1994,9 @@
   "dictAiWordFamily": "Word Family",
   "dictAiForms": "Word Forms",
   "dictAiEtymology": "Etymology",
-  "dictAiTips": "Tips"
+  "dictAiTips": "Learning Tips",
+  "dictAiMultiNaturalness": "Naturalness",
+  "dictAiMultiPronunciationTips": "Pronunciation",
+  "dictAiMultiSimilarExpressions": "Similar Expressions",
+  "dictAiMultiBackground": "Background Knowledge"
 }
